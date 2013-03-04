@@ -1,5 +1,5 @@
 /*
- * arch/arm/boot/dts/axm-sim.dts
+ * arch/arm/boot/dts/axm5500-sim.dts
  *
  * Copyright (C) 2012 LSI
  *
@@ -31,9 +31,6 @@
 
 	aliases {
 		serial0 = &axxia_serial0;
-		serial1 = &axxia_serial1;
-		serial2 = &axxia_serial2;
-		serial3 = &axxia_serial3;
 		timer   = &axxia_timers;
 	};
 
@@ -45,96 +42,6 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <0>;
-		};
-
-		cpu@1 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <1>;
-		};
-
-		cpu@2 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <2>;
-		};
-
-		cpu@3 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <3>;
-		};
-
-		cpu@4 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <4>;
-		};
-
-		cpu@5 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <5>;
-		};
-
-		cpu@6 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <6>;
-		};
-
-		cpu@7 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <7>;
-		};
-
-		cpu@8 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <8>;
-		};
-
-		cpu@9 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <9>;
-		};
-
-		cpu@10 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <10>;
-		};
-
-		cpu@11 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <11>;
-		};
-
-		cpu@12 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <12>;
-		};
-
-		cpu@13 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <13>;
-		};
-
-		cpu@14 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <14>;
-		};
-
-		cpu@15 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <15>;
 		};
 	};
 
@@ -148,10 +55,8 @@
 		#interrupt-cells = <3>;
 		#address-cells = <0>;
 		interrupt-controller;
-		reg = <0x20 0x01001000 0 0x1000>,  /* gic dist base */
-		      <0x20 0x01002000 0 0x100>,   /* gic cpu base */
-		      <0x20 0x10030000 0 0x100>,   /* axm IPI mask reg base */
-		      <0x20 0x10040000 0 0x20000>; /* axm IPI send reg base */
+		reg = <0x20 0x01001000 0 0x1000>,
+		      <0x20 0x01002000 0 0x100>;
 	};
 
 	timer {
@@ -225,24 +130,6 @@
 			compatible = "arm,pl011", "arm,primecell";
 			reg = <0x20 0x10080000 0x00 0x1000>;
 			interrupts = <0 56 4>;
-		};
-
-		axxia_serial1: uart@2010081000 {
-			compatible = "arm,pl011", "arm,primecell";
-			reg = <0x20 0x10081000 0x00 0x1000>;
-			interrupts = <0 57 4>;
-		};
-
-		axxia_serial2: uart@2010082000 {
-			compatible = "arm,pl011", "arm,primecell";
-			reg = <0x20 0x10082000 0x00 0x1000>;
-			interrupts = <0 58 4>;
-		};
-
-		axxia_serial3: uart@2010083000 {
-			compatible = "arm,pl011", "arm,primecell";
-			reg = <0x20 0x10083000 0x00 0x1000>;
-			interrupts = <0 59 4>;
 		};
 
 		axxia_timers: timer@2010091000 {

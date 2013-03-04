@@ -300,16 +300,15 @@
                 0x20 0x20120000 0x0 0x00008000 >;
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
-                /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > *
-/
+                /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> >*/
                 ranges = <0x03000000 0x00000000 0xa0000000
                           0x30 0x00000000
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x03000000 0x00000000 0xa0000000
+                dma-ranges = <0x03000000 0x00000000 0x00000000
                               0x00 0x00000000
-                              0x00 0x10000000>;
+                              0x00 0x40000000>;
                     interrupt-parent = <&gic>;
                 interrupts = <29 2>;
                 interrupt-map-mask = <0000 0 0 7>;
@@ -343,9 +342,9 @@
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x03000000 0x00000000 0xb0000000
+                dma-ranges = <0x03000000 0x00000000 0x00000000
                              0x00 0x00000000
-                              0x00 0x10000000>;
+                              0x00 0x40000000>;
                 interrupt-parent = <&gic>;
                 interrupts = <72 2>;
                 interrupt-map-mask = <0000 0 0 7>;
@@ -379,9 +378,9 @@
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x03000000 0x00000000 0xc0000000
+                dma-ranges = <0x03000000 0x00000000 0x00000000
                               0x00 0x00000000
-                              0x00 0x10000000>;
+                              0x00 0x40000000>;
 
                 interrupt-parent = <&gic>;
                 interrupts = <73 2>;
@@ -393,6 +392,50 @@
                         0000 0 0 3 &gic 73 2
                         0000 0 0 4 &gic 73 2
                 >;
+        };
+
+        I2C0: i2c@0x02010084000 {
+                compatible = "lsi,api2c";
+                device_type = "i2c";
+                enabled = <0>;
+                port = <0>;
+                /* bus_name = "auto"; */
+                /* bus = <2>; */
+                reg = <0x20 0x10084000 0x00 0x1000>;
+		interrupts = <0 19 4>;
+        };
+
+        I2C1: i2c@0x02010085000 {
+                compatible = "lsi,api2c";
+                device_type = "i2c";
+                enabled = <0>;
+                port = <1>;
+                /* bus_name = "auto"; */
+                /* bus = <3>; */
+                reg = <0x20 0x10085000 0x00 0x1000>;
+		interrupts = <0 20 4>;
+        };
+
+        I2C2: i2c@0x02010086000 {
+                compatible = "lsi,api2c";
+                device_type = "i2c";
+                enabled = <0>;
+                port = <2>;
+                /* bus_name = "auto"; */
+                /* bus = <4>; */
+                reg = <0x20 0x10086000 0x00 0x1000>;
+		interrupts = <0 21 4>;
+        };
+
+        SMB: i2c@0x02010087000 {
+                compatible = "lsi,api2c";
+                device_type = "i2c";
+                enabled = <0>;
+                port = <3>;
+                bus_name = "smb";
+                /* bus = <5>; */
+                reg = <0x20 0x10087000 0x00 0x1000>;
+		interrupts = <0 22 4>;
         };
 };
 

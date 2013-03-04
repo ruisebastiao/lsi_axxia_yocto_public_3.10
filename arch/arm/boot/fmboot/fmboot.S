@@ -28,7 +28,7 @@ _start:
 	@ CPU initialisation
 	@
 	mrc	p15, 0, r0, c0, c0, 5		@ MPIDR (ARMv7 only)
-	and	r0, r0, #15			@ CPU number
+	bic 	r0, #0xff000000			@ CPU number
 	cmp	r0, #0				@ primary CPU?
 	beq	2f
 
@@ -39,13 +39,12 @@ _start:
 	adr	r2, 1f
 	ldmia	r2, {r3 - r7}			@ move the code to a location
 	stmia	r1, {r3 - r7}			@ less likely to be overridden
-	add	r0, r1, #0x20			@ Entry point for secondary
-						@ CPUs @ SPIN_TABLE_BASE+0x20
+	add	r0, r1, #0x20			@ Entry point for secondary CPUs
+						@ SPIN_TABLE_BASE+0x20
 	mov	r2, #0
 	str	r2, [r0, #0]			@ ensure initially zero
 	mov	pc, r1				@ branch to the relocated code
 1:
-	wfe
 	ldr	r1, [r0]
 	cmp	r1, #0
 	beq	1b
