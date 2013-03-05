@@ -90,13 +90,14 @@ static void __init acpx14xx_init_irq(void)
 #ifdef CONFIG_SMP
 #ifdef CONFIG_KEXEC
 atomic_t kexec_down_cpus = ATOMIC_INIT(0);
+extern void kexec_smp_wait(void);
 void smp_acpx14xx_kexec_cpu_down(int crash_shutdown, int secondary)
 {
 	local_irq_disable();
 
 	if (secondary) {
 		atomic_inc(&kexec_down_cpus);
-		while (1);
+		kexec_smp_wait();
 	}
 }
 
