@@ -12,6 +12,30 @@
 	.syntax	unified
 	.text
 
+reset_exception:
+	b	_start
+
+undefined_exception:
+	b	undefined_exception
+
+supervisor_exception:
+	b	supervisor_exception
+
+prefetch_abort:
+	b	prefetch_abort
+
+data_abort:
+	b	data_abort
+
+unused_exception:
+	b	unused_exception
+
+irq_exception:
+	b	irq_exception
+
+fiq_exception:
+	b	fiq_exception
+
 	.globl	_start
 _start:
 	@
@@ -31,6 +55,30 @@ _start:
 	ldr	r0, =6250000			@ 6.25 MHz timer frequency
 	mcr	p15, 0, r0, c14, c0, 0		@ CNTFRQ
 1:
+
+	@
+	@ Set the L2ACTLR
+	@
+	mrc	p15, 1, r0, c15, c0, 0		@ L2ACTLR
+	@ Set bit 3 - disable clean/evict push to external
+	orr	r0, r0, #(0x1 << 3)
+	@ Set bit 12 - disable multiple outstanding
+	@ WriteClean/WriteBack/Evicts using same AWID
+	orr	r0, r0, #(0x1 << 12)
+	@ Set bit 13 - disable SharedClean data transfers
+	orr	r0, r0, #(0x1 << 13)
+	@ Set bit 14 - enable UniqueClena evictions with data
+	orr	r0, r0, #(0x1 << 14)
+	mcr	p15, 1, r0, c15, c0, 0
+
+	@
+	@ Set the ACTLR2
+	@
+	mrc	p15, 1, r0, c15, c0, 4
+	@ Set bit 0 - execute data cache clean as data cache clean/invalidate
+	orr	r0, r0, #(0x1 << 0)
+	mcr	p15, 1, r0, c15, c0, 4
+
 	@
 	@ CPU initialisation
 	@
