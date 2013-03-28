@@ -19,7 +19,7 @@ linux.img: emuboot.o emuboot.lds zImage.emu
 	rm -f linux.tmp
 
 zImage.emu: $(ZIMAGE) axm55xx.dtb
-	python pack.py $(ZIMAGE) $< > $@
+	python pack.py $(ZIMAGE) axm55xx.dtb > $@
 
 axm55xx.dtb: $(DTS)
 	$(DTC) -O dtb -o $@ $<
