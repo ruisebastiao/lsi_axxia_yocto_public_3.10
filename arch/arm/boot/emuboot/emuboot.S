@@ -39,13 +39,6 @@ fiq_exception:
 	.globl	_start
 _start:
 	@
-	@ Allow the debugger to gain control...
-	@
-1:	ldr	r0, =0
-	cmp	r0, #0
-	beq	1b
-
-	@
 	@ Program architected timer frequency
 	@
 	mrc	p15, 0, r0, c0, c1, 1		@ CPUID_EXT_PFR1
@@ -125,7 +118,7 @@ atags:
 	@ ATAG_CMDLINE
 	.long	(1f - .) >> 2
 	.long	0x54410009
-	.asciz	"root=/dev/mmcblk0 rootwait ip=none mem=1024M console=ttyAMA0"
+	.asciz	"root=/dev/mmcblk0 rootwait ip=none mem=1024M console=ttyAMA0 earlyprintk"
 
 	.align	2
 1:
