@@ -285,7 +285,7 @@
 
 	};
 
-    PCIE0: pciex@0xf0120000 {
+    PCIE0: pciex@0x3000000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
@@ -321,7 +321,7 @@
                 >;
         };
 
-        PCIE1: pciex@0xf0128000 {
+        PCIE1: pciex@0x3040000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
@@ -357,7 +357,7 @@
                 >;
         };
 
-        PCIE2: pciex@0xf0130000 {
+        PCIE2: pciex@0x3080000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
