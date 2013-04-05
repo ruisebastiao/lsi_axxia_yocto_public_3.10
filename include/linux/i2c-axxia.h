@@ -16,10 +16,24 @@
 #define AXXIA_I2C_IP_VERSION_2 2                /* AXM55xx */
 
 /* struct axxia_i2c_bus_platform_data .flags meanings */
+#define AXXIA_I2C_FLAGS_NONE            (0x00000000)
+
+
+/*
+ * Maximum byte size of I2C bus name string including null terminator
+ */
+#define MAX_AXXIA_I2C_HWMOD_NAME_LEN    16
+
 
 struct axxia_i2c_bus_platform_data {
-	u32		rev;
-	u32		flags;
+	struct device_node     *node;
+	char                    name[MAX_AXXIA_I2C_HWMOD_NAME_LEN];
+	u32		        index;
+	u32		        rev;
+	u32		        flags;
+	u32		        bus_nr;
+	struct resource         dev_space;
+	struct resource         int_space;
 };
 
 #endif
