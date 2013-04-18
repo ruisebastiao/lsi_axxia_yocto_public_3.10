@@ -3,23 +3,23 @@
 AS		= $(CROSS_COMPILE)gcc -c
 LD		= $(CROSS_COMPILE)ld
 
-DTC = ../../../../scripts/dtc/dtc
-DTS = ../dts/axm55xxsim.dts
-ZIMAGE = ../zImage
-
-all: clean linux.img
+DTC = $(obj)/../../../../scripts/dtc/dtc
+DTS = $(obj)/../dts/axm55xxsim.dts
+ZIMAGE = $(obj)/../zImage
 
 clean:
-	rm -f linux.img fmboot.o zImage.fm axm55xxsim.dtb
+	rm -f $(obj)/../linux.img $(obj)/fmboot.o $(obj)/zImage.fm $(obj)/axm55xxsim.dtb
 
-linux.img: fmboot.o fmboot.lds zImage.fm
-	$(LD) -o $@ --script=fmboot.lds
+arch/arm/boot/linux.img: $(obj)/fmboot.o $(srctree)/$(obj)/fmboot.lds $(obj)/zImage.fm
+	cd $(obj) && $(LD) -o ../linux.img --script=$(srctree)/$(obj)/fmboot.lds
+	tar jcf $(obj)/../linux.img.tar.bz2 $(obj)/../linux.img
+	rm -rf $(obj)/../linux.img
 
-zImage.fm: $(ZIMAGE) axm55xxsim.dtb
-	python pack.py $(ZIMAGE) axm55xxsim.dtb > $@
+$(obj)/zImage.fm: $(ZIMAGE) $(obj)/axm55xxsim.dtb
+	python $(srctree)/$(obj)/pack.py $(ZIMAGE) $(obj)/axm55xxsim.dtb > $@
 
-axm55xxsim.dtb: $(DTS)
+$(obj)/axm55xxsim.dtb: $(DTS)
 	$(DTC) -O dtb -o $@ $<
 
-fmboot.o: fmboot.S
+$(obj)/fmboot.o: $(obj)/fmboot.S
 	$(AS) -o $@ $<
