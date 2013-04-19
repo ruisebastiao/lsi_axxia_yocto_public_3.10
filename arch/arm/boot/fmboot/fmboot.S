@@ -1,5 +1,5 @@
 /*
- * boot.S - simple register setup code for stand-alone Linux booting
+ * fmboot.S - simple register setup code for stand-alone Linux booting
  *
  * Copyright (C) 2011 ARM Limited. All rights reserved.
  *

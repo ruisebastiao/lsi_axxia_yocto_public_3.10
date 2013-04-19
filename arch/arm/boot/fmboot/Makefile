@@ -4,21 +4,21 @@ AS		= $(CROSS_COMPILE)gcc -c
 LD		= $(CROSS_COMPILE)ld
 
 DTC = ../../../../scripts/dtc/dtc
-DTS = ../dts/axm-sim.dts
+DTS = ../dts/axm55xxsim.dts
 ZIMAGE = ../zImage
 
-all: clean linux.fm
+all: clean linux.img
 
 clean:
-	rm -f linux.fm fmboot.o zImage.fm axm-sim.dtb
+	rm -f linux.img fmboot.o zImage.fm axm55xxsim.dtb
 
-linux.fm: fmboot.o fmboot.lds zImage.fm
+linux.img: fmboot.o fmboot.lds zImage.fm
 	$(LD) -o $@ --script=fmboot.lds
 
-zImage.fm: $(ZIMAGE) axm-sim.dtb
-	python pack.py $(ZIMAGE) axm-sim.dtb > $@
+zImage.fm: $(ZIMAGE) axm55xxsim.dtb
+	python pack.py $(ZIMAGE) axm55xxsim.dtb > $@
 
-axm-sim.dtb: $(DTS)
+axm55xxsim.dtb: $(DTS)
 	$(DTC) -O dtb -o $@ $<
 
 fmboot.o: fmboot.S
