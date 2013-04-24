@@ -94,4 +94,5 @@ obj-$(CONFIG_SCx200_I2C)	+= scx200_i2c.o
 
 ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
 
-obj-y				+= ai2c/
+obj-$(CONFIG_I2C_AXXIA)	+= ai2c/
+obj-$(CONFIG_ACP3400_I2C)	+= acp3400-i2c.o
