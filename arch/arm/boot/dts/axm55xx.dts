@@ -102,6 +102,12 @@
 		reg = <0x20 0x10094000 0 0x1000>;
 	};
 
+	mtc@2010098000 {
+		compatible = "lsi,mtc";
+		reg = <0x20 0x10098000 0 0x3000>;
+		interrupts = <0 45 4>;
+	};
+
 	ethernet@201100000000 {
 		compatible = "smsc,lan91c111";
 		device_type = "network";

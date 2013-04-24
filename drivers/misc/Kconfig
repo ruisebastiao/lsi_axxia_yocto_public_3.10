@@ -565,6 +565,14 @@ config SRAM
 	  the genalloc API. It is supposed to be used for small on-chip SRAM
 	  areas found on many SoCs.
 
+config LSI_MTC
+	tristate "LSI Master Test Controller driver"
+	depends on ARCH_AXXIA
+	help
+	  The Master Test Controller (MTC) is a test generator that is fully
+	  compliant with IEEE 1149.1 and can run JTAG test sequences on
+	  external devices.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
