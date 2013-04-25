@@ -544,4 +544,11 @@ config MTD_NAND_XWAY
 	  Enables support for NAND Flash chips on Lantiq XWAY SoCs. NAND is attached
 	  to the External Bus Unit (EBU).
 
+config MTD_NAND_EP501X
+	tristate "Driver for Eureka EP501/EP501G1/EP501G3 Controllers"
+	depends on MTD_NAND
+	help
+	  Enables NAND flash support for the Eureka EP501, EP501G1
+	  and EP501G3 controllers.
+
 endif # MTD_NAND
