@@ -2692,7 +2692,7 @@ device_tree_failed:
 		 * and use hard-coded values for device base addresses.
 		 */
 		unsigned char ethaddr_string[20];
-
+#ifdef CONFIG_MTD_NAND_EP501X_UBOOTENV
 		if (0 != ubootenv_get("ethaddr", ethaddr_string)) {
 			pr_err("acp-femac: Could not read ethernet address!\n");
 			return -EBUSY;
@@ -2731,10 +2731,15 @@ device_tree_failed:
 			 (unsigned long)ioremap(0x002000482000ULL, 0x1000);
 			appnic_device->interrupt = 33;
 		}
+#else
+		/* Neither dtb info nor ubootenv driver found. */
+		pr_err("Could not read ethernet address!\n");
+		return -EBUSY;
+#endif
 	}
 
 device_tree_succeeded:
-
+#ifdef CONFIG_MTD_NAND_EP501X_UBOOTENV
 	/* Override phy_address with u-boot environment variable if set. */
 	if (0 == ubootenv_get("phy_address", uboot_env_string)) {
 		/*
@@ -2765,7 +2770,7 @@ device_tree_succeeded:
 			return -EBUSY;
 		appnic_device->ad_value = res;
 	}
-
+#endif
 	/* ad_value should never be 0. Use default if so ... */
 	if (appnic_device->ad_value == 0) {
 		appnic_device->ad_value = (PHY_AUTONEG_ADVERTISE_100FULL |
