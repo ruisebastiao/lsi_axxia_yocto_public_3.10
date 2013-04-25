@@ -1722,7 +1722,6 @@ static irqreturn_t appnic_isr(int irq, void *device_id)
 				  APPNIC_DMA_INTERRUPT_ENABLE);
 			__napi_schedule(&dev->napi);
 		} else {
-			pr_err("acp-femac: NAPI bug! Int while in poll\n");
 			write_mac(APPNIC_DMA_INTERRUPT_ENABLE_TRANSMIT,
 				  APPNIC_DMA_INTERRUPT_ENABLE);
 		}
@@ -1737,6 +1736,21 @@ static irqreturn_t appnic_isr(int irq, void *device_id)
 
 	return IRQ_HANDLED;
 }
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling receive - used by netconsole and other diagnostic tools
+ * to allow network i/o with interrupts disabled.
+ */
+static void
+appnic_poll_controller(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	appnic_isr(dev->irq, dev);
+	enable_irq(dev->irq);
+}
+
+#endif
 
 /*
  * ----------------------------------------------------------------------
@@ -2149,6 +2163,9 @@ static const struct net_device_ops appnic_netdev_ops = {
 	.ndo_get_stats = appnic_get_stats,
 	.ndo_set_mac_address = appnic_set_mac_address,
 	.ndo_start_xmit = appnic_hard_start_xmit,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller = appnic_poll_controller,
+#endif
 };
 
 /*
