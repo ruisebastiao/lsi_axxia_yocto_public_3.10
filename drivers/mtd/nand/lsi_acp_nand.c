@@ -2820,100 +2820,28 @@ static int
 report_ecc_errors_ep501g1(struct mtd_info *mtd, struct nand_chip *chip,
 			  uint8_t *buffer, int page)
 {
-	unsigned long bch_status;
-	int rc = 0;
+	unsigned long ecc_status;
 	int i;
-	int is_blank = 1;
-	uint8_t *data = buffer;
-	int section;
-	int syndrome;
-	unsigned long syndromes[8][8];
 
-	/* If there are no errors, return. */
-	bch_status = READL(chip->IO_ADDR_R + EP501G1_NAND_BCH_STATUS);
+	for (i = 0; i < (mtd->writesize / 1024); ++i) {
+		ecc_status = readl(chip->IO_ADDR_R +
+				   EP501G1_NAND_1BIT_ECC0_STATUS + (i * 4));
 
-	if (0 == bch_status)
-		goto report_ecc_errors_ep501g1_end;
-
-	switch (mtd->writesize) {
-	case 512:
-		bch_status &= 0x1;
-		break;
-	case 2048:
-		bch_status &= 0xf;
-		break;
-	case 4096:
-		bch_status &= 0xff;
-		break;
-	default:
-		printk(KERN_ERR "Unexpected Page Size!\n");
-		rc = -1;
-		goto report_ecc_errors_ep501g1_end;
-		break;
-	}
-
-	/* Ignore fully erased blocks. */
-	if (NULL != data) {
-		for (i = 0; i < mtd->writesize; ++i) {
-			if (0xff != *data++) {
-				is_blank = 0;
-				break;
-			}
+		switch (ecc_status & (3 << 12)) {
+		case 01:
+			printk(KERN_ERR
+			       "Correctable ECC Error: %d:0x%lx\n",
+			       i, ecc_status);
+			break;
+		case 02:
+			printk(KERN_ERR
+			       "Uncorrectable ECC Error: %d:0x%lx\n",
+			       i, ecc_status);
+			break;
 		}
 	}
 
-	if (0 != is_blank)
-		goto report_ecc_errors_ep501g1_end;
-
-	/* Read the syndrome registers and split them into syndromes. */
-	for (section = 0; section < 8; ++section) {
-		unsigned long address;
-		unsigned long value;
-
-		address = EP501G1_NAND_SYN_R12_S0 + (section * 0x10);
-
-		for (syndrome = 0; syndrome < 8; syndrome += 2) {
-			value = READL(chip->IO_ADDR_R + address +
-				      (syndrome * 2));
-			syndromes[section][syndrome] =
-				(value & 0x1fff);
-			syndromes[section][syndrome + 1] =
-				((value & 0x1fff0000) >> 16);
-		}
-	}
-
-#ifdef NOT_USED
-	/* Debug output (BCH status register and syndromes). */
-	printk(KERN_INFO "BCH Status Register: 0x%02lx\n", bch_status);
-
-	for (section = 0; section < 8; ++section) {
-		printk(KERN_INFO "Syndromes, Section %d: ", section);
-
-		for (syndrome = 0; syndrome < 8; ++syndrome) {
-			printk(KERN_INFO "0x%04lx ",
-			       syndromes[section][syndrome]);
-		}
-
-		printk(KERN_INFO "\n");
-	}
-#endif
-
-	for (i = 0; i < 4; ++i) {
-		if ((1 << i) == (bch_status & (1 << i))) {
-			rc = fix_section(((page * mtd->writesize) + (512 * i)),
-					 (void *)(buffer + (512 * i)),
-					 (int *)&syndromes[i]);
-
-			if (-1 == rc)
-				printk(KERN_ERR
-				       "Uncorrectable ECC Error: Page %d\n",
-				       page);
-		}
-	}
-
- report_ecc_errors_ep501g1_end:
-
-	return rc;
+	return 0;
 }
 
 /*
