@@ -349,6 +349,27 @@ config ARCH_VERSATILE
 	help
 	  This enables support for ARM Ltd Versatile board.
 
+config ARCH_AXXIA
+	bool "LSI Axxia family"
+	select ARCH_PHYS_ADDR_T_64BIT
+	select ARCH_DMA_ADDR_T_64BIT
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select ARM_AMBA
+	select COMMON_CLK
+	select CLKDEV_LOOKUP
+	select CLKSRC_MMIO
+	select GENERIC_CLOCKEVENTS
+	select HAVE_CLK
+	select HAVE_PATA_PLATFORM
+	select ARM_TIMER_SP804
+	select ICST
+	select NEED_MACH_IO_H
+	select PCI
+	select PCI_DOMAINS if PCI
+	select ARCH_SUPPORTS_MSI if PCI
+	help
+	  This enables support for the LSI Axxia boards.
+
 config ARCH_AT91
 	bool "Atmel AT91"
 	select ARCH_REQUIRE_GPIOLIB
@@ -1018,6 +1039,8 @@ source "arch/arm/mach-u300/Kconfig"
 source "arch/arm/mach-ux500/Kconfig"
 
 source "arch/arm/mach-versatile/Kconfig"
+
+source "arch/arm/mach-axxia/Kconfig"
 
 source "arch/arm/mach-vexpress/Kconfig"
 source "arch/arm/plat-versatile/Kconfig"
