@@ -1,7 +1,11 @@
 config LSI_NET
-	bool "Network interface for LSI's APP and AXXIA"
+	bool "LSI ACP34XX Ethernet support"
+	select MII
+	select PHYLIB
 	help
 	  Network interface driver for LSI's APP and AXXIA series boards.
+
+if LSI_NET
 
 config LSI_NET_NUM_RX_DESC
 	int "LSI Axxia Network Driver: Number of receive descriptors"
@@ -30,3 +34,20 @@ config LSI_NET_TX_BUF_SZ
 	default "32768"
 	help
 	  The size of the transmit buffer.
+
+config DISABLE_TX_INTERRUPTS
+	bool "NIC driver: Disable Tx interrupts"
+	depends on LSI_NET
+	default y
+	help
+	  If set to "yes", disables Transmit interrupts
+
+config PRELOAD_RX_BUFFERS
+	bool "NIC driver: Preload Rx buffers"
+	depends on LSI_NET
+	default n
+	help
+	  If set to "yes", enables preloading of Rx buffer prior to
+	  copying into device
+
+endif # LSI_NET
