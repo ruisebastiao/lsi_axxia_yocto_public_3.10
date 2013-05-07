@@ -1284,7 +1284,7 @@ static const struct of_device_id crypto4xx_match[] = {
 	{ },
 };
 
-static struct platform_driver crypto4xx_driver = {
+static struct platform_driver __refdata crypto4xx_driver = {
 	.driver = {
 		.name = "crypto4xx",
 		.owner = THIS_MODULE,
