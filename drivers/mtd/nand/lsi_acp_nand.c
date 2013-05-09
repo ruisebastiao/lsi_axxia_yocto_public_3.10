@@ -3489,9 +3489,9 @@ lsi_nand_init(void)
 
 		enabled = of_get_property(np, "enabled", NULL);
 
-		if (NULL == enabled) {
+		if (!enabled || (enabled && (0 == *enabled))) {
 			printk("ACP NAND Controller Isn't Enabled.\n");
-			return -1;
+			return -ENODEV;
 		}
 
 		reg = of_get_property(np, "reg", &reglen);
