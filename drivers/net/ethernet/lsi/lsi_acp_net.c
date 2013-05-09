@@ -1767,6 +1767,11 @@ static int __devinit appnic_probe_config_dt(struct net_device *dev,
 	if (!np)
 		return -ENODEV;
 
+	field = of_get_property(np, "enabled", NULL);
+
+	if (!field || (field && (0 == *field)))
+		return -EINVAL;
+
 	field = of_get_property(np, "reg", NULL);
 
 	if (!field) {
