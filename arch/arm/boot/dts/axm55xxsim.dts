@@ -321,49 +321,13 @@
                 >;
         };
 
-        PCIE1: pciex@0x3040000000 {
+        PCIE1: pciex@0x3080000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
                 plx = <0>;
                 primary;
                 port = <1>;
-                #interrupt-cells = <1>;
-                #size-cells = <2>;
-                #address-cells = <3>;
-                /* config space access MPAGE7 registers*/
-                reg = <0x30 0x78000000 0x0 0x01000000
-                       0x20 0x20128000 0x0 0x00008000 >;
-                bus-range = <0 0x0f>;
-                /* Outbound ranges */
-                /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x03000000 0x00000000 0xa0000000
-                          0x30 0x40000000
-                          0x00 0x10000000>;
-                /* Inbound ranges */
-                /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x03000000 0x00000000 0x00000000
-                             0x00 0x00000000
-                              0x00 0x40000000>;
-                interrupt-parent = <&gic>;
-                interrupts = <72 2>;
-                interrupt-map-mask = <0000 0 0 7>;
-                interrupt-map = <
-                        /* <3-cell dev> <irq#> <prnt> <2-cell prnt IRQ/sense> */
-                        0000 0 0 1 &gic 72 2
-                        0000 0 0 2 &gic 72 2
-                        0000 0 0 3 &gic 72 2
-                        0000 0 0 4 &gic 72 2
-                >;
-        };
-
-        PCIE2: pciex@0x3080000000 {
-                compatible = "lsi,plb-pciex";
-                device_type = "pci";
-                enabled = <0>;
-                plx = <0>;
-                primary;
-                port = <2>;
                 #interrupt-cells = <1>;
                 #size-cells = <2>;
                 #address-cells = <3>;
