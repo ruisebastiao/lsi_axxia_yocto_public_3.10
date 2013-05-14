@@ -288,9 +288,7 @@
     PCIE0: pciex@0x3000000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
-                enabled = <0>;
-                plx = <0>;
-                primary;
+		status = "ok";
                 port = <0>;
                 #interrupt-cells = <1>;
                 #size-cells = <2>;
@@ -298,7 +296,6 @@
                 /* config space access MPAGE7 registers*/
                 reg = < 0x30 0x38000000 0x0 0x01000000
                 0x20 0x20120000 0x0 0x00008000 >;
-                bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> >*/
                 ranges = <0x03000000 0x00000000 0xa0000000
@@ -309,24 +306,29 @@
                 dma-ranges = <0x03000000 0x00000000 0x00000000
                               0x00 0x00000000
                               0x00 0x40000000>;
-                    interrupt-parent = <&gic>;
-                interrupts = <29 2>;
-                interrupt-map-mask = <0000 0 0 7>;
-                interrupt-map = <
-                        /* <3-cell dev> <irq#> <prnt> <2-cell prnt IRQ/sense> */
-                        0000 0 0 1 &gic 29 2
-                        0000 0 0 2 &gic 29 2
-                        0000 0 0 3 &gic 29 2
-                        0000 0 0 4 &gic 29 2
-                >;
+	        interrupts = <0 68 4>,
+                             <0 73 4>,
+                             <0 74 4>,
+                             <0 75 4>,
+                             <0 76 4>,
+                             <0 77 4>,
+                             <0 78 4>,
+                             <0 79 4>,
+                             <0 80 4>,
+                             <0 81 4>,
+                             <0 82 4>,
+                             <0 83 4>,
+                             <0 84 4>,
+                             <0 85 4>,
+                             <0 86 4>,
+                             <0 87 4>,
+                             <0 88 4>;
         };
 
         PCIE1: pciex@0x3080000000 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
-                enabled = <0>;
-                plx = <0>;
-                primary;
+		status = "ok";
                 port = <1>;
                 #interrupt-cells = <1>;
                 #size-cells = <2>;
@@ -334,7 +336,6 @@
                 /* config space access MPAGE7 registers*/
                 reg = <0x30 0xb8000000 0x0 0x01000000
                        0x20 0x20130000 0x0 0x00008000 >;
-                bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
                 ranges = <0x03000000 0x00000000 0xa0000000
@@ -345,17 +346,7 @@
                 dma-ranges = <0x03000000 0x00000000 0x00000000
                               0x00 0x00000000
                               0x00 0x40000000>;
-
-                interrupt-parent = <&gic>;
-                interrupts = <73 2>;
-                interrupt-map-mask = <0000 0 0 7>;
-                interrupt-map = <
-                        /* <3-cell dev> <irq#> <prnt> <2-cell prnt IRQ/sense> */
-                        0000 0 0 1 &gic 73 2
-                        0000 0 0 2 &gic 73 2
-                        0000 0 0 3 &gic 73 2
-                        0000 0 0 4 &gic 73 2
-                >;
+	        interrupts = <0 70 4>;
         };
 
         I2C0: i2c@0x02010084000 {
