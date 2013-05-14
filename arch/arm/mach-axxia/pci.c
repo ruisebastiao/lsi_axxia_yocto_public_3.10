@@ -442,7 +442,7 @@ int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	u32 mpage_lower, pciah, pcial;
 	u64 size, bar0_size;
 	void __iomem *cfg_addr = NULL, *cfg_data = NULL, *tpage_base = NULL;
-	int mappedIrq;
+	int mappedIrq, irq_entry;
 	u32 inbound_size;
 
 	port = &axxia_pciex_ports[sys->domain];
@@ -497,16 +497,9 @@ int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	/* hookup an interrupt handler */
 	printk(KERN_INFO "PCIE%d mapping interrupt\n", port->index);
 	mappedIrq = irq_of_parse_and_map(port->node, 0);
-
-	if (sys->domain == 0) {
-		/* IRQ# 68 for PEI0 */
-		mappedIrq = 100;
-	} else if (sys->domain == 1) {
-		/* IRQ# 70 for PEI1 */
-		mappedIrq = 102;
-	}
 	printk(KERN_INFO "Requesting irq#%d for PEI%d Legacy INTs\n",
 			mappedIrq, port->index);
+
 	err = request_irq(mappedIrq, acp_pcie_isr,
 			  IRQF_SHARED, "acp_pcie", port);
 	if (err) {
@@ -518,16 +511,17 @@ int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	/* MSI INTS for PEI0 */
 	if (sys->domain == 0) {
 		/* IRQ# 73-88 for PEI0 MSI INTs */
-		for (mappedIrq = 73; mappedIrq <= 88; mappedIrq++) {
+		for (irq_entry = 1; irq_entry <= 16; irq_entry++) {
+			mappedIrq = irq_of_parse_and_map(port->node, irq_entry);
 			printk(KERN_INFO
 				"Requesting irq#%d for PEI0 MSI INTs\n",
-				mappedIrq+32);
-			err = request_irq(mappedIrq+32, acp_pcie_MSI_isr,
+				mappedIrq);
+			err = request_irq(mappedIrq, acp_pcie_MSI_isr,
 				IRQF_SHARED, "acp_pcie_MSI", port);
 			if (err) {
 				printk(KERN_ERR
 				"request_irq failed!!!! for IRQ# %d err = %d\n",
-				mappedIrq+32, err);
+				mappedIrq, err);
 				goto fail;
 			}
 		}
@@ -735,6 +729,7 @@ static void __devinit axxia_pcie_msi_enable(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, axxia_pcie_msi_enable);
 
+
 /* Port definition struct
  * Please note: PEI core#1 is not used in AXM5500 */
 static struct hw_pci axxia_pcie_hw[] = {
@@ -794,16 +789,17 @@ static void axxia_probe_pciex_bridge(struct device_node *np)
 	int num = pna + 5;
 	u64 size, pci_addr;
 
+	/* Check if device is enabled */
+	if (!of_device_is_available(np)) {
+		printk(KERN_INFO "%s: Port disabled via device-tree\n",
+			np->full_name);
+		return;
+	}
+
 	/* Get the port number from the device-tree */
 	if (!of_property_read_u32(np, "port", &pval)) {
 		portno = pval;
 
-#if 0
-		if (portno == 1) {
-			/* only PCIe0 and PCIe1 are supported in AXM5500 */
-			return;
-		}
-#endif
 		printk(KERN_INFO "PCIE Port %d found\n", portno);
 	} else {
 		printk(KERN_ERR "PCIE: Can't find port number for %s\n",
