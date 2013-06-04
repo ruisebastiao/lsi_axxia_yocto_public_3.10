@@ -34,6 +34,6 @@
 
 void __iomem *__axxia_arch_ioremap(phys_addr_t, size_t, unsigned int);
 #define __arch_ioremap __axxia_arch_ioremap
-#define __arch_iounmap __iounmap
+#define __arch_iounmap __arm_iounmap
 
 #endif
