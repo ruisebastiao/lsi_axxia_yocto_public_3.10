@@ -194,7 +194,7 @@
 /
                 ranges = <0x03000000 0x00000000 0xa0000000
                           0x30 0x00000000
-                          0x00 0x10000000>;
+                          0x00 0x20000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
                 dma-ranges = <0x03000000 0x00000000 0x00000000
@@ -236,7 +236,7 @@
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
                 ranges = <0x03000000 0x00000000 0xa0000000
                           0x30 0x80000000
-                          0x00 0x10000000>;
+                          0x00 0x20000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
                 dma-ranges = <0x03000000 0x00000000 0x00000000
