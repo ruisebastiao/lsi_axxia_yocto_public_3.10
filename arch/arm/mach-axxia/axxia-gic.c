@@ -155,8 +155,12 @@ static void gic_mask_irq(struct irq_data *d)
 	if (irqid >= 1020)
 		return;
 
+	/* Don't mess with the AXM IPIs. */
+	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+		return;
+
 	/* Deal with PPI interrupts directly. */
-	if (irqid > 16 && irqid < 32) {
+	if ((irqid > 16) && (irqid < 32)) {
 		_gic_mask_irq(d);
 		return;
 	}
@@ -203,8 +207,12 @@ static void gic_unmask_irq(struct irq_data *d)
 	if (irqid >= 1020)
 		return;
 
+	/* Don't mess with the AXM IPIs. */
+	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+		return;
+
 	/* Deal with PPI interrupts directly. */
-	if (irqid > 15 && irqid < 32) {
+	if ((irqid > 15) && (irqid < 32)) {
 		_gic_unmask_irq(d);
 		return;
 	}
@@ -252,18 +260,6 @@ static int _gic_set_type(struct irq_data *d, unsigned int type)
 	u32 confoff = (gicirq / 16) * 4;
 	bool enabled = false;
 	u32 val;
-
-	/* Interrupt configuration for SGIs can't be changed. */
-	if (gicirq < 16)
-		return -EINVAL;
-
-	/* Interrupt configuration for the AXM IPIs can't be changed. */
-	if ((gicirq >= IPI0_CPU0) && (gicirq < MAX_AXM_IPI_NUM))
-		return -EINVAL;
-
-	/* We only support two interrupt trigger types. */
-	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-		return -EINVAL;
 
 	raw_spin_lock(&irq_controller_lock);
 
@@ -315,8 +311,21 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 {
 #ifdef CONFIG_SMP
 	int i, nr_cluster_ids = ((nr_cpu_ids-1) / 4) + 1;
+	unsigned int gicirq = gic_irq(d);
 	u32 pcpu = cpu_logical_map(smp_processor_id());
 	struct gic_set_type_wrapper_struct data;
+
+	/* Interrupt configuration for SGIs can't be changed. */
+	if (gicirq < 16)
+		return -EINVAL;
+
+	/* Interrupt configuration for the AXM IPIs can't be changed. */
+	if ((gicirq >= IPI0_CPU0) && (gicirq < MAX_AXM_IPI_NUM))
+		return -EINVAL;
+
+	/* We only support two interrupt trigger types. */
+	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+		return -EINVAL;
 
 	/*
 	 * Duplicate IRQ type settings across all clusters. Run
@@ -410,15 +419,26 @@ static int gic_set_affinity(struct irq_data *d,
 	if (irqid >= 1020)
 		return -EINVAL;
 
-	data.d = d;
-	data.mask_val = mask_val;
-	data.disable = false;
+	/* Interrupt affinity for the AXM IPIs can't be changed. */
+	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+		return IRQ_SET_MASK_OK;
+
+	/*
+	 * If the new IRQ affinity is the same as current, then
+	 * there's no need to update anything.
+	 */
+	if (cpu == irq_cpuid[irqid])
+		return IRQ_SET_MASK_OK;
 
 	/*
 	 * If the new physical cpu assignment falls within the same
 	 * cluster as the cpu we're currently running on, set the IRQ
 	 * affinity directly. Otherwise, use the IPI mechanism.
 	 */
+	data.d = d;
+	data.mask_val = mask_val;
+	data.disable = false;
+
 	if ((cpu_logical_map(cpu) / 4) == (pcpu / 4)) {
 		_gic_set_affinity(&data);
 	} else {
@@ -475,7 +495,6 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 {
 	u32 irqstat, irqnr;
 	u32 ipinum = 0;
-	u32 mask, offset;
 	struct gic_chip_data *gic = &gic_data;
 	void __iomem *cpu_base = gic_data_cpu_base(gic);
 
@@ -540,7 +559,7 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 				break;
 			}
 
-			if (ipinum) {
+			if (ipinum > 1) { /* Ignore IPI_WAKEUP (1) */
 				/*
 				 * Write the original irq number to the
 				 * EOI register to acknowledge the IRQ.
@@ -548,18 +567,6 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 				 * is really a SPI interrupt, not a SGI.
 				 */
 				writel_relaxed(irqnr, cpu_base + GIC_CPU_EOI);
-
-				/*
-				 * Unlike the GIC softirqs, the Axxia IPI
-				 * interrupts do not remain enabled after
-				 * firing. Re-enable the interrupt here.
-				 */
-				mask = 1 << (irqnr % 32);
-				offset = 4 * (irqnr / 32);
-				writel_relaxed(mask,
-					gic_data_dist_base(&gic_data)
-					+ GIC_DIST_ENABLE_SET + offset);
-
 #ifdef CONFIG_SMP
 				/* Do the normal IPI handling. */
 				handle_IPI(ipinum, regs);
@@ -668,8 +675,7 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	 */
 	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
 		cpumask_8 = 1 << ((i - IPI0_CPU0) % 4);
-		writeb_relaxed(cpumask_8,
-			base + GIC_DIST_TARGET + (4 * (i / 4)) + i % 4);
+		writeb_relaxed(cpumask_8, base + GIC_DIST_TARGET + i);
 	}
 
 	/*
@@ -849,7 +855,6 @@ static int _gic_notifier(struct notifier_block *self,
 			 unsigned long cmd, void *v)
 {
 	int i;
-
 	switch (cmd) {
 	case CPU_PM_ENTER:
 		gic_cpu_save();

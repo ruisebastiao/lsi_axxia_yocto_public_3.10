@@ -18,26 +18,33 @@
 
 extern volatile int pen_release;
 
-static inline void cpu_enter_lowpower(void)
+static inline void cpu_enter_lowpower_a15(void)
 {
 	unsigned int v;
 
-	flush_cache_all();
 	asm volatile(
-		"mcr	p15, 0, %1, c7, c5, 0\n"
-	"	mcr	p15, 0, %1, c7, c10, 4\n"
+	"       mrc     p15, 0, %0, c1, c0, 0\n"
+	"       bic     %0, %0, %1\n"
+	"       mcr     p15, 0, %0, c1, c0, 0\n"
+	: "=&r" (v)
+	: "Ir" (CR_C)
+	: "cc");
+
+	flush_cache_all();
+
+	asm volatile(
 	/*
-	 * Turn off coherency
-	 */
-	"	mrc	p15, 0, %0, c1, c0, 1\n"
-	"	bic	%0, %0, %3\n"
-	"	mcr	p15, 0, %0, c1, c0, 1\n"
-	"	mrc	p15, 0, %0, c1, c0, 0\n"
-	"	bic	%0, %0, %2\n"
-	"	mcr	p15, 0, %0, c1, c0, 0\n"
-	  : "=&r" (v)
-	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-	  : "cc");
+	* Turn off coherency
+	*/
+	"       mrc     p15, 0, %0, c1, c0, 1\n"
+	"       bic     %0, %0, %1\n"
+	"       mcr     p15, 0, %0, c1, c0, 1\n"
+	: "=&r" (v)
+	: "Ir" (0x40)
+	: "cc");
+
+	isb();
+	dsb();
 }
 
 static inline void cpu_leave_lowpower(void)
@@ -58,6 +65,8 @@ static inline void cpu_leave_lowpower(void)
 
 static void __ref platform_do_lowpower(unsigned int cpu, int *spurious)
 {
+	int phys_cpu, cluster;
+
 	/*
 	 * there is no power-control hardware on this platform, so all
 	 * we can do is put the core into WFI; this is safe as the calling
@@ -66,7 +75,18 @@ static void __ref platform_do_lowpower(unsigned int cpu, int *spurious)
 	for (;;) {
 		wfi();
 
-		if (pen_release == cpu_logical_map(cpu)) {
+		/*
+		 * Convert the "cpu" variable to be compatible with the
+		 * ARM MPIDR register format (CLUSTERID and CPUID):
+		 *
+		 * Bits:   |11 10 9 8|7 6 5 4 3 2|1 0
+		 *         | CLUSTER | Reserved  |CPU
+		 */
+		phys_cpu = cpu_logical_map(cpu);
+		cluster = (phys_cpu / 4) << 8;
+		phys_cpu = cluster + (phys_cpu % 4);
+
+		if (pen_release == phys_cpu) {
 			/*
 			 * OK, proper wakeup, we're done
 			 */
@@ -101,7 +121,7 @@ void platform_cpu_die(unsigned int cpu)
 	/*
 	 * we're ready for shutdown now, so do it
 	 */
-	cpu_enter_lowpower();
+	cpu_enter_lowpower_a15();
 	platform_do_lowpower(cpu, &spurious);
 
 	/*
