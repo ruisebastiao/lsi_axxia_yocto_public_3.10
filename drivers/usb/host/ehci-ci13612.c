@@ -68,7 +68,10 @@ static void ci13612_usb_setup(struct usb_hcd *hcd)
 /* called after powerup, by probe or system-pm "wakeup" */
 static int ehci_ci13612_reinit(struct ehci_hcd *ehci)
 {
+#ifdef CONFIG_LSI_USB_SW_WORKAROUND
+	/* S/W workarounds are not needed in AXM55xx */
 	ci13612_usb_setup(ehci_to_hcd(ehci));
+#endif
 	ehci_port_power(ehci, 0);
 
 	return 0;
@@ -114,6 +117,7 @@ static int ehci_run_fix(struct usb_hcd *hcd)
 	u32 port_status;
 	unsigned burst_size;
 	int retval;
+#ifdef CONFIG_LSI_USB_SW_WORKAROUND
 
 	/* Fix HW errata 0003256: Do not enable USBCMD.RS for some time after
 	 * the USB reset has been completed (PORTSCx.PR=0). This ensures that
@@ -146,6 +150,8 @@ static int ehci_run_fix(struct usb_hcd *hcd)
 	burst_size = ehci_readl(ehci, &ehci->regs->reserved[1]);
 	burst_size = (burst_size & 0xffff00ff) | 0x4000;	/* TXPBURST */
 	ehci_writel(ehci, burst_size, &ehci->regs->reserved[1]);
+
+#endif
 
 	return 0;
 }
