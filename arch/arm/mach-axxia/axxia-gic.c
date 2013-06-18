@@ -344,7 +344,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 		 * smp_call_function_single().
 		 */
 		local_irq_enable();
-		smp_call_function_single((i/4),
+		smp_call_function_single((i * 4),
 			 gic_set_type_wrapper, &data, 1);
 		local_irq_disable();
 		if (data.status != 0)
