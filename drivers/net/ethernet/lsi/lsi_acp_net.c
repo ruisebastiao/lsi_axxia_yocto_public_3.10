@@ -72,7 +72,6 @@
 #define LSI_MDIO_NAME          "acp-femac-mdio"
 #define LSI_DRV_VERSION        "2013-04-30"
 
-
 MODULE_AUTHOR("John Jacques");
 MODULE_DESCRIPTION("LSI ACP-FEMAC Ethernet driver");
 MODULE_LICENSE("GPL");
@@ -83,37 +82,6 @@ static void *tx_base;
 static void *dma_base;
 
 /*
-  =============================================================================
-  MDIO / PHY
-  =============================================================================
-*/
-
-#define MDIO_CONTROL_RD_DATA ((void *)(pdata->mdio_base + 0x0))
-#define MDIO_STATUS_RD_DATA  ((void *)(pdata->mdio_base + 0x4))
-#define MDIO_CLK_OFFSET      ((void *)(pdata->mdio_base + 0x8))
-#define MDIO_CLK_PERIOD      ((void *)(pdata->mdio_base + 0xc))
-
-/*
- * ----------------------------------------------------------------------
- * appnic_mdio_initialize
- */
-
-static void appnic_mdio_initialize(struct net_device *dev)
-{
-	struct appnic_device *pdata = netdev_priv(dev);
-
-	if (is_asic()) {
-		out_le32(MDIO_CLK_OFFSET, 0x10);
-		out_le32(MDIO_CLK_PERIOD, 0x2c);
-	} else {
-		out_le32(MDIO_CLK_OFFSET, 0x05);
-		out_le32(MDIO_CLK_PERIOD, 0x0c);
-	}
-
-	return;
-}
-
-/*
  * ----------------------------------------------------------------------
  * appnic_mii_read
  *
@@ -122,41 +90,13 @@ static void appnic_mdio_initialize(struct net_device *dev)
 
 static int appnic_mii_read(struct mii_bus *bus, int phy, int reg)
 {
-	struct appnic_device *pdata = (struct appnic_device *)bus->priv;
-	unsigned long flags;
 	unsigned short value;
-	unsigned long command = 0;
-	unsigned long status;
 
-	spin_lock_irqsave(&pdata->mdio_lock, flags);
+	/* Always returns success, so no need to check return status. */
+	acp_mdio_read(phy, reg, &value);
 
-	/* Set the mdio_busy (status) bit. */
-	status = in_le32(MDIO_STATUS_RD_DATA);
-	status |= 0x40000000;
-	out_le32(MDIO_STATUS_RD_DATA, status);
-
-	/* Write the command. */
-	command |= 0x10000000;          /* op_code: read */
-	command |= (phy & 0x1f) << 16;  /* port_addr (target device) */
-	command |= (reg & 0x1f) << 21;  /* device_addr (target register) */
-	out_le32(MDIO_CONTROL_RD_DATA, command);
-
-	/* Wait for the mdio_busy (status) bit to clear. */
-	do {
-		status = in_le32(MDIO_STATUS_RD_DATA);
-	} while (0 != (status & 0x40000000));
-
-	/* Wait for the mdio_busy (control) bit to clear. */
-	do {
-		command = in_le32(MDIO_CONTROL_RD_DATA);
-	} while (0 != (command & 0x80000000));
-
-	value = (unsigned short)(command & 0xffff);
-	spin_unlock_irqrestore(&pdata->mdio_lock, flags);
-
-	return value;
+	return (int)value;
 }
-
 
 /*
  * ----------------------------------------------------------------------
@@ -165,43 +105,7 @@ static int appnic_mii_read(struct mii_bus *bus, int phy, int reg)
 
 static int appnic_mii_write(struct mii_bus *bus, int phy, int reg, u16 val)
 {
-	struct appnic_device *pdata = (struct appnic_device *)bus->priv;
-	unsigned long flags;
-	unsigned long command = 0;
-	unsigned long status;
-
-	spin_lock_irqsave(&pdata->mdio_lock, flags);
-
-	/* Wait for mdio_busy (control) to be clear. */
-	do {
-		command = in_le32(MDIO_CONTROL_RD_DATA);
-	} while (0 != (command & 0x80000000));
-
-	/* Set the mdio_busy (status) bit. */
-	status = in_le32(MDIO_STATUS_RD_DATA);
-	status |= 0x40000000;
-	out_le32(MDIO_STATUS_RD_DATA, status);
-
-	/* Write the command. */
-	command = 0x08000000;           /* op_code: write */
-	command |= (phy & 0x1f) << 16;  /* port_addr (target device) */
-	command |= (reg & 0x1f) << 21;  /* device_addr (target register) */
-	command |= (val & 0xffff);      /* value */
-	out_le32(MDIO_CONTROL_RD_DATA, command);
-
-	/* Wait for the mdio_busy (status) bit to clear. */
-	do {
-		status = in_le32(MDIO_STATUS_RD_DATA);
-	} while (0 != (status & 0x40000000));
-
-	/* Wait for the mdio_busy (control) bit to clear. */
-	do {
-		command = in_le32(MDIO_CONTROL_RD_DATA);
-	} while (0 != (command & 0x80000000));
-
-	spin_unlock_irqrestore(&pdata->mdio_lock, flags);
-
-	return 0;
+	return acp_mdio_write(phy, reg, val);
 }
 
 /*
@@ -1596,7 +1500,6 @@ int appnic_init(struct net_device *dev)
 	 * Initialize the spinlocks.
 	 */
 
-	spin_lock_init(&pdata->mdio_lock);
 	spin_lock_init(&pdata->dev_lock);
 	spin_lock_init(&pdata->extra_lock);
 
@@ -1807,15 +1710,6 @@ static int __devinit appnic_probe_config_dt(struct net_device *dev,
 	else
 		pdata->mdio_clock = field[0];
 
-	field = of_get_property(np, "mdio-reg", NULL);
-	if (!field) {
-		goto device_tree_failed;
-	} else {
-		value64 = of_translate_address(np, field);
-		value32 = field[1];
-		pdata->mdio_base = (unsigned long)ioremap(value64, value32);
-	}
-
 	field = of_get_property(np, "phy-address", NULL);
 	if (!field)
 		goto device_tree_failed;
@@ -1997,9 +1891,6 @@ static int __devinit appnic_drv_probe(struct platform_device *pdev)
 		rc = -ENODEV;
 		goto out;
 	}
-
-	/* Initialize the MDIO interface. */
-	appnic_mdio_initialize(dev);
 
 	/* Initialize the PHY. */
 	rc = appnic_mii_init(pdev, dev);

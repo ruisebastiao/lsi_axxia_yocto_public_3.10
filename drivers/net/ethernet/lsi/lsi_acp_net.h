@@ -93,7 +93,6 @@ struct appnic_device {
 	unsigned long dma_base;
 	unsigned long interrupt;
 	unsigned long mdio_clock;
-	unsigned long mdio_base;
 	unsigned long phy_address;
 	unsigned long ad_value;
 	unsigned char mac_addr[6];
@@ -149,7 +148,6 @@ struct appnic_device {
 	union appnic_queue_pointer tx_head;
 
 	/* Spin Lock */
-	spinlock_t mdio_lock;
 	spinlock_t dev_lock;
 	spinlock_t extra_lock;
 
