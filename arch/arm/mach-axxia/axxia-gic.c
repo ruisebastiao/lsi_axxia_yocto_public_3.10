@@ -310,7 +310,7 @@ static void gic_set_type_wrapper(void *data)
 static int gic_set_type(struct irq_data *d, unsigned int type)
 {
 #ifdef CONFIG_SMP
-	int i, nr_cluster_ids = ((nr_cpu_ids-1) / 4) + 1;
+	int i, cpu, nr_cluster_ids = ((nr_cpu_ids-1) / 4) + 1;
 	unsigned int gicirq = gic_irq(d);
 	u32 pcpu = cpu_logical_map(smp_processor_id());
 	struct gic_set_type_wrapper_struct data;
@@ -337,19 +337,23 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 		if (i == (pcpu/4))
 			continue;
 
-		/*
-		 * We are running here with local interrupts
-		 * disabled. Temporarily re-enable them to
-		 * avoid possible deadlock when calling
-		 * smp_call_function_single().
-		 */
-		local_irq_enable();
-		smp_call_function_single((i * 4),
-			 gic_set_type_wrapper, &data, 1);
-		local_irq_disable();
-		if (data.status != 0)
-			printk(KERN_ERR "gic_set_type() error (%d)!\n",
-			       data.status);
+		/* Have the first cpu in each cluster execute this. */
+		cpu = i * 4;
+		if (cpu_online(cpu)) {
+			/*
+			 * We are running here with local interrupts
+			 * disabled. Temporarily re-enable them to
+			 * avoid possible deadlock when calling
+			 * smp_call_function_single().
+			 */
+			local_irq_enable();
+			smp_call_function_single(cpu, gic_set_type_wrapper,
+						 &data, 1);
+			local_irq_disable();
+			if (data.status != 0)
+				pr_err("Failed to set IRQ type for cpu%d\n",
+				       cpu);
+		}
 	}
 #endif
 	return _gic_set_type(d, type);
@@ -892,7 +896,7 @@ static void gic_notifier_wrapper(void *data)
 
 static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 {
-	int i;
+	int i, cpu;
 	struct gic_notifier_wrapper_struct data;
 	int nr_cluster_ids = ((nr_cpu_ids-1) / 4) + 1;
 	u32 pcpu = cpu_logical_map(smp_processor_id());
@@ -907,11 +911,14 @@ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 			continue;
 
 		/* Have the first cpu in each cluster execute this. */
-		local_irq_enable(); /* Temporarily re-enable interrupts. */
-		smp_call_function_single((i * 4),
-					 gic_notifier_wrapper,
-					 &data, 0);
-		local_irq_disable();
+		cpu = i * 4;
+		if (cpu_online(cpu)) {
+			local_irq_enable();
+			smp_call_function_single(cpu,
+						 gic_notifier_wrapper,
+						 &data, 0);
+			local_irq_disable();
+		}
 	}
 
 	/* Execute on this cluster. */
