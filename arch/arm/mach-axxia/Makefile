@@ -1,7 +1,8 @@
 #
 # Makefile for the linux kernel.
 #
-obj-y					:= axxia.o
+obj-y					:= wrappers.o
+obj-y					+= axxia.o
 obj-y					+= clock.o
 obj-y                                   += io.o
 obj-y					+= timers.o
