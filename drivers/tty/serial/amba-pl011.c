@@ -1519,7 +1519,7 @@ static int pl011_hwinit(struct uart_port *port)
 	return retval;
 }
 
-static int pl011_startup(struct uart_port *port)
+/*ZZZ static*/ int pl011_startup(struct uart_port *port)
 {
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
 	unsigned int cr;
@@ -1801,7 +1801,7 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 			quot -= 2;
 	}
 	/* Set baud rate */
-#if 0
+#if 1
 	writew(quot & 0x3f, port->membase + UART011_FBRD);
 	writew(quot >> 6, port->membase + UART011_IBRD);
 #else
