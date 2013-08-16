@@ -67,7 +67,6 @@
                         cpu-release-addr = <0>; // Fixed by the boot loader
 		};
 
-		/*
 		cpu@4 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
@@ -88,7 +87,69 @@
 			reg = <6>;
                         cpu-release-addr = <0>; // Fixed by the boot loader
 		};
-		*/
+
+		cpu@7 {
+			device_type = "cpua";
+			compatible = "arm,cortex-a15";
+			reg = <7>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@8 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <8>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@9 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <9>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@10 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <10>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@11 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <11>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@12 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <12>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@13 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <13>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@14 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <14>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
+
+		cpu@15 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <15>;
+                        cpu-release-addr = <0>; // Fixed by the boot loader
+		};
 	};
 
 	memory@00000000 {
