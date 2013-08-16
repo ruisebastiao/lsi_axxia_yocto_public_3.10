@@ -237,7 +237,7 @@ void __init axxia_dt_init(void)
 		writel(0x1F, ssp_base+0x30);
 	}
 
-	axxia_pcie_init();
+	/*axxia_pcie_init();*/
 
 #ifdef CONFIG_I2C
 	axxia_register_i2c_busses();
