@@ -1801,12 +1801,12 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 			quot -= 2;
 	}
 	/* Set baud rate */
-#if 1
+#if 0
 	writew(quot & 0x3f, port->membase + UART011_FBRD);
 	writew(quot >> 6, port->membase + UART011_IBRD);
 #else
-	writew(0x5, port->membase + UART011_FBRD);
-	writew(0x1, port->membase + UART011_IBRD);
+	writew(0x3, port->membase + UART011_FBRD);
+	writew(0x364, port->membase + UART011_IBRD);
 #endif
 
 	/*
