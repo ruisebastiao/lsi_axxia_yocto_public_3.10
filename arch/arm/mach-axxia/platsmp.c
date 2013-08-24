@@ -209,10 +209,6 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 				continue;
 
 			release_addr[phys_cpu] = release;
-			printk(KERN_ERR
-			       "%s:%d - set address for %d to 0x%08x\n",
-			       __FILE__, __LINE__,
-			       phys_cpu, release_addr[phys_cpu]);
 		}
 
 		/*
