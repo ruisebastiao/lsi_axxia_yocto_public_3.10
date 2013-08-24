@@ -13,6 +13,9 @@
 #include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/clk-provider.h>
+#include <linux/of_fdt.h>
+#include <linux/of_irq.h>
+#include <linux/of_platform.h>
 
 #define AXXIA_CPU_CLOCK 1400000000
 #define AXXIA_SYS_CLOCK  450000000
@@ -81,6 +84,11 @@ axxia_init_clocks(void)
 
 #else
 
+static struct of_device_id cpu_pll[] __initconst = {
+	{ .name = "/clocks/cpu", },
+	{},
+};
+
 /*
   -------------------------------------------------------------------------------
   axxia_init_clocks
@@ -93,27 +101,29 @@ axxia_init_clocks(void)
 {
 	struct clk *clk;
 	int i;
+	struct device_node *np;
+	u32 frequency;
 
-	/* APB clock dummy */
-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
-				      CLK_IS_ROOT, AXXIA_SYS_CLOCK/2);
-	clk_register_clkdev(clk, "apb_pclk", NULL);
+	np = of_find_node_by_path("/clocks/cpu");
 
-	/* CPU core clock (1400MHz) from CPU_PLL */
+	if (np) {
+		if (of_property_read_u32(np, "frequency", &frequency))
+			printk(KERN_ERR "%d - Error!", __LINE__);
+	}
+
 	clk = clk_register_fixed_rate(NULL, "clk_cpu", NULL,
-				      CLK_IS_ROOT, AXXIA_CPU_CLOCK);
+				      CLK_IS_ROOT, frequency);
 
-	/* APB and System AXI clock from CPU_PLL */
-	clk = clk_register_fixed_rate(NULL, "clk_pclk", NULL,
-				      CLK_IS_ROOT, AXXIA_CPU_CLOCK/9);
+	np = of_find_node_by_path("/clocks/peripheral");
 
-	/* DDR3 (interface 1) clock from SMEM1_PLL */
-	clk = clk_register_fixed_rate(NULL, "clk_smem1_2x", NULL,
-				      CLK_IS_ROOT, AXXIA_DDR_CLOCK);
+	if (np) {
+		if (of_property_read_u32(np, "frequency", &frequency))
+			printk(KERN_ERR "%d - Error!", __LINE__);
+	}
 
-	/* AXIS slow peripheral clock from SMEM1_PLL. */
 	clk = clk_register_fixed_rate(NULL, "clk_per", NULL,
-				      CLK_IS_ROOT, 2000000);
+				      CLK_IS_ROOT, frequency);
+
 	/* PL011 UART0 */
 	clk_register_clkdev(clk, NULL, "2010080000.uart");
 	/* PL011 UART1 */
@@ -124,20 +134,38 @@ axxia_init_clocks(void)
 	clk_register_clkdev(clk, NULL, "2010083000.uart");
 	/* PL022 SSP */
 	clk_register_clkdev(clk, NULL, "ssp");
-
-	/* Timers 1MHz clock */
-	clk = clk_register_fixed_rate(NULL, "clk_1mhz", NULL,
-				      CLK_IS_ROOT, 1000000);
 	/* SP804 timers */
 	clk_register_clkdev(clk, NULL, "sp804");
 	for (i = 0; i < 8; i++)
 		clk_register_clkdev(clk, NULL, "axxia-timer%d", i);
 
-	/* Dummy MMC clk */
+	np = of_find_node_by_path("/clocks/emmc");
+
+	if (np) {
+		if (of_property_read_u32(np, "frequency", &frequency))
+			printk(KERN_ERR "%d - Error!", __LINE__);
+	}
+
 	clk = clk_register_fixed_rate(NULL, "clk_mmci", NULL,
-				      CLK_IS_ROOT, 25000000);
+				      CLK_IS_ROOT, frequency);
+
 	/* PL180 MMCI */
 	clk_register_clkdev(clk, NULL, "mmci");
+
+	/* APB clock dummy */
+	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
+				      CLK_IS_ROOT, AXXIA_SYS_CLOCK/2);
+	clk_register_clkdev(clk, "apb_pclk", NULL);
+
+	/* APB and System AXI clock from CPU_PLL */
+	clk = clk_register_fixed_rate(NULL, "clk_pclk", NULL,
+				      CLK_IS_ROOT, AXXIA_CPU_CLOCK/9);
+
+	/* DDR3 (interface 1) clock from SMEM1_PLL */
+	clk = clk_register_fixed_rate(NULL, "clk_smem1_2x", NULL,
+				      CLK_IS_ROOT, AXXIA_DDR_CLOCK);
+
+	return;
 }
 
 #endif
