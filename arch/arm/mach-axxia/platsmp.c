@@ -35,6 +35,65 @@ extern void axxia_secondary_startup(void);
 #define APB2_SER3_ADDR_SIZE   0x10000
 
 /*
+  flush_l3
+*/
+
+static void
+flush_l3(void)
+{
+#if 0
+	unsigned long hnf_offsets[] = {
+		 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
+	};
+	int i;
+	unsigned long status;
+	int retries;
+	void __iomem *dickens;
+
+	dickens = ioremap(0x2000000000, 0x1000000);
+
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		/* set state NOL3 */
+		writel(0x0, dickens + (0x10000 * hnf_offsets[i]) + 0x10);
+	}
+
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		retries = 10000;
+
+		do {
+			status = readl(dickens +
+				       (0x10000 * hnf_offsets[i]) + 0x18);
+			udelay(1);
+		} while ((0 < --retries) && (0x0 != (status & 0xf)));
+
+		if (0 == retries)
+			BUG();
+	}
+
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		/* set state FAM */
+		writel(0x3, dickens + (0x10000 * hnf_offsets[i]) + 0x10);
+	}
+
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		retries = 10000;
+
+		do {
+			status = readl(dickens +
+				       (0x10000 * hnf_offsets[i]) + 0x18);
+			udelay(1);
+		} while ((0 < --retries) && (0xc != (status & 0xf)));
+
+		if (0 == retries)
+			BUG();
+	}
+
+	iounmap(dickens);
+#endif
+	return;
+}
+
+/*
  * Write pen_release in a way that is guaranteed to be visible to all
  * observers, irrespective of whether they're taking part in coherency
  * or not.  This is necessary for the hotplug code to work reliably.
@@ -45,6 +104,7 @@ static void __cpuinit write_pen_release(int val)
 	smp_wmb();
 	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+	flush_l3();
 }
 
 static DEFINE_RAW_SPINLOCK(boot_lock);
@@ -191,7 +251,7 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 	int i;
 	void __iomem *apb2_ser3_base;
 	unsigned long resetVal;
-	int phys_cpu, cpu_count=0;
+	int phys_cpu, cpu_count = 0;
 	struct device_node *np;
 	unsigned long release_addr[NR_CPUS] = {0};
 	unsigned long release;
@@ -216,24 +276,32 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 		 * actually populated at the present time.
 		 */
 
-		apb2_ser3_base = ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
+		apb2_ser3_base =
+			ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
 
-		for (i = 0; i < NR_CPUS; i++) {	
+		for (i = 0; i < NR_CPUS; i++) {
 			/* check if this is a possible CPU and
 			   it is within max_cpus range */
 			if ((cpu_possible(i)) &&
 			    (cpu_count < max_cpus) &&
 			    (0 != release_addr[i])) {
-				resetVal = readl(apb2_ser3_base + 0x1010);
-				phys_cpu = cpu_logical_map(i);
 				set_cpu_present(cpu_count, true);
-				if (phys_cpu != 0) {
-					writel(0xab, apb2_ser3_base+0x1000);
-					resetVal &= ~(1 << phys_cpu);
-					writel(resetVal, apb2_ser3_base+0x1010);
-					udelay(1000);
-				}
 				cpu_count++;
+			}
+
+			/* Release all physical cpu:s since we might want to
+			 * bring them online later. Also we need to get the
+			 * execution into kernel code (it's currently executing
+			 * in u-boot).
+			 */
+			phys_cpu = cpu_logical_map(i);
+
+			if (phys_cpu != 0) {
+				resetVal = readl(apb2_ser3_base + 0x1010);
+				writel(0xab, apb2_ser3_base+0x1000);
+				resetVal &= ~(1 << phys_cpu);
+				writel(resetVal, apb2_ser3_base+0x1010);
+				udelay(1000);
 			}
 		}
 
@@ -244,14 +312,19 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 		 * cores will execute once they are released from their
 		 * "holding pen".
 		 */
-		*(u32 *)phys_to_virt(release) =
-			virt_to_phys(axxia_secondary_startup);
-		smp_wmb();
-		__cpuc_flush_dcache_area((void *)phys_to_virt(release),
-					 sizeof(u32));
+		for (i = 0; i < NR_CPUS; i++) {
+			if (release_addr[i] != 0) {
+				u32 *vrel_addr =
+					(u32 *)phys_to_virt(release_addr[i]);
+				*vrel_addr =
+					virt_to_phys(axxia_secondary_startup);
+				smp_wmb();
+				__cpuc_flush_dcache_area(vrel_addr, sizeof(u32));
+			}
+		}
 	} else if (of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim")) {
 		for (i = 0; i < max_cpus; i++)
-                	set_cpu_present(i, true);
+			set_cpu_present(i, true);
 
 		/*
 		 * This is the entry point of the routine that the secondary
