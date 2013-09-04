@@ -20,6 +20,8 @@
 
 /dts-v1/;
 
+/memreserve/ 0x00000000 0x00400000;
+
 / {
 	model = "AXM5516";
 	compatible = "arm", "lsi,axm5516";
