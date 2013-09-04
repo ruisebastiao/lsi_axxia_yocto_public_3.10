@@ -28,7 +28,35 @@ ENTRY(axxia_secondary_startup)
 	sub	r4, r4, r5
 	add	r6, r6, r4
 pen:	ldr	r7, [r6]
-	cmp	r7, r0
+	/*
+	 * It seems that just looping over read/compare kills starves
+	 * ethernet, this will happen if we start the kernel with
+	 * maxcpus=X where X < 16. Which we really want in order to
+	 * isolate cores.
+	 *
+	 * FIXME: We should really use wfi or wfe here
+	 */
+	mov	r4, #0x7000
+__delay:
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	subs	r4,r4,#1
+	bne	__delay
+ 	cmp	r7, r0
 	bne	pen
 
 	/*
