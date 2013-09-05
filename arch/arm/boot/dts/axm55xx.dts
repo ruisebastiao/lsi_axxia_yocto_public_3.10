@@ -246,6 +246,15 @@
 		mac-address = [00 00 00 00 00 00];
 	};
 
+        USB0: usb@004a4000 {
+                device_type = "usb";
+                compatible = "acp-usb";
+                enabled = <0>;
+                reg = <0x20 0x10140000 0x0 0020000>,
+                      <0x20 0x10094000 0x0 0002000>;
+                interrupts = <0 55 4>;
+        };
+
         amba {
 		compatible = "arm,amba-bus";
 		#address-cells = <2>;
