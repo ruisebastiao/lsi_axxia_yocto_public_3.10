@@ -362,6 +362,7 @@ config ARCH_AXXIA
 	select ARM_TIMER_SP804
 	select ICST
 	select NEED_MACH_IO_H
+	select ZONE_DMA
 	select PCI
 	select PCI_DOMAINS if PCI
 	select ARCH_SUPPORTS_MSI if PCI

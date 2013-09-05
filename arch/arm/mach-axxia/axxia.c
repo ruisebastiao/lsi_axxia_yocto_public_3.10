@@ -65,6 +65,7 @@ void __init axxia_dt_map_io(void)
 
 void __init axxia_dt_init_early(void)
 {
+	 init_dma_coherent_pool_size(SZ_1M);
 }
 
 static struct of_device_id axxia_irq_match[] __initdata = {
@@ -258,4 +259,7 @@ DT_MACHINE_START(AXXIA_DT, "LSI Axxia")
 	.init_machine	= axxia_dt_init,
 	.handle_irq	= axxia_gic_handle_irq,
 	.restart	= axxia_restart,
+#if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
+ 	.dma_zone_size	= (4ULL * SZ_1G),
+#endif
 MACHINE_END
