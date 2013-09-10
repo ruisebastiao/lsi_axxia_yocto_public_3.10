@@ -102,18 +102,13 @@ static void soft_reset(struct gpdma_engine *engine)
 	wr32(GPDMA_MAGIC, engine->gbase + SOFT_RESET);
 	wmb();
 
-	/*
-	 *  Set has to be done twice???
-	 *  Yep! According to LSI code it has to be done twice,
-	 *  have no idea why.
-	 */
 	cfg = (engine->pool.phys & 0xfff00000) | GEN_CONFIG_EXT_MEM;
+
 	if (engine->chip->flags & LSIDMA_EDGE_INT) {
 		for (i = 0; i < engine->chip->num_channels; i++)
 			cfg |= GEN_CONFIG_INT_EDGE(i);
 		engine_dbg(engine, "Using edge-triggered interrupts\n");
 	}
-	wr32(cfg, engine->gbase + GEN_CONFIG);
 	wr32(cfg, engine->gbase + GEN_CONFIG);
 	engine_dbg(engine, "engine->desc.phys & 0xfff00000 == %llx\n",
 		   (engine->pool.phys & 0xfff00000));
@@ -327,9 +322,18 @@ static irqreturn_t gpdma_isr_err(int irqno, void *_engine)
 {
 	struct gpdma_engine *engine = _engine;
 	u32 status = rd32(engine->gbase + GEN_STAT);
+	u32 ch = (status & GEN_STAT_CH0_ERROR) ? 0 : 1;
+	struct gpdma_channel *dmac = &engine->channel[ch];
 
-	(void) status;
-	engine_dbg(engine, "ERROR ISR: status=%08x\n", status);
+	if (0 == (status & (GEN_STAT_CH0_ERROR | GEN_STAT_CH1_ERROR)))
+		return IRQ_NONE;
+
+	/* Read the channel status bits and dump the error */
+	status = rd32(dmac->base + DMA_STATUS);
+	pr_err("dma: channel%d error %08x\n", dmac->channel, status);
+	/* Clear the error indication */
+	wr32(DMA_STATUS_ERROR, dmac->base+DMA_STATUS);
+
 	return IRQ_HANDLED;
 }
 
@@ -715,8 +719,7 @@ static struct lsidma_hw lsi_dma32 = {
 	.chregs_offset  = 0x80,
 	.genregs_offset = 0xF00,
 	.flags          = (LSIDMA_NEXT_FULL |
-			   LSIDMA_SEG_REGS  |
-			   LSIDMA_EDGE_INT)
+			   LSIDMA_SEG_REGS)
 };
 
 static struct lsidma_hw lsi_dma31 = {
@@ -800,7 +803,7 @@ static int __devinit gpdma_of_probe(struct platform_device *op)
 	}
 	dev_dbg(&op->dev, "mapped base @ %p\n", engine->iobase);
 
-	engine->err_irq = irq_of_parse_and_map(op->dev.of_node, 0);
+	engine->err_irq = irq_of_parse_and_map(op->dev.of_node, 1);
 	if (engine->err_irq) {
 		rc = request_irq(engine->err_irq, gpdma_isr_err,
 				 IRQF_SHARED, "lsi-dma-err", engine);

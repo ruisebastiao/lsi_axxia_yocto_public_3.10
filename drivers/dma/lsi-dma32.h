@@ -114,6 +114,11 @@
 					 DMA_CONFIG_CHAN_EN)
 
 #define GEN_STAT       0x0
+#define   GEN_STAT_CH0_ACTIVE (1<<0)
+#define   GEN_STAT_CH1_ACTIVE (1<<2)
+#define   GEN_STAT_CH1_ACTIVE (1<<2)
+#define   GEN_STAT_CH0_ERROR  (1<<16)
+#define   GEN_STAT_CH1_ERROR  (1<<17)
 #define GEN_CONFIG     0x4
 #define  GEN_CONFIG_EXT_MEM                     (1<<19)
 #define  GEN_CONFIG_INT_EDGE(_ch)               (1<<(_ch))
