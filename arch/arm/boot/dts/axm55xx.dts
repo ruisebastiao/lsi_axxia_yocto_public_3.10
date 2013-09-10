@@ -241,8 +241,9 @@
 		             <0 4 4>;
 		mdio-reg = <0x20 0x10090000 0 0x1000>;
 		mdio-clock = <0>;
-		phy-address = <0x3>;
-		ad-value = <0x61>;
+		phy-address = <0x1e>;
+		ad-value = <0>;
+		phy-link = "auto";
 		mac-address = [00 00 00 00 00 00];
 	};
 
