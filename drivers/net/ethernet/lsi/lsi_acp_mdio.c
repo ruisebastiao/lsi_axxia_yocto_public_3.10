@@ -98,6 +98,11 @@ acp_mdio_read(unsigned long address, unsigned long offset,
 	*value = (unsigned short)(command & 0xffff);
 	spin_unlock_irqrestore(&mdio_lock, flags);
 
+#if 0
+	printk("%s - Read 0x%x from 0x%x register 0x%x\n",
+	       __FUNCTION__, *value, address, offset);
+#endif
+
 	return 0;
 }
 EXPORT_SYMBOL(acp_mdio_read);
@@ -149,6 +154,11 @@ acp_mdio_write(unsigned long address, unsigned long offset,
 	} while (0 != (command & 0x80000000));
 
 	spin_unlock_irqrestore(&mdio_lock, flags);
+
+#if 0
+	printk("%s - Wrote 0x%x to 0x%x register 0x%x\n",
+	       __FUNCTION__, value, address, offset);
+#endif
 
 	return 0;
 }
