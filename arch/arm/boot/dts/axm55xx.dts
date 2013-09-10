@@ -210,7 +210,6 @@
 	};
 
 	gpdma@2020141000 {
-		status = "disabled";
 		compatible = "lsi,dma32";
 		reg = <0x20 0x20141000 0x00 0x1000>;
 		interrupts = <0 64 4>, /* busy */
