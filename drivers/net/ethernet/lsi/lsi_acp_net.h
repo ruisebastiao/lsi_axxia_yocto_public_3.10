@@ -86,7 +86,7 @@ struct appnic_dma_descriptor {
 	unsigned long host_data_memory_pointer;
 #endif
 
-} __attribute__ ((packed));
+} __packed;
 
 union appnic_queue_pointer {
 
@@ -102,9 +102,9 @@ union appnic_queue_pointer {
 		unsigned long generation_bit:1;
 		unsigned long offset:20;
 #endif
-	} __attribute__ ((packed)) bits;
+	} __packed bits;
 
-} __attribute__ ((packed));
+} __packed;
 
 /*
   =============================================================================
