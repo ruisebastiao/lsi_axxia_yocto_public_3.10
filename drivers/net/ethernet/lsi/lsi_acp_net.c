@@ -181,6 +181,11 @@ static void appnic_handle_link_change(struct net_device *dev)
 		status_change = 1;
 	}
 
+#ifdef AMARILLO_WA
+	rx_configuration &= ~0x1000;
+	tx_configuration &= ~0x1000;
+#endif
+
 	if (status_change) {
 		if (phydev->link) {
 			netif_carrier_on(dev);
@@ -192,11 +197,6 @@ static void appnic_handle_link_change(struct net_device *dev)
 			netif_carrier_off(dev);
 			netdev_info(dev, "link down\n");
 		}
-
-#ifdef AMARILLO_WA
-		rx_configuration &= ~0x1000;
-		tx_configuration &= ~0x1000;
-#endif
 
 		if (rx_configuration != read_mac(APPNIC_RX_CONF))
 			write_mac(rx_configuration, APPNIC_RX_CONF);
