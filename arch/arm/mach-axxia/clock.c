@@ -90,7 +90,7 @@ static struct of_device_id cpu_pll[] __initconst = {
 };
 
 /*
-  -------------------------------------------------------------------------------
+  --------------------------------------------------------------------
   axxia_init_clocks
 
   Clock setup for Emulation/ASIC systems.
@@ -134,6 +134,11 @@ axxia_init_clocks(void)
 	clk_register_clkdev(clk, NULL, "2010083000.uart");
 	/* PL022 SSP */
 	clk_register_clkdev(clk, NULL, "ssp");
+	/* I2C */
+	clk_register_clkdev(clk, NULL, "2010084000.i2c");
+	clk_register_clkdev(clk, NULL, "2010085000.i2c");
+	clk_register_clkdev(clk, NULL, "2010086000.i2c");
+	clk_register_clkdev(clk, NULL, "2010087000.i2c");
 	/* SP804 timers */
 	clk_register_clkdev(clk, NULL, "sp804");
 	for (i = 0; i < 8; i++)
