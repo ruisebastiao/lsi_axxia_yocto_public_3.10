@@ -299,6 +299,12 @@
                 port = <1>;
                 reg = <0x20 0x10085000 0x00 0x1000>;
 		interrupts = <0 20 4>;
+
+                eeprom@54 {
+                        compatible = "24c1024";
+                        reg = <0x54>;
+			pagesize = <128>;
+                };
         };
 
         I2C2: i2c@0x02010086000 {
