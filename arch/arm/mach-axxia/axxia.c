@@ -173,7 +173,6 @@ spidev_chip_select(u32 control, unsigned n)
 
 static void spi_cs_eeprom0(u32 control) { spidev_chip_select(control, 0); }
 static void spi_cs_eeprom1(u32 control) { spidev_chip_select(control, 1); }
-static void spi_cs_eeprom2(u32 control) { spidev_chip_select(control, 2); }
 
 struct pl022_config_chip spi_eeprom0 = {
 	.iface      = SSP_INTERFACE_MOTOROLA_SPI,
@@ -187,37 +186,23 @@ struct pl022_config_chip spi_eeprom1 = {
 	.cs_control = spi_cs_eeprom1
 };
 
-struct pl022_config_chip spi_eeprom2 = {
-	.iface      = SSP_INTERFACE_MOTOROLA_SPI,
-	.com_mode   = POLLING_TRANSFER,
-	.cs_control = spi_cs_eeprom2
-};
-
 static struct spi_board_info spi_devs[] __initdata = {
 	{
-		.modalias               = "spidev",
+		.modalias               = "s25fl129p1",
 		.controller_data        = &spi_eeprom0,
 		.bus_num                = 0,
 		.chip_select            = 0,
-		.max_speed_hz           = 12000000,
+		.max_speed_hz           = 25000000,
 		.mode                   = SPI_MODE_0,
 	},
 	{
-		.modalias               = "spidev",
+		.modalias               = "s25fl129p1",
 		.controller_data        = &spi_eeprom1,
 		.bus_num                = 0,
 		.chip_select            = 1,
-		.max_speed_hz           = 12000000,
+		.max_speed_hz           = 25000000,
 		.mode                   = SPI_MODE_0,
-	},
-	{
-		.modalias               = "spidev",
-		.controller_data        = &spi_eeprom2,
-		.bus_num                = 0,
-		.chip_select            = 2,
-		.max_speed_hz           = 12000000,
-		.mode                   = SPI_MODE_0,
-	},
+	}
 };
 
 void __init axxia_dt_init(void)
