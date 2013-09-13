@@ -123,7 +123,7 @@ static int appnic_mii_read(struct mii_bus *bus, int phy, int reg)
 	unsigned short value;
 
 	/* Always returns success, so no need to check return status. */
-	acp_mdio_read(phy, reg, &value);
+	acp_mdio_read(phy, reg, &value, 0);
 
 	return (int)value;
 }
@@ -135,7 +135,7 @@ static int appnic_mii_read(struct mii_bus *bus, int phy, int reg)
 
 static int appnic_mii_write(struct mii_bus *bus, int phy, int reg, u16 val)
 {
-	return acp_mdio_write(phy, reg, val);
+	return acp_mdio_write(phy, reg, val, 0);
 }
 
 /*
@@ -277,27 +277,27 @@ skip_first:
 
 #ifdef AMARILLO_WA
 	/*
-	 * For Amarillo, without the auto-negotiate ecn.
+	 * For the Amarillo, without the auto-negotiate ecn.
 	 */
 	{
 		u16 val;
 		int rc;
 
 		/* Enable access to shadow register @ 0x1d */
-		rc = acp_mdio_read(phydev->addr, PHY_BCM_TEST_REG, &val);
+		rc = acp_mdio_read(phydev->addr, PHY_BCM_TEST_REG, &val, 0);
 		val |= 0x80;
-		rc |= acp_mdio_write(phydev->addr, PHY_BCM_TEST_REG, val);
+		rc |= acp_mdio_write(phydev->addr, PHY_BCM_TEST_REG, val, 0);
 
 		/* Set RX FIFO size to 0x7 */
-		rc |= acp_mdio_read(phydev->addr, PHY_AUXILIARY_MODE3, &val);
+		rc |= acp_mdio_read(phydev->addr, PHY_AUXILIARY_MODE3, &val, 0);
 		val &= 0xf;
 		val |= 0x7;
-		rc |= acp_mdio_write(phydev->addr, PHY_AUXILIARY_MODE3, val);
+		rc |= acp_mdio_write(phydev->addr, PHY_AUXILIARY_MODE3, val, 0);
 
 		/* Disable access to shadow register @ 0x1d */
-		rc |= acp_mdio_read(phydev->addr, PHY_BCM_TEST_REG, &val);
+		rc |= acp_mdio_read(phydev->addr, PHY_BCM_TEST_REG, &val, 0);
 		val &= ~0x80;
-		rc |= acp_mdio_write(phydev->addr, PHY_BCM_TEST_REG, val);
+		rc |= acp_mdio_write(phydev->addr, PHY_BCM_TEST_REG, val, 0);
 
 		if (0 != rc)
 			return -EIO;
