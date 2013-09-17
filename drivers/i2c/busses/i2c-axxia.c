@@ -197,14 +197,13 @@ axxia_i2c_init(struct axxia_i2c_dev *idev)
 	/*
 	   Find the prescaler value that makes tmo_clk fit in 15-bits counter.
 	 */
-	for (prescale=0; prescale < 15; ++prescale) {
+	for (prescale = 0; prescale < 15; ++prescale) {
 		if (tmo_clk <= 0x7fff)
 			break;
 		tmo_clk >>= 1;
 	}
-	if (tmo_clk > 0x7fff) {
+	if (tmo_clk > 0x7fff)
 		tmo_clk = 0x7fff;
-	}
 
 	/* Prescale divider (log2) */
 	writel(prescale, &idev->regs->timer_clock_div);
@@ -444,7 +443,7 @@ axxia_i2c_probe(struct platform_device *pdev)
 	struct axxia_i2c_dev *idev = NULL;
 	struct clk *i2c_clk = NULL;
 	void __iomem *base = NULL;
-	u32 port = 0;
+	u32 bus = pdev->id;
 	int irq = 0;
 	int ret = 0;
 
@@ -481,7 +480,7 @@ axxia_i2c_probe(struct platform_device *pdev)
 	idev->dev          = &pdev->dev;
 	init_completion(&idev->msg_complete);
 
-	of_property_read_u32(np, "port", &port);
+	of_property_read_u32(np, "bus", &bus);
 
 	of_property_read_u32(np, "clock-frequency", &idev->bus_clk_rate);
 
@@ -509,10 +508,10 @@ axxia_i2c_probe(struct platform_device *pdev)
 	idev->adapter.owner = THIS_MODULE;
 	idev->adapter.class = I2C_CLASS_HWMON;
 	snprintf(idev->adapter.name, sizeof(idev->adapter.name),
-		 "Axxia I2C%u", port);
+		 "Axxia I2C%u", bus);
 	idev->adapter.algo = &axxia_i2c_algo;
 	idev->adapter.dev.parent = &pdev->dev;
-	idev->adapter.nr = pdev->id;
+	idev->adapter.nr = bus;
 	idev->adapter.dev.of_node = pdev->dev.of_node;
 
 	ret = i2c_add_numbered_adapter(&idev->adapter);
