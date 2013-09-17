@@ -1204,7 +1204,7 @@ ai2c_return:
 }
 
 int ai2c_stateSetup(
-    struct ai2c_priv           **outPriv)
+	struct ai2c_priv           **outPriv)
 {
 	int                     ai2cStatus = AI2C_ST_SUCCESS;
 	struct ai2c_priv        *priv = NULL;
@@ -1234,8 +1234,8 @@ ai2c_return:
 }
 
 int ai2c_memSetup(
-    struct platform_device      *pdev,
-    struct ai2c_priv            *priv)
+	struct platform_device      *pdev,
+	struct ai2c_priv            *priv)
 {
 	int                     ai2cStatus = AI2C_ST_SUCCESS;
 	struct axxia_i2c_bus_platform_data  *pdata;
