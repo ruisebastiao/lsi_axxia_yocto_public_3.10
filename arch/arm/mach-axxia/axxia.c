@@ -224,7 +224,7 @@ void __init axxia_dt_init(void)
 		writel(0x1F, ssp_base+0x30);
 	}
 
-	/*axxia_pcie_init();*/
+	axxia_pcie_init();
 }
 
 static void axxia_restart(char str, const char *cmd)
