@@ -259,7 +259,7 @@
                 0x20 0x20120000 0x0 0x00008000 >;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> >*/
-                ranges = <0x03000000 0x00000000 0xa0000000
+                ranges = <0x03000000 0x00000000 0x80000000
                           0x30 0x00000000
                           0x00 0x20000000>;
                 /* Inbound ranges */
@@ -299,7 +299,7 @@
                        0x20 0x20130000 0x0 0x00008000 >;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x03000000 0x00000000 0xa0000000
+                ranges = <0x03000000 0x00000000 0xc0000000
                           0x30 0x80000000
                           0x00 0x20000000>;
                 /* Inbound ranges */

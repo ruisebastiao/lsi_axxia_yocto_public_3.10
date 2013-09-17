@@ -622,7 +622,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 
 	/* make sure the ACP device is configured as PCI Root Complex */
 	if ((pci_status & 0x18) != 0x18) {
-		pr_err("PCIE%d: Device is not Root Complex\n", portno);
+		pr_err("PCIE%d: Device is not Root Complex\n", port->index);
 		goto fail;
 	}
 
