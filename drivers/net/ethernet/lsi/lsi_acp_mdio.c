@@ -77,53 +77,52 @@ acp_mdio_read(unsigned long address, unsigned long offset,
 	WRITE(MDIO_STATUS_RD_DATA, status);
 #endif				/* BZ33327_WA */
 
-    if(clause45 == 0) {
-    	/* Write the command. */
-    	command |= 0x10000000;	/* op_code: read */
-    	command |= (address & 0x1f) << 16;	/* port_addr (target device) */
-    	command |= (offset & 0x1f) << 21;/* device_addr (target register) */
-    	WRITE(MDIO_CONTROL_RD_DATA, command);
-    } else {
-        /* 
-         * Step 1: Write the address. 
-         */
-         
-    	/* Write the address */
-        command |= 0x20000000; /* clause_45 = 1 */
-    	command |= 0x00000000;	/* op_code: write */
-        command |= 0x04000000; /* interface_select = 1 */
-        command |= ((offset & 0x001f0000) >> 3); /* device_addr (target device_type) */
-    	command |= (address & 0x1f) << 16; /* port_addr (target device) */
-        command |= (offset & 0xffff); /*  	addr_or_data (target register) */
-    	WRITE(MDIO_CONTROL_RD_DATA, command);
+	if (clause45 == 0) {
+		/* Write the command. */
+		command = 0x10000000;	/* op_code: read */
+		command |= (address & 0x1f) << 16;	/* port_addr (target device) */
+		command |= (offset & 0x1f) << 21;/* device_addr (target register) */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
+	} else {
+		/*
+		* Step 1: Write the address.
+		*/
 
-    	/* Wait for the mdio_busy (status) bit to clear. */
-    	do {
-    		status = READ(MDIO_STATUS_RD_DATA);
-    	} while (0 != (status & 0x40000000));
+		/* Write the address */
+		command = 0x20000000; /* clause_45 = 1 */
+		command |= 0x00000000;	/* op_code: 0 */
+		command |= 0x04000000; /* interface_select = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
+		command |= (address & 0x1f) << 16; /* port_addr (target device) */
+		command |= (offset & 0xffff); /* addr_or_data (target register) */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
 
-    	/* Wait for the mdio_busy (control) bit to clear. */
-    	do {
-    		command = READ(MDIO_CONTROL_RD_DATA);
-    	} while (0 != (command & 0x80000000));
+		/* Wait for the mdio_busy (status) bit to clear. */
+		do {
+			status = READ(MDIO_STATUS_RD_DATA);
+		} while (0 != (status & 0x40000000));
 
-        /* 
-         * Step 2: Read the value. 
-         */
+		/* Wait for the mdio_busy (control) bit to clear. */
+		do {
+			command = READ(MDIO_CONTROL_RD_DATA);
+		} while (0 != (command & 0x80000000));
 
-        /* Set the mdio_busy (status) bit. */
-    	status = READ(MDIO_STATUS_RD_DATA);
-    	status |= 0x40000000;
-    	WRITE(MDIO_STATUS_RD_DATA, status);
+		/*
+		* Step 2: Read the value.
+		*/
 
-        command = 0;
-        command |= 0x20000000; /* clause_45 = 1 */
-        command |= 0x10000000;	/* op_code: read */
-        command |= 0x04000000; /* interface_select = 1 */
-        command |= ((offset & 0x001f0000) >> 3); /* device_addr (target device_type) */
-        command |= (address & 0x1f) << 16; /* port_addr (target device) */
-        WRITE(MDIO_CONTROL_RD_DATA, command);
-    }
+		/* Set the mdio_busy (status) bit. */
+		status = READ(MDIO_STATUS_RD_DATA);
+		status |= 0x40000000;
+		WRITE(MDIO_STATUS_RD_DATA, status);
+
+		command = 0x20000000; /* clause_45 = 1 */
+		command |= 0x10000000;	/* op_code: read */
+		command |= 0x04000000; /* interface_select = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
+		command |= (address & 0x1f) << 16; /* port_addr (target device) */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
+	}
 
 #if defined(BZ33327_WA)
 	/* Wait for the mdio_busy (status) bit to clear. */
@@ -171,55 +170,54 @@ acp_mdio_write(unsigned long address, unsigned long offset,
 	WRITE(MDIO_STATUS_RD_DATA, status);
 #endif				/* BZ33327_WA */
 
-    if(clause45 == 0) {
-    	/* Write the command. */
-    	command = 0x08000000;	/* op_code: write */
-    	command |= (address & 0x1f) << 16;	/* port_addr (target device) */
-    	command |= (offset & 0x1f) << 21;/* device_addr (target register) */
-    	command |= (value & 0xffff);	/* value */
-    	WRITE(MDIO_CONTROL_RD_DATA, command);
-    } else {
-        /* 
-         * Step 1: Write the address. 
-         */
-         
-    	/* Write the address */
-        command |= 0x20000000; /* clause_45 = 1 */
-    	command |= 0x08000000;	/* op_code: write */
-        command |= 0x04000000; /* interface_select = 1 */
-        command |= ((offset & 0x001f0000) >> 3); /* device_addr (target device_type) */
-    	command |= (address & 0x1f) << 16; /* port_addr (target device) */
-        command |= (offset & 0xffff); /*  	addr_or_data (target register) */
-    	WRITE(MDIO_CONTROL_RD_DATA, command);
+	if (clause45 == 0) {
+		/* Write the command. */
+		command = 0x08000000;	/* op_code: write */
+		command |= (address & 0x1f) << 16;	/* port_addr (target device) */
+		command |= (offset & 0x1f) << 21;/* device_addr (target register) */
+		command |= (value & 0xffff);	/* value */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
+	} else {
+		/*
+		* Step 1: Write the address.
+		*/
 
-    	/* Wait for the mdio_busy (status) bit to clear. */
-    	do {
-    		status = READ(MDIO_STATUS_RD_DATA);
-    	} while (0 != (status & 0x40000000));
+		/* Write the address */
+		command = 0x20000000; /* clause_45 = 1 */
+		command |= 0x00000000;	/* op_code: 0 */
+		command |= 0x04000000; /* interface_select = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
+		command |= (address & 0x1f) << 16; /* port_addr (target device) */
+		command |= (offset & 0xffff); /* addr_or_data (target register) */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
 
-    	/* Wait for the mdio_busy (control) bit to clear. */
-    	do {
-    		command = READ(MDIO_CONTROL_RD_DATA);
-    	} while (0 != (command & 0x80000000));
+		/* Wait for the mdio_busy (status) bit to clear. */
+		do {
+			status = READ(MDIO_STATUS_RD_DATA);
+		} while (0 != (status & 0x40000000));
 
-        /* 
-         * Step 2: Write the value. 
-         */
+		/* Wait for the mdio_busy (control) bit to clear. */
+		do {
+			command = READ(MDIO_CONTROL_RD_DATA);
+		} while (0 != (command & 0x80000000));
 
-        /* Set the mdio_busy (status) bit. */
-    	status = READ(MDIO_STATUS_RD_DATA);
-    	status |= 0x40000000;
-    	WRITE(MDIO_STATUS_RD_DATA, status);
+		/*
+		* Step 2: Write the value.
+		*/
 
-        command = 0;
-        command |= 0x20000000; /* clause_45 = 1 */
-        command |= 0x08000000;	/* op_code: write */
-        command |= 0x04000000; /* interface_select = 1 */
-        command |= ((offset & 0x001f0000) >> 3); /* device_addr (target device_type) */
-        command |= (address & 0x1f) << 16; /* port_addr (target device) */
-        command |= (value & 0xffff); /*  	addr_or_data = value */
-        WRITE(MDIO_CONTROL_RD_DATA, command);
-    }
+		/* Set the mdio_busy (status) bit. */
+		status = READ(MDIO_STATUS_RD_DATA);
+		status |= 0x40000000;
+		WRITE(MDIO_STATUS_RD_DATA, status);
+
+		command = 0x20000000; /* clause_45 = 1 */
+		command |= 0x08000000;	/* op_code: write */
+		command |= 0x04000000; /* interface_select = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
+		command |= (address & 0x1f) << 16; /* port_addr (target device) */
+		command |= (value & 0xffff); /*	addr_or_data = value */
+		WRITE(MDIO_CONTROL_RD_DATA, command);
+	}
 
 #if defined(BZ33327_WA)
 	/* Wait for the mdio_busy (status) bit to clear. */
