@@ -209,8 +209,8 @@ axxia_pciex_get_config_base(struct axxia_pciex_port *port,
 		return port->regs;
 
 	relbus = bus->number - (port->root_bus_nr + 1);
-	dev    = (PCI_SLOT(devfn) & 0xf8) >> 3;
-	fn     = (PCI_FUNC(devfn) & 0x7);
+	dev    = PCI_SLOT(devfn);
+	fn     = PCI_FUNC(devfn);
 
 	if (dev > 31)
 		return NULL;
