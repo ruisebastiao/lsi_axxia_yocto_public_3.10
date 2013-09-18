@@ -92,7 +92,7 @@
 
 /* Define to disable full duplex mode on Amarillo boards */
 #undef AMARILLO_WA
-/*#define AMARILLO_WA*/
+#define AMARILLO_WA
 
 #define LSI_DRV_NAME           "acp-femac"
 #define LSI_MDIO_NAME          "acp-femac-mdio"
