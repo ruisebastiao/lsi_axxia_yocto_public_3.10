@@ -92,7 +92,7 @@
 
 /* Define to disable full duplex mode on Amarillo boards */
 #undef AMARILLO_WA
-#define AMARILLO_WA
+/*#define AMARILLO_WA*/
 
 #define LSI_DRV_NAME           "acp-femac"
 #define LSI_MDIO_NAME          "acp-femac-mdio"
@@ -1881,8 +1881,8 @@ static int __devinit appnic_probe_config_dt(struct net_device *dev,
 			pdata->phy_link_speed = 0;
 			pdata->phy_link_duplex = 0;
 		} else {
-			pr_err("Invalid phy-link value \"%s\" "
-			       "in DTS. Defaulting to \"auto\".\n",
+			pr_err(
+			  "Invalid phy-link value \"%s\" in DTS. Defaulting to \"auto\".\n",
 			       macspeed);
 			pdata->phy_link_auto = 1;
 		}
