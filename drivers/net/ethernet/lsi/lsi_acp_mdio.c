@@ -75,26 +75,29 @@ acp_mdio_read(unsigned long address, unsigned long offset,
 	status = READ(MDIO_STATUS_RD_DATA);
 	status |= 0x40000000;
 	WRITE(MDIO_STATUS_RD_DATA, status);
-#endif				/* BZ33327_WA */
+#endif /* BZ33327_WA */
 
 	if (clause45 == 0) {
 		/* Write the command. */
-		command = 0x10000000;	/* op_code: read */
-		command |= (address & 0x1f) << 16;	/* port_addr (target device) */
-		command |= (offset & 0x1f) << 21;/* device_addr (target register) */
+		command = 0x10000000;              /* op_code: read */
+		command |= (address & 0x1f) << 16; /* port_addr (tgt device) */
+		command |= (offset & 0x1f) << 21;  /* device_addr (tgt reg) */
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 	} else {
 		/*
-		* Step 1: Write the address.
-		*/
+		 * Step 1: Write the address.
+		 */
 
 		/* Write the address */
-		command = 0x20000000; /* clause_45 = 1 */
-		command |= 0x00000000;	/* op_code: 0 */
-		command |= 0x04000000; /* interface_select = 1 */
-		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
-		command |= (address & 0x1f) << 16; /* port_addr (target device) */
-		command |= (offset & 0xffff); /* addr_or_data (target register) */
+		command = 0x20000000;                    /* clause_45 = 1 */
+		command |= 0x00000000;                   /* op_code: 0 */
+		command |= 0x04000000;                   /* interface_sel = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target
+							    device_type) */
+		command |= (address & 0x1f) << 16;       /* port_addr (target
+							    device) */
+		command |= (offset & 0xffff);            /* addr_or_data (target
+							    register) */
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 
 		/* Wait for the mdio_busy (status) bit to clear. */
@@ -108,19 +111,21 @@ acp_mdio_read(unsigned long address, unsigned long offset,
 		} while (0 != (command & 0x80000000));
 
 		/*
-		* Step 2: Read the value.
-		*/
+		 * Step 2: Read the value.
+		 */
 
 		/* Set the mdio_busy (status) bit. */
 		status = READ(MDIO_STATUS_RD_DATA);
 		status |= 0x40000000;
 		WRITE(MDIO_STATUS_RD_DATA, status);
 
-		command = 0x20000000; /* clause_45 = 1 */
-		command |= 0x10000000;	/* op_code: read */
-		command |= 0x04000000; /* interface_select = 1 */
-		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
-		command |= (address & 0x1f) << 16; /* port_addr (target device) */
+		command = 0x20000000;                    /* clause_45 = 1 */
+		command |= 0x10000000;                   /* op_code: read */
+		command |= 0x04000000;                   /* interface_sel = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target
+							    device_type) */
+		command |= (address & 0x1f) << 16;       /* port_addr (target
+							    device) */
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 	}
 
@@ -168,27 +173,30 @@ acp_mdio_write(unsigned long address, unsigned long offset,
 	status = READ(MDIO_STATUS_RD_DATA);
 	status |= 0x40000000;
 	WRITE(MDIO_STATUS_RD_DATA, status);
-#endif				/* BZ33327_WA */
+#endif /* BZ33327_WA */
 
 	if (clause45 == 0) {
 		/* Write the command. */
-		command = 0x08000000;	/* op_code: write */
-		command |= (address & 0x1f) << 16;	/* port_addr (target device) */
-		command |= (offset & 0x1f) << 21;/* device_addr (target register) */
-		command |= (value & 0xffff);	/* value */
+		command = 0x08000000;              /* op_code: write */
+		command |= (address & 0x1f) << 16; /* port_addr (tgt device) */
+		command |= (offset & 0x1f) << 21;  /* device_addr (tgt reg) */
+		command |= (value & 0xffff);       /* value */
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 	} else {
 		/*
-		* Step 1: Write the address.
-		*/
+		 * Step 1: Write the address.
+		 */
 
 		/* Write the address */
-		command = 0x20000000; /* clause_45 = 1 */
-		command |= 0x00000000;	/* op_code: 0 */
-		command |= 0x04000000; /* interface_select = 1 */
-		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
-		command |= (address & 0x1f) << 16; /* port_addr (target device) */
-		command |= (offset & 0xffff); /* addr_or_data (target register) */
+		command = 0x20000000;                    /* clause_45 = 1 */
+		command |= 0x00000000;                   /* op_code: 0 */
+		command |= 0x04000000;                   /* interface_sel = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target
+							    device_type) */
+		command |= (address & 0x1f) << 16;       /* port_addr (target
+							    device) */
+		command |= (offset & 0xffff);            /* addr_or_data (target
+							    register) */
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 
 		/* Wait for the mdio_busy (status) bit to clear. */
@@ -202,20 +210,22 @@ acp_mdio_write(unsigned long address, unsigned long offset,
 		} while (0 != (command & 0x80000000));
 
 		/*
-		* Step 2: Write the value.
-		*/
+		 * Step 2: Write the value.
+		 */
 
 		/* Set the mdio_busy (status) bit. */
 		status = READ(MDIO_STATUS_RD_DATA);
 		status |= 0x40000000;
 		WRITE(MDIO_STATUS_RD_DATA, status);
 
-		command = 0x20000000; /* clause_45 = 1 */
-		command |= 0x08000000;	/* op_code: write */
-		command |= 0x04000000; /* interface_select = 1 */
-		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target device_type) */
-		command |= (address & 0x1f) << 16; /* port_addr (target device) */
-		command |= (value & 0xffff); /*	addr_or_data = value */
+		command = 0x20000000;                    /* clause_45 = 1 */
+		command |= 0x08000000;                   /* op_code: write */
+		command |= 0x04000000;                   /* interface_sel = 1 */
+		command |= ((offset & 0x1f000000) >> 3); /* device_addr (target
+							    device_type) */
+		command |= (address & 0x1f) << 16;       /* port_addr (target
+							    device) */
+		command |= (value & 0xffff);             /* addr_or_data=value*/
 		WRITE(MDIO_CONTROL_RD_DATA, command);
 	}
 
@@ -224,7 +234,7 @@ acp_mdio_write(unsigned long address, unsigned long offset,
 	do {
 		status = READ(MDIO_STATUS_RD_DATA);
 	} while (0 != (status & 0x40000000));
-#endif				/* BZ33327_WA */
+#endif	/* BZ33327_WA */
 
 	/* Wait for the mdio_busy (control) bit to clear. */
 	do {
@@ -280,12 +290,14 @@ acp_mdio_init(void)
 	u64 mdio_address;
 	u32 mdio_size;
 
-	printk(KERN_INFO "Initializing Axxia Wrappers.\n");
+	pr_info("Initializing Axxia Wrappers.\n");
 
 #ifndef CONFIG_ACPISS
 	np = of_find_node_by_type(np, "network");
 
-	while (np && !of_device_is_compatible(np, "acp-femac"))
+	while (np &&
+	       !of_device_is_compatible(np, "lsi,acp-femac") &&
+	       !of_device_is_compatible(np, "acp-femac"))
 		np = of_find_node_by_type(np, "network");
 
 	if (!np)
@@ -305,7 +317,6 @@ acp_mdio_init(void)
 #endif
 
 error:
-
 	return rc;
 }
 
