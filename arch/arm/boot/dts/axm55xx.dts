@@ -1,5 +1,5 @@
 /*
- * arch/arm/boot/dts/axm5500-sim.dts
+ * arch/arm/boot/dts/axm5500.dts
  *
  * Copyright (C) 2012 LSI
  *
@@ -321,6 +321,12 @@
                 reg = <0x20 0x10087000 0x00 0x1000>;
 		interrupts = <0 22 4>;
         };
+
+	 mtc@2010098000 {
+		compatible = "lsi,mtc";
+		reg = <0x20 0x10098000 0 0x3000>;
+		interrupts = <0 45 4>;
+	};
 };
 
 /*

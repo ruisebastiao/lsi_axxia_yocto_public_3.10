@@ -275,9 +275,9 @@ skip_first:
 		return ret;
 	}
 
-#ifdef CONFIG_ARCH_AXXIA
+#ifdef AMARILLO_WA
 	/*
-	 * For the Axxia AXM, set RX FIFO size to 0x7.
+	 * For Amarillo, without the auto-negotiate ecn.
 	 */
 	{
 		u16 val;
@@ -298,6 +298,9 @@ skip_first:
 		rc |= acp_mdio_read(phydev->addr, PHY_BCM_TEST_REG, &val);
 		val &= ~0x80;
 		rc |= acp_mdio_write(phydev->addr, PHY_BCM_TEST_REG, val);
+
+		if (0 != rc)
+			return -EIO;
 	}
 #endif
 	netdev_info(dev,
