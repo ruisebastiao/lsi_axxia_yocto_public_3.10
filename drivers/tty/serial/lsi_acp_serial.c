@@ -52,8 +52,6 @@
 #include <linux/of.h>
 #include <linux/io.h>
 
-#include <asm/lsi/acp_ncr.h>
-
 #define SZ_4K (4*1024)
 #define UART_NR			2
 #define SERIAL_AMBA_MAJOR	204

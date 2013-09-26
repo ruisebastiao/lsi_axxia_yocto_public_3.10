@@ -21,7 +21,6 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <asm/irq.h>
-#include <asm/lsi/acp_ncr.h>
 #include <linux/io.h>
 #include <linux/of_address.h>
 #include <linux/irqdomain.h>
