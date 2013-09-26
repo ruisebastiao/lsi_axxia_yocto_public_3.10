@@ -1,5 +1,5 @@
 /*
- * asm/lsi/acp_ncr.h
+ * drivers/lsi/common/version.h
  *
  * Copyright (C) 2010 LSI
  *
@@ -23,7 +23,7 @@
 
 #ifndef NCP_REGION_ID
 #define NCP_REGION_ID(node, target) \
-(unsigned long)((((node) & 0xffff) << 16) | ((target) & 0xffff))
+(unsigned long) ((((node) & 0xffff) << 16) | ((target) & 0xffff))
 #endif
 
 #ifndef NCP_NODE_ID
@@ -36,10 +36,5 @@
 
 int ncr_read(unsigned long, unsigned long, int, void *);
 int ncr_write(unsigned long, unsigned long, int, void *);
-
-int is_asic(void);
-
-extern int acp_mdio_read(unsigned long, unsigned long, unsigned short *, int);
-extern int acp_mdio_write(unsigned long, unsigned long, unsigned short, int);
 
 #endif /*  __DRIVERS_LSI_ACP_NCR_H */

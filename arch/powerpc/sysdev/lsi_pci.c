@@ -22,7 +22,7 @@
 #include "ppc4xx_pci.h"
 
 #include <linux/interrupt.h>
-#include <asm/lsi/acp_ncr.h>
+
 static int acp_plx;
 
 #undef PRINT_CONFIG_ACCESSES

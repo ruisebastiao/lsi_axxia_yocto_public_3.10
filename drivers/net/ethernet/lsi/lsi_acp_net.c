@@ -87,8 +87,10 @@
 #include <linux/io.h>
 #include <asm/dma.h>
 
-#include <asm/lsi/acp_ncr.h>
 #include "lsi_acp_net.h"
+
+extern int acp_mdio_read(unsigned long, unsigned long, unsigned short *, int);
+extern int acp_mdio_write(unsigned long, unsigned long, unsigned short, int);
 
 /* Define to disable full duplex mode on Amarillo boards */
 #undef AMARILLO_WA

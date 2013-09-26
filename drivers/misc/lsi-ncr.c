@@ -20,58 +20,85 @@
  * MA 02111-1307 USA
  */
 
-#include <linux/io.h>
 #include <linux/module.h>
 
-#include <include/asm/lsi/acp_ncr.h>
+#include <asm/io.h>
 
-static void __iomem *nca_address;
+#include "lsi-ncr.h"
+
+static void __iomem *nca_address = NULL;
+
+#ifdef CONFIG_ARCH_AXXIA
+#define NCA_PHYS_ADDRESS 0x002020100000ULL
+#else
+#define NCA_PHYS_ADDRESS 0x002000520000ULL
+#endif
 
 #define WFC_TIMEOUT (400000)
 
 #define LOCK_DOMAIN 0
 
-union command_data_register_0 {
+typedef union {
 	unsigned long raw;
 	struct {
-		unsigned long start_done:1;
-		unsigned long unused:6;
-		unsigned long local_bit:1;
-		unsigned long status:2;
-		unsigned long byte_swap_enable:1;
-		unsigned long cfg_cmpl_int_enable:1;
-		unsigned long cmd_type:4;
-		unsigned long dbs:16;
-	} __packed bits;
-} __packed;
+#ifdef __BIG_ENDIAN
+		unsigned long start_done              :1;
+		unsigned long unused                  :6;
+		unsigned long local_bit               :1;
+		unsigned long status                  :2;
+		unsigned long byte_swap_enable        :1;
+		unsigned long cfg_cmpl_int_enable     :1;
+		unsigned long cmd_type                :4;
+		unsigned long dbs                     :16;
+#else
+		unsigned long dbs                     :16;
+		unsigned long cmd_type                :4;
+		unsigned long cfg_cmpl_int_enable     :1;
+		unsigned long byte_swap_enable        :1;
+		unsigned long status                  :2;
+		unsigned long local_bit               :1;
+		unsigned long unused                  :6;
+		unsigned long start_done              :1;
+#endif
+	} __attribute__ ((packed)) bits;
+} __attribute__ ((packed)) command_data_register_0_t;
 
-union command_data_register_1 {
+typedef union {
 	unsigned long raw;
 	struct {
-		unsigned long target_address:32;
-	} __packed bits;
-} __packed;
+		unsigned long target_address          :32;
+	} __attribute__ ((packed)) bits;
+} __attribute__ ((packed)) command_data_register_1_t;
 
-union command_data_register_2 {
+typedef union {
 	unsigned long raw;
 	struct {
-		unsigned long unused:16;
-		unsigned long target_node_id:8;
-		unsigned long target_id_address_upper:8;
-	} __packed bits;
-} __packed;
+#ifdef __BIG_ENDIAN
+		unsigned long unused                  :16;
+		unsigned long target_node_id          :8;
+		unsigned long target_id_address_upper :8;
+#else
+		unsigned long target_id_address_upper :8;
+		unsigned long target_node_id          :8;
+		unsigned long unused                  :16;
+#endif
+	} __attribute__ ((packed)) bits;
+} __attribute__ ((packed)) command_data_register_2_t;
+
+#ifdef CONFIG_ARM
 
 /*
   ----------------------------------------------------------------------
   ncr_register_read
 */
 
-static inline unsigned long
+static __inline__ unsigned long
 ncr_register_read(unsigned *address)
 {
 	unsigned long value;
 
-	value = in_be32(address);
+	value = ioread32be(address);
+	printk("%s: value=0x%x address=0x%p\n", __FUNCTION__, value, address);
 
 	return value;
 }
@@ -81,11 +108,40 @@ ncr_register_read(unsigned *address)
   ncr_register_write
 */
 
-static inline void
+static __inline__ void
+ncr_register_write(const unsigned value, unsigned *address)
+{
+	printk("%s: value=0x%x address=0x%p\n", __FUNCTION__, value, address);
+	iowrite32be(value, address);
+
+	return;
+}
+
+#else
+
+/*
+  ----------------------------------------------------------------------
+  ncr_register_read
+*/
+
+static __inline__ unsigned long
+ncr_register_read(unsigned *address)
+{
+	return in_be32((unsigned *)address);
+}
+
+/*
+  ----------------------------------------------------------------------
+  ncr_register_write
+*/
+
+static __inline__ void
 ncr_register_write(const unsigned value, unsigned *address)
 {
 	out_be32(address, value);
 }
+
+#endif
 
 /*
   ------------------------------------------------------------------------------
@@ -99,7 +155,7 @@ ncr_lock(int domain)
 	unsigned long value;
 	int loops = 10000;
 
-	offset = (0xff80 + (domain * 4));
+	offset=(0xff80 + (domain * 4));
 
 	do {
 		value = ncr_register_read((unsigned *)(nca_address + offset));
@@ -121,7 +177,7 @@ ncr_unlock(int domain)
 {
 	unsigned long offset;
 
-	offset = (0xff80 + (domain * 4));
+	offset=(0xff80 + (domain * 4));
 	ncr_register_write(0, (unsigned *)(nca_address + offset));
 
 	return;
@@ -141,15 +197,16 @@ ncr_unlock(int domain)
 */
 
 int
-ncr_read(unsigned long region, unsigned long address, int number, void *buffer)
+ncr_read(unsigned long region, unsigned long address, int number,
+	void *buffer)
 {
-	union command_data_register_0 cdr0;
-	union command_data_register_1 cdr1;
-	union command_data_register_2 cdr2;
+	command_data_register_0_t cdr0;
+	command_data_register_1_t cdr1;
+	command_data_register_2_t cdr2;
 	int wfc_timeout = WFC_TIMEOUT;
 
 	if (NULL == nca_address)
-		nca_address = ioremap(0x002000520000ULL, 0x20000);
+		nca_address = ioremap(NCA_PHYS_ADDRESS, 0x20000);
 
 	if (0 != ncr_lock(LOCK_DOMAIN))
 		return -1;
@@ -207,7 +264,8 @@ ncr_read(unsigned long region, unsigned long address, int number, void *buffer)
 	}
 
 	if (0 < number) {
-		unsigned long temp = ncr_register_read((unsigned *) address);
+		unsigned long temp =
+			ncr_register_read((unsigned *) address);
 		memcpy((void *) buffer, &temp, number);
 	}
 
@@ -215,27 +273,6 @@ ncr_read(unsigned long region, unsigned long address, int number, void *buffer)
 
 	return 0;
 }
-EXPORT_SYMBOL(ncr_read);
-/*
-  ------------------------------------------------------------------------------
-  is_asic
-*/
-
-int
-is_asic(void)
-{
-#ifdef CONFIG_ACPISS
-	return 0;
-#else
-	unsigned long nca_config;
-
-	if (0 == ncr_read(NCP_REGION_ID(0x16, 0xff), 0x10, 4, &nca_config))
-		return (0 == (nca_config & 0x80000000));
-
-	return -1;
-#endif
-}
-EXPORT_SYMBOL(is_asic);
 
 /*
   ----------------------------------------------------------------------
@@ -243,17 +280,18 @@ EXPORT_SYMBOL(is_asic);
 */
 
 int
-ncr_write(unsigned long region, unsigned long address, int number, void *buffer)
+ncr_write(unsigned long region, unsigned long address, int number,
+	  void *buffer)
 {
-	union command_data_register_0 cdr0;
-	union command_data_register_1 cdr1;
-	union command_data_register_2 cdr2;
+	command_data_register_0_t cdr0;
+	command_data_register_1_t cdr1;
+	command_data_register_2_t cdr2;
 	unsigned long data_word_base;
 	int dbs = (number - 1);
 	int wfc_timeout = WFC_TIMEOUT;
 
 	if (NULL == nca_address)
-		nca_address = ioremap(0x002000520000ULL, 0x20000);
+		nca_address = ioremap(NCA_PHYS_ADDRESS, 0x20000);
 
 	if (0 != ncr_lock(LOCK_DOMAIN))
 		return -1;
@@ -298,8 +336,9 @@ ncr_write(unsigned long region, unsigned long address, int number, void *buffer)
 	cdr0.raw = 0;
 	cdr0.bits.start_done = 1;
 
-	if (0xff == cdr2.bits.target_id_address_upper)
+	if (0xff == cdr2.bits.target_id_address_upper) {
 		cdr0.bits.local_bit = 1;
+	}
 
 	cdr0.bits.cmd_type = 5;
 	/* TODO: Verify number... */
@@ -326,9 +365,9 @@ ncr_write(unsigned long region, unsigned long address, int number, void *buffer)
 	  Check status.
 	*/
 
-	if (0x3 !=
-	    ((ncr_register_read((unsigned *) (nca_address + 0xf0)) &
-		0x00c00000) >> 22)) {
+	if( 0x3 !=
+	    ( ( ncr_register_read( ( unsigned * ) ( nca_address + 0xf0 ) ) &
+		0x00c00000 ) >> 22 ) ) {
 		unsigned long status;
 
 		status = ncr_register_read((unsigned *)(nca_address + 0xe4));
@@ -341,7 +380,6 @@ ncr_write(unsigned long region, unsigned long address, int number, void *buffer)
 
 	return 0;
 }
-EXPORT_SYMBOL(ncr_write);
 
 /*
   ----------------------------------------------------------------------
@@ -351,13 +389,32 @@ EXPORT_SYMBOL(ncr_write);
 int
 ncr_init(void)
 {
-	/* We need this to be a module so that the functions can be exported
-	 * as module symbols.
-	 */
+#if 1
+	{
+		unsigned long value;
+
+#ifdef CONFIG_ARCH_AXXIA
+		if (0 != ncr_read(NCP_REGION_ID(0x22, 0), 0x694, 4, &value))
+			printk(KERN_CRIT
+			       "%s: ncr_read() failed!\n", __FUNCTION__);
+		else
+			printk(KERN_CRIT
+			       "%s: value is 0x%x\n", __FUNCTION__, value);
+#else
+		if (0 != ncr_read(NCP_REGION_ID(0x22, 0), 0x50, 4, &value))
+			printk(KERN_CRIT
+			       "%s: ncr_read() failed!\n", __FUNCTION__);
+		else
+			printk(KERN_CRIT
+			       "%s: value is 0x%x\n", __FUNCTION__, value);
+#endif
+	}
+#endif
+
 	return 0;
 }
 
-postcore_initcall(ncr_init);
+module_init(ncr_init);
 
 /*
   ----------------------------------------------------------------------
@@ -369,9 +426,14 @@ ncr_exit(void)
 {
 	/* Unmap the NCA. */
 	iounmap(nca_address);
+
+	return;
 }
 
-module_exit(ncr_exit);
+module_exit( ncr_exit );
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Register Ring access for LSI's ACP board");
+
+EXPORT_SYMBOL(ncr_read);
+EXPORT_SYMBOL(ncr_write);
