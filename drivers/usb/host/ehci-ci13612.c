@@ -196,7 +196,7 @@ static const struct hc_driver ci13612_hc_driver = {
 	.product_desc		= "CI13612A EHCI USB Host Controller",
 	.hcd_priv_size		= sizeof(struct ehci_hcd),
 	.irq			= ehci_irq,
-	.flags			= HCD_MEMORY | HCD_USB2 | HCD_LOCAL_MEM,
+	.flags			= HCD_MEMORY | HCD_USB2,
 	.reset			= ci13612_ehci_init,
 	.start			= ehci_run_fix,
 	.stop			= ehci_stop,
@@ -276,6 +276,10 @@ static int ci13612_ehci_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	/* Device using 32-bit addressing */
+	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+
 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
 	if (!hcd) {
 		retval = -ENOMEM;
@@ -300,11 +304,11 @@ static int ci13612_ehci_probe(struct platform_device *pdev)
 		retval = -ENOMEM;
 		goto fail_put_hcd;
 	} else {
-		/* Setup GPREG for USB to enable the 6-bit address line */
+		/* Set address bits [39:32] to zero */
 		writel(0x0, gpreg_base + 0x8);
 #ifndef CONFIG_LSI_USB_SW_WORKAROUND
-		/* setup hprot for uncached USB mode */
-		writel(0x0, gpreg_base + 0x74);
+		/* hprot pass-through (let the controller drive hprot[0:3] */
+		writel(0x100, gpreg_base + 0x74);
 #endif
 		iounmap(gpreg_base);
 	}
