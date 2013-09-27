@@ -55,3 +55,4 @@ obj-$(CONFIG_LATTICE_ECP3_CONFIG)	+= lattice-ecp3-config.o
 obj-$(CONFIG_SRAM)		+= sram.o
 obj-$(CONFIG_LSI_NCR)           += lsi-ncr.o
 obj-$(CONFIG_LSI_MTC)		+= lsi-mtc.o
+obj-$(CONFIG_LSI_SMMON)         += lsi-smmon.o

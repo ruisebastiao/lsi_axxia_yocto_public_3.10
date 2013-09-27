@@ -541,6 +541,12 @@ config LSI_NCR
 	help
 	  Provides access to the LSI Axxia NCR bus.
 
+config LSI_SMMON
+	tristate "LSI System Memory Monitor"
+	depends on ARCH_AXXIA || ACP
+	help
+	  Monitor the system memory controllers for errors.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
