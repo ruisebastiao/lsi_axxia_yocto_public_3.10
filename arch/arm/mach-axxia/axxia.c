@@ -52,6 +52,8 @@
 #include "pci.h"
 #include "i2c.h"
 
+extern void axxia_ddr_retention_init(void);
+
 static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516",		/* AXM5516 */
 	NULL
@@ -225,6 +227,8 @@ void __init axxia_dt_init(void)
 	}
 
 	axxia_pcie_init();
+
+    axxia_ddr_retention_init();
 }
 
 static void axxia_restart(char str, const char *cmd)
