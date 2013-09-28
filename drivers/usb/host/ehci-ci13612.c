@@ -125,6 +125,7 @@ static int ehci_run_fix(struct usb_hcd *hcd)
 #endif
 	unsigned burst_size;
 	int retval;
+	unsigned usb_cmd;
 
 #ifdef CONFIG_LSI_USB_SW_WORKAROUND
 	/* Fix HW errata 0003256: Do not enable USBCMD.RS for some time after
@@ -160,7 +161,6 @@ static int ehci_run_fix(struct usb_hcd *hcd)
 	ehci_writel(ehci, burst_size, &ehci->regs->reserved[1]);
 
 #else
-#if 1
     /* Fix for HW errata 9000373951: You can adjust the burst size and fill the
      * level to minimize under-run possibilities. In the failing case, the
      * transfer size was 96 bytes, the burst size was 16, and the fill
@@ -174,10 +174,18 @@ static int ehci_run_fix(struct usb_hcd *hcd)
 	burst_size = (burst_size & 0xffff00ff) | 0x4000;	/* TXPBURST */
 	ehci_writel(ehci, burst_size, &ehci->regs->reserved[1]);
 
+	/* Set the SBUSCFG[2:0] to 3 (AHBBRST3) */
+	writel(0x3, (void __iomem *)USB_SBUSCFG);
+
 	retval = ehci_run(hcd);
+
+	/* Performance tweaking */
+	/* Clear ITC field 23:16 to zero */
+	usb_cmd = inl(USB_USBCMD) & 0xFF00FFFF;
+	writel(usb_cmd, (void __iomem *)USB_USBCMD);
+
 	if (retval)
 		return retval;
-#endif
 #endif
 
 	return 0;
@@ -331,7 +339,7 @@ MODULE_ALIAS("platform:ci13612-ehci");
 static struct of_device_id ci13612_match[] = {
 	{
 		.type	= "usb",
-		.compatible = "acp-usb",
+		.compatible = "lsi,acp-usb",
 	},
 	{},
 };
