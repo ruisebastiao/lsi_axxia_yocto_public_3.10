@@ -3,7 +3,7 @@
  */
 
 /* define CI13612 USB registers here */
-#define CI13612_USB_BASE	((unsigned) hcd->regs)
+#define CI13612_USB_BASE	(hcd->regs)
 
 #define USB_ID			(CI13612_USB_BASE + 0x0000)
 #define USB_HWGENERAL		(CI13612_USB_BASE + 0x0004)
