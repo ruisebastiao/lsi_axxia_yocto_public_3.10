@@ -232,7 +232,7 @@ l3_set_pstate(void __iomem *l3ctrl, unsigned int req, unsigned int act)
 
 		if (0 == retries)
 			return -ENODEV;
-
+	}
 
 	return 0;
 }
@@ -243,6 +243,7 @@ void __init axxia_dt_init(void)
 	int rc;
 
 	/* Enable L3-cache */
+#ifndef CONFIG_ARCH_AXXIA_SIM
 	l3ctrl = ioremap(0x2000000000ULL, SZ_4M);
 	if (l3ctrl) {
 		rc = l3_set_pstate(l3ctrl, 0x3, 0xc);
@@ -252,6 +253,7 @@ void __init axxia_dt_init(void)
 	} else {
 		pr_warn("axxia: Failed to map L3-cache control regs\n");
 	}
+#endif
 
 	of_platform_populate(NULL, of_default_bus_match_table,
 			     axxia_auxdata_lookup, NULL);
