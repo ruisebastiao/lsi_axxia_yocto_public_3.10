@@ -108,6 +108,10 @@ MODULE_LICENSE("GPL");
 static void *rx_base;
 static void *tx_base;
 static void *dma_base;
+#ifdef CONFIG_ARM
+static void *gpreg_base;
+#define GPREG_BASE 0x002010094000ULL
+#endif
 
 /* BCM5221 registers */
 #define PHY_BCM_TEST_REG	0x1f
@@ -1363,6 +1367,13 @@ int appnic_init(struct net_device *dev)
 	struct appnic_dma_descriptor descriptor;
 	struct sockaddr address;
 
+#ifdef CONFIG_ARM
+	/* Set FEMAC to uncached */
+	gpreg_base = ioremap(GPREG_BASE, 0x1000);
+	writel(0x0, gpreg_base+0x78);
+#endif
+
+
 	/*
 	 * Reset the MAC
 	 */
@@ -1916,6 +1927,7 @@ device_tree_failed:
 	iounmap(rx_base);
 	iounmap(tx_base);
 	iounmap(dma_base);
+	iounmap(gpreg_base);
 	return -EINVAL;
 }
 #else
@@ -2108,6 +2120,7 @@ static int __devexit appnic_drv_remove(struct platform_device *pdev)
 	iounmap(rx_base);
 	iounmap(tx_base);
 	iounmap(dma_base);
+	iounmap(gpreg_base);
 
 	return 0;
 }
