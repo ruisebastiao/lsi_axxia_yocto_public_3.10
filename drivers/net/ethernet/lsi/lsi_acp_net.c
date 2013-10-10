@@ -88,6 +88,7 @@
 #include <asm/dma.h>
 
 #include "lsi_acp_net.h"
+#include "../../../misc/lsi-ncr.h"
 
 extern int acp_mdio_read(unsigned long, unsigned long, unsigned short *, int);
 extern int acp_mdio_write(unsigned long, unsigned long, unsigned short, int);
@@ -1366,6 +1367,7 @@ int appnic_init(struct net_device *dev)
 	unsigned long buf;
 	struct appnic_dma_descriptor descriptor;
 	struct sockaddr address;
+	unsigned long node_cfg;
 
 #ifdef CONFIG_ARM
 	/* Set FEMAC to uncached */
@@ -1637,7 +1639,18 @@ int appnic_init(struct net_device *dev)
 	write_mac(0x1, APPNIC_RX_MODE);
 	write_mac(0x0, APPNIC_TX_SOFT_RESET);
 	write_mac(0x1, APPNIC_TX_MODE);
-	write_mac(0x300a, APPNIC_TX_WATERMARK);
+
+        /*
+	 * Set the watermark.
+	 */
+
+	ncr_read(NCP_REGION_ID(0x16, 0xff), 0x10, 4, &node_cfg);
+
+	if (0 == (0x80000000 & node_cfg))
+		write_mac(0x300a, APPNIC_TX_WATERMARK);
+	else
+		write_mac(0xc00096, APPNIC_TX_WATERMARK);
+
 	write_mac(0x1, APPNIC_TX_HALF_DUPLEX_CONF);
 	write_mac(0xffff, APPNIC_TX_TIME_VALUE_CONF);
 	write_mac(0x1, APPNIC_TX_INTERRUPT_CONTROL);
@@ -1927,7 +1940,9 @@ device_tree_failed:
 	iounmap(rx_base);
 	iounmap(tx_base);
 	iounmap(dma_base);
+#ifdef CONFIG_ARM
 	iounmap(gpreg_base);
+#endif
 	return -EINVAL;
 }
 #else
@@ -2120,7 +2135,9 @@ static int __devexit appnic_drv_remove(struct platform_device *pdev)
 	iounmap(rx_base);
 	iounmap(tx_base);
 	iounmap(dma_base);
+#ifdef CONFIG_ARM
 	iounmap(gpreg_base);
+#endif
 
 	return 0;
 }
