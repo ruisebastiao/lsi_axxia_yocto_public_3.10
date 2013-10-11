@@ -90,7 +90,6 @@ static int ci13612_ehci_init(struct usb_hcd *hcd)
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	int retval = 0;
 	int len;
-	int value, count = 5;
 
 	/* EHCI registers start at offset 0x100 */
 	ehci->caps = hcd->regs + 0x100;
@@ -104,30 +103,10 @@ static int ci13612_ehci_init(struct usb_hcd *hcd)
 
 	ehci->sbrn = 0x20;
 
-	/* Reset is only allowed on a stopped controller,
-	 * ehci_reset assumes stopped state */
-	value = ehci_readl(ehci, &ehci->regs->command);
-	if (value & 0x1)
-	{
-		pr_info("ehci-ci13612 (ci13612_ehci_init): Controller Running - Trying to stop\n");
-		ehci_writel(ehci, value & 0xFFFE, &ehci->regs->command);
-		udelay(1);
+	/* Reset is only allowed on a stopped controller */
+	ehci_halt(ehci);
 
-		/* Timed loop to try and stop the running Controller */
-		do {
-			value = ehci_readl(ehci, &ehci->regs->command);
-			udelay(1);
-			count--;
-		} while ((value & 0x1) && (count > 0));
-
-		if (value & 0x1) {
-			pr_err("ehci-ci13612: USB controller is in running state and cannot be"
-		       "stopped\n");
-			return -EFAULT;
-		}
-	}
-
-	/* reset and halt controller */
+	/* reset controller */
 	ehci_reset(ehci);
 
 	/* data structure init */
