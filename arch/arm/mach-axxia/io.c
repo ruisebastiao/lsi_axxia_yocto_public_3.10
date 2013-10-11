@@ -35,6 +35,6 @@ __axxia_arch_ioremap(phys_addr_t physical_address, size_t size,
 	pfn = (unsigned long)((physical_address >> PAGE_SHIFT) & 0xffffffffULL);
 	offset = (unsigned long)(physical_address & (PAGE_SIZE - 1));
 
-	return __arm_ioremap_pfn(pfn, 0, size, flags);
+	return __arm_ioremap_pfn(pfn, offset, size, flags);
 }
 EXPORT_SYMBOL(__axxia_arch_ioremap);
