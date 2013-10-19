@@ -220,7 +220,7 @@ static struct sample *buffer_get_sample(struct sample *sample)
 #else
 #define time_type	u64
 #define time_get()	trace_clock_local()
-#define time_to_us(x)	((x) / 1000)
+#define time_to_us(x)	div_u64(x, 1000)
 #define time_sub(a, b)	((a) - (b))
 #define init_time(a, b)	a = b
 #define time_u64(a)	a
