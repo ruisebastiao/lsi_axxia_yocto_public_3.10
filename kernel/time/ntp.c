@@ -555,14 +555,14 @@ static __init int create_cmos_delay_thread(void)
 }
 early_initcall(create_cmos_delay_thread);
 #else
-static void notify_cmos_timer(void)
+void ntp_notify_cmos_timer(void)
 {
 	schedule_delayed_work(&sync_cmos_work, 0);
 }
 #endif /* CONFIG_PREEMPT_RT_FULL */
 
 #else
-static inline void notify_cmos_timer(void) { }
+void ntp_notify_cmos_timer(void) { }
 #endif
 
 
@@ -726,8 +726,6 @@ int __do_adjtimex(struct timex *txc, struct timespec *ts, s32 *time_tai)
 	txc->time.tv_usec = ts->tv_nsec;
 	if (!(time_status & STA_NANO))
 		txc->time.tv_usec /= NSEC_PER_USEC;
-
-	notify_cmos_timer();
 
 	return result;
 }
