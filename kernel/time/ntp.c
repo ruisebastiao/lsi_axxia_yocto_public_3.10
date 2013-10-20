@@ -554,6 +554,9 @@ static __init int create_cmos_delay_thread(void)
 	return 0;
 }
 early_initcall(create_cmos_delay_thread);
+
+void ntp_notify_cmos_timer(void) { }
+
 #else
 void ntp_notify_cmos_timer(void)
 {
