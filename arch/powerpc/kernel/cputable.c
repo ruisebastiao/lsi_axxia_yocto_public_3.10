@@ -1892,6 +1892,12 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 128,
 		.machine_check		= machine_check_47x,
 		.platform		= "ppc470",
+		.machine_check          = machine_check_47x,
+		.num_pmcs		= 8,
+		.oprofile_cpu_type	= "ppc/476",
+		.oprofile_type		= PPC_OPROFILE_ACP_PMU,
+		.platform		= "ppc470",
+
 	},
 	{ /* X2 DD2 core */
 		.pvr_mask		= 0xffffffff,
@@ -1905,6 +1911,10 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 128,
 		.machine_check		= machine_check_47x,
+		.platform		= "ppc470",
+		.num_pmcs		= 8,
+		.oprofile_cpu_type	= "ppc/476",
+		.oprofile_type		= PPC_OPROFILE_ACP_PMU,
 		.platform		= "ppc470",
 	},
 	{ /* 476fpe */
@@ -1948,6 +1958,10 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 128,
 		.machine_check		= machine_check_47x,
 		.platform		= "ppc470",
+		.num_pmcs		= 8,
+		.oprofile_cpu_type	= "ppc/476",
+		.oprofile_type		= PPC_OPROFILE_ACP_PMU,
+		.platform		= "ppc470",
 	},
 	{ /* 476 ACP25xx */
 		.pvr_mask		= 0x7ff520c1,
@@ -1961,6 +1975,10 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 128,
 		.machine_check		= machine_check_47x,
+		.platform		= "ppc470",
+		.num_pmcs		= 8,
+		.oprofile_cpu_type	= "ppc/476",
+		.oprofile_type		= PPC_OPROFILE_ACP_PMU,
 		.platform		= "ppc470",
 	},
 	{ /* 476 others */
