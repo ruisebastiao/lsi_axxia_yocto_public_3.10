@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm 3.4.28 Kernel Configuration
+# Linux/arm 3.4.43 Kernel Configuration
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -402,7 +402,6 @@ CONFIG_ARCH_NR_GPIO=0
 # CONFIG_PREEMPT_NONE is not set
 # CONFIG_PREEMPT_VOLUNTARY is not set
 CONFIG_PREEMPT=y
-CONFIG_PREEMPT_RTB=y
 CONFIG_PREEMPT_COUNT=y
 CONFIG_HZ=100
 # CONFIG_THUMB2_KERNEL is not set
@@ -745,7 +744,6 @@ CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
 # CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_UB is not set
 # CONFIG_BLK_DEV_RAM is not set
-# CONFIG_BLK_DEV_ISS is not set
 # CONFIG_CDROM_PKTCDVD is not set
 # CONFIG_ATA_OVER_ETH is not set
 # CONFIG_MG_DISK is not set
@@ -777,6 +775,7 @@ CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
 # CONFIG_BMP085 is not set
 # CONFIG_PCH_PHUB is not set
 # CONFIG_USB_SWITCH_FSA9480 is not set
+# CONFIG_LSI_MTC is not set
 # CONFIG_C2PORT is not set
 
 #
@@ -1045,6 +1044,7 @@ CONFIG_NET_VENDOR_CIRRUS=y
 CONFIG_NET_VENDOR_CISCO=y
 # CONFIG_ENIC is not set
 # CONFIG_DM9000 is not set
+# CONFIG_LSI_NET is not set
 # CONFIG_DNET is not set
 CONFIG_NET_VENDOR_DEC=y
 # CONFIG_NET_TULIP is not set
@@ -1163,7 +1163,6 @@ CONFIG_PHYLIB=y
 #
 # CONFIG_WAN is not set
 # CONFIG_VMXNET3 is not set
-# CONFIG_LSI_NET is not set
 # CONFIG_ISDN is not set
 
 #
@@ -1820,6 +1819,7 @@ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
 #
 # USB Host Controller Drivers
 #
+CONFIG_LSI_USB_SW_WORKAROUND=y
 # CONFIG_USB_C67X00_HCD is not set
 # CONFIG_USB_XHCI_HCD is not set
 # CONFIG_USB_EHCI_HCD is not set
@@ -2018,10 +2018,20 @@ CONFIG_DMADEVICES=y
 #
 # DMA Devices
 #
+CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=y
 # CONFIG_AMBA_PL08X is not set
 # CONFIG_DW_DMAC is not set
+CONFIG_LSI_DMA=y
 # CONFIG_TIMB_DMA is not set
 # CONFIG_PL330_DMA is not set
+CONFIG_DMA_ENGINE=y
+
+#
+# DMA Clients
+#
+# CONFIG_NET_DMA is not set
+# CONFIG_ASYNC_TX_DMA is not set
+# CONFIG_DMATEST is not set
 # CONFIG_AUXDISPLAY is not set
 # CONFIG_UIO is not set
 
@@ -2061,6 +2071,7 @@ CONFIG_CLKSRC_MMIO=y
 #
 # CONFIG_VIRT_DRIVERS is not set
 # CONFIG_PM_DEVFREQ is not set
+CONFIG_IRQCHIP=y
 
 #
 # File systems
@@ -2478,32 +2489,3 @@ CONFIG_DQL=y
 CONFIG_NLATTR=y
 # CONFIG_AVERAGE is not set
 # CONFIG_CORDIC is not set
-
-#
-# RapidIO management options
-#
-CONFIG_HAS_RAPIDIO=y
-CONFIG_RAPIDIO=y
-# CONFIG_AXXIA_RIO is not set
-# CONFIG_RIO_MAX_IRQS is not set
-# CONFIG_AXXIA_RIO_STAT is not set
-# CONFIG_SRIO_IRQ_TIME is not set
-# CONFIG_AXXIA_RIO_16B_ID is not set
-# CONFIG_AXXIA_RIO_DEBUG is not set
-# CONFIG_FSL_RIO is not set
-# CONFIG_RIO_MAINT_WIN_SIZE is not set
-# CONFIG_RAPIDIO_TSI721 is not set
-# CONFIG_RAPIDIO_DISC_TIMEOUT is not set
-# CONFIG_RAPIDIO_ENABLE_RX_TX_PORTS is not set
-# CONFIG_RAPIDIO_DIO_DMA is not set
-# CONFIG_RAPIDIO_ACCESS_ERR_LIMIT is not set
-# CONFIG_RAPIDIO_DYNAMIC_ROUTES is not set
-# CONFIG_RAPIDIO_MULTICAST_PW is not set
-# CONFIG_RAPIDIO_HOTPLUG is not set
-# CONFIG_RAPIDIO_STATIC_DESTID is not set
-# CONFIG_RAPIDIO_DEBUG is not set
-# CONFIG_RAPIDIO_TSI57X is not set
-# CONFIG_RAPIDIO_CPS_XX is not set
-# CONFIG_RAPIDIO_TSI568 is not set
-# CONFIG_RAPIDIO_CPS_GEN2 is not set
-# CONFIG_RAPIDIO_TSI500 is not set
