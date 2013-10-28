@@ -28,4 +28,7 @@ config ARCH_AXXIA_DT
 	  If your bootloader supports Flattened Device Tree based booting,
 	  say Y here.
 
+config ARCH_AXXIA_SIM
+       bool "Build for Simulation instead of Emulation or ASIC"
+
 endmenu
