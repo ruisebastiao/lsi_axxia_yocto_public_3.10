@@ -10,26 +10,28 @@
  * published by the Free Software Foundation.
  */
 
-#ifdef CONFIG_DEBUG_VEXPRESS_CA9X4_UART
-#define DEBUG_LL_PHYS_BASE		0x10000000
-#define DEBUG_LL_UART_OFFSET		0x00009000
+/*
+ * -- NOTE --
+ *
+*/
+
+#if !defined(CONFIG_ARM_LPAE)
+#error "Axxia Peripherals Are Only Accessible Using the LPAE!"
 #endif
 
-#ifdef CONFIG_DEBUG_VEXPRESS_RS1_UART
-#define DEBUG_LL_PHYS_BASE		0x1c000000
-#define DEBUG_LL_UART_OFFSET		0x00090000
-#endif
+#define UART0_PHYSICAL_ADDRESS 0x0000002010080000ULL
+#define UART1_PHYSICAL_ADDRESS 0x0000002010081000ULL
+#define UART2_PHYSICAL_ADDRESS 0x0000002010082000ULL
+#define UART3_PHYSICAL_ADDRESS 0x0000002010083000ULL
 
-#define DEBUG_LL_VIRT_BASE		0xf8000000
+#define UART0_VIRTUAL_ADDRESS 0xf0080000
+#define UART1_VIRTUAL_ADDRESS 0xf0081000
+#define UART2_VIRTUAL_ADDRESS 0xf0082000
+#define UART3_VIRTUAL_ADDRESS 0xf0083000
 
-#ifndef DEBUG_LL_UART_OFFSET
-#error "Unknown vexpress UART offset"
-#endif
-
-		.macro	addruart,rp,rv,tmp
-		mov	\rp, #DEBUG_LL_UART_OFFSET
-		orr	\rv, \rp, #DEBUG_LL_VIRT_BASE
-		orr	\rp, \rp, #DEBUG_LL_PHYS_BASE
-		.endm
+	.macro	addruart, rp, rv, tmp
+	ldr	\rp, =0x10080000
+	ldr	\rv, =0xf0080000
+	.endm
 
 #include <asm/hardware/debug-pl01x.S>

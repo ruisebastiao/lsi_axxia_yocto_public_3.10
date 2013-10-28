@@ -31,6 +31,9 @@ volatile int __cpuinitdata pen_release = -1;
 
 extern void axxia_secondary_startup(void);
 
+#define APB2_SER3_PHY_ADDR      0x002010030000ULL
+#define APB2_SER3_ADDR_SIZE   0x10000
+
 /*
  * Write pen_release in a way that is guaranteed to be visible to all
  * observers, irrespective of whether they're taking part in coherency
@@ -113,7 +116,12 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 #endif
 
 	/* Wait for so long, then give up if nothing happens ... */
+#ifdef CONFIG_ARCH_AXXIA_SIM
 	timeout = jiffies + (1 * HZ);
+#else
+	timeout = jiffies + (10 * HZ);
+#endif
+
 	while (time_before(jiffies, timeout)) {
 		smp_rmb();
 		if (pen_release == -1)
@@ -159,8 +167,10 @@ void __init smp_init_cpus(void)
 	set_smp_cross_call(axxia_gic_raise_softirq);
 }
 
-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+void __init
+platform_smp_prepare_cpus(unsigned int max_cpus)
 {
+#ifdef CONFIG_ARCH_AXXIA_SIM
 	int i;
 
 	/*
@@ -177,4 +187,88 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
 	 */
 	*(u32 *)phys_to_virt(0x10000020) =
 		virt_to_phys(axxia_secondary_startup);
+#else
+	int i;
+	void __iomem *apb2_ser3_base;
+	unsigned long resetVal;
+	int phys_cpu, cpu_count=0;
+	struct device_node *np;
+	unsigned long release_addr[NR_CPUS] = {0};
+	unsigned long release;
+
+	if (of_find_compatible_node(NULL, NULL, "lsi,axm5516")) {
+		for_each_node_by_name(np, "cpu") {
+			if (of_property_read_u32(np, "reg", &phys_cpu))
+				continue;
+
+			if (0 == phys_cpu)
+				continue;
+
+			if (of_property_read_u32(np, "cpu-release-addr",
+						 &release))
+				continue;
+
+			release_addr[phys_cpu] = release;
+			printk(KERN_ERR
+			       "%s:%d - set address for %d to 0x%08x\n",
+			       __FILE__, __LINE__,
+			       phys_cpu, release_addr[phys_cpu]);
+		}
+
+		/*
+		 * Initialise the present map, which describes the set of CPUs
+		 * actually populated at the present time.
+		 */
+
+		apb2_ser3_base = ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
+
+		for (i = 0; i < NR_CPUS; i++) {	
+			/* check if this is a possible CPU and
+			   it is within max_cpus range */
+			if ((cpu_possible(i)) &&
+			    (cpu_count < max_cpus) &&
+			    (0 != release_addr[i])) {
+				resetVal = readl(apb2_ser3_base + 0x1010);
+				phys_cpu = cpu_logical_map(i);
+				set_cpu_present(cpu_count, true);
+				if (phys_cpu != 0) {
+					writel(0xab, apb2_ser3_base+0x1000);
+					resetVal &= ~(1 << phys_cpu);
+					writel(resetVal, apb2_ser3_base+0x1010);
+					udelay(1000);
+				}
+				cpu_count++;
+			}
+		}
+
+		iounmap(apb2_ser3_base);
+
+		/*
+		 * This is the entry point of the routine that the secondary
+		 * cores will execute once they are released from their
+		 * "holding pen".
+		 */
+		*(u32 *)phys_to_virt(release) =
+			virt_to_phys(axxia_secondary_startup);
+		smp_wmb();
+		__cpuc_flush_dcache_area((void *)phys_to_virt(release),
+					 sizeof(u32));
+	} else if (of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim")) {
+		for (i = 0; i < max_cpus; i++)
+                	set_cpu_present(i, true);
+
+		/*
+		 * This is the entry point of the routine that the secondary
+		 * cores will execute once they are released from their
+		 * "holding pen".
+		 */
+		*(u32 *)phys_to_virt(0x10000020) =
+			virt_to_phys(axxia_secondary_startup);
+		smp_wmb();
+		__cpuc_flush_dcache_area((void *)phys_to_virt(0x10000020),
+					 sizeof(u32));
+	}
+
+	return;
+#endif
 }
