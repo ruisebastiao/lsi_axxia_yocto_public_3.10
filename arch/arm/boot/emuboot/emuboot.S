@@ -45,14 +45,32 @@ _start:
 	lsr	r0, r0, #16
 	ands	r0, r0, #1			@ Check generic timer support
 	beq	1f
-	ldr	r0, =6250000			@ 6.25 MHz timer frequency
+	@ldr	r0, =6250000			@ 6.25 MHz timer frequency
+	ldr	r0, =4096000			@ 4.096 MHz timer frequency
 	mcr	p15, 0, r0, c14, c0, 0		@ CNTFRQ
-1:
 
+	@
+	@ CPU initialisation
+	@
+1:	mrc	p15, 0, r0, c0, c0, 5		@ MPIDR (ARMv7 only)
+	mov	r1, r0
+	and	r0, r1,0x3			@ CPU number
+	cmp	r0, #0				@ primary CPU in any cluster
+	bne	actlr2_set
+	lsr	r0, r1, #8
+	ands	r0, r0, #3			@ primary CPU in cluster 0
+	beq primary
+
+	@
+	@ Secondary CPUs
 	@
 	@ Set the L2ACTLR
 	@
-	mrc	p15, 1, r0, c15, c0, 0		@ L2ACTLR
+secondary:	and	r1, r1,0x3			@ CPU number
+	cmp	r1, #0
+	bne 	actlr2_set
+
+ 	mrc	p15, 1, r0, c15, c0, 0		@ L2ACTLR
 	@ Set bit 3 - disable clean/evict push to external
 	orr	r0, r0, #(0x1 << 3)
 	@ Set bit 12 - disable multiple outstanding
@@ -118,9 +136,10 @@ atags:
 	@ ATAG_CMDLINE
 	.long	(1f - .) >> 2
 	.long	0x54410009
-	.asciz	"root=/dev/mmcblk0 rootwait ip=none mem=1024M console=ttyAMA0 earlyprintk"
+	.asciz	"root=/dev/nfs rw mem=1024M console=ttyAMA0 ip=dhcp"
 
 	.align	2
+
 1:
 
 	@ ATAG_NONE

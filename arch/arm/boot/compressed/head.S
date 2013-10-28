@@ -178,7 +178,12 @@ not_angel:
 		@ determine final kernel image address
 		mov	r4, pc
 		and	r4, r4, #0xf8000000
+#ifdef CONFIG_ARCH_AXXIA
+		ldr	r3, =TEXT_OFFSET
+		add	r4, r4, r3
+#else
 		add	r4, r4, #TEXT_OFFSET
+#endif
 #else
 		ldr	r4, =zreladdr
 #endif
@@ -276,7 +281,12 @@ restart:	adr	r0, LC0
 		 * of RAM and hope for the best.
 		 */
 		cmp	r0, #1
+#ifdef CONFIG_ARCH_AXXIA
+		ldr	r1, =TEXT_OFFSET
+		sub	r0, r4, r1
+#else
 		sub	r0, r4, #TEXT_OFFSET
+#endif
 		add	r0, r0, #0x100
 		mov	r1, r6
 		sub	r2, sp, r6
@@ -612,58 +622,6 @@ __armv3_mpu_cache_on:
 #define CB_BITS 0x0c
 #endif
 
-#if defined(CONFIG_ARCH_AXXIA)
-__setup_mmu:
-		sub	r3, r4, #16384		@ Page directory size
-		bic	r3, r3, #0xff		@ Align the pointer
-		bic	r3, r3, #0x3f00
-
-		/*
-		 * Clear the level 1 page table.
-		 */
-
-		mov	r0, #0
-		mov	r1, r3
-		add	r2, r3, #0x4000
-1:		str	r0, [r1], #4
-		cmp	r1, r2
-		blt	1b
-
-		/*
-		 * First 1G is RAM, cacheable and bufferable.
-	         */
-
-		ldr	r0, =0x40c1e
-		mov	r1, r3
-		add	r2, r3, #0x1000
-1:		mov	r9, #0
-2:		str	r0, [r1], #4		@ Each supersection is repeated
-		add	r9, r9, #1		@ 16 times.
-		cmp	r9, #16
-		blt	2b
-		add	r0, r0, #0x1000000	@ 16M
-		cmp	r1, r2
-		blt	1b
-
-		/*
-		 * Third 1G is IO, not cacheable or bufferable.
-		 */
-
-		ldr	r0,=0x10040c52		@ Start at 0x20_1000_0000
-		add	r1, r3, #0x2000
-		add	r2, r3, #0x3000
-1:		mov	r9, #0
-2:		str	r0, [r1], #4		@ Each supersection is repeated
-		add	r9, r9, #1		@ 16 times.
-		cmp	r9, #16
-		blt	2b
-		add	r0, r0, #0x1000000	@ 16M
-		cmp	r1, r2
-		blt	1b
-
-		mov	pc, lr
-ENDPROC(__setup_mmu)
-#else
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		bic	r3, r3, #0xff		@ Align the pointer
 		bic	r3, r3, #0x3f00
@@ -704,7 +662,6 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		str	r1, [r0]
 		mov	pc, lr
 ENDPROC(__setup_mmu)
-#endif
 
 @ Enable unaligned access on v6, to allow better code generation
 @ for the decompressor C code:

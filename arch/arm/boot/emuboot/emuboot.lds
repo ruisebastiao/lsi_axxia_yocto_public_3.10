@@ -12,7 +12,7 @@ OUTPUT_ARCH(arm)
 TARGET(binary)
 
 INPUT(./emuboot.o)
-INPUT(./zImage.emu)
+INPUT(./image.emu)
 
 PHYS_OFFSET = 0x00000000;
 
@@ -22,7 +22,7 @@ SECTIONS
 	.text : { emuboot.o }
 	. = PHYS_OFFSET + 0x8000 - 0x0;
 	kernel = . + 0x0;
-	.kernel : { ./zImage.emu }
+	.kernel : { ./image.emu }
 	. = PHYS_OFFSET + 0x00800000;
 	filesystem = .;
 	.data : { *(.data) }
