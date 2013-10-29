@@ -40,6 +40,29 @@ extern int ubootenv_get(const char *, char *);
 
 struct appnic_dma_descriptor {
 
+#ifdef CONFIG_ARM
+	/* Word 0 */
+	/* 00=Fill|01=Block|10=Scatter */
+	unsigned long transfer_type:2;
+	unsigned long write:1;
+	unsigned long start_of_packet:1;
+	unsigned long end_of_packet:1;
+	unsigned long interrupt_on_completion:1;
+	unsigned long error:1;
+	/* big endian to little endian */
+	unsigned long byte_swapping_on:1;
+	unsigned long unused:24;
+
+	/* Word 1 */
+	unsigned long data_transfer_length:16;
+	unsigned long pdu_length:16;
+
+	/* Word 2 */
+	unsigned long target_memory_address;
+
+	/* Word 3 */
+	unsigned long host_data_memory_pointer;
+#else
 	/* Word 0 */
 	unsigned long unused:24;
 	/* big endian to little endian */
@@ -61,20 +84,27 @@ struct appnic_dma_descriptor {
 
 	/* Word 3 */
 	unsigned long host_data_memory_pointer;
+#endif
 
-} __packed;
+} __attribute__ ((packed));
 
 union appnic_queue_pointer {
 
 	unsigned long raw;
 
 	struct {
+#ifdef CONFIG_ARM
+		unsigned long offset:20;
+		unsigned long generation_bit:1;
+		unsigned long unused:11;
+#else
 		unsigned long unused:11;
 		unsigned long generation_bit:1;
 		unsigned long offset:20;
-	} __packed bits;
+#endif
+	} __attribute__ ((packed)) bits;
 
-} __packed;
+} __attribute__ ((packed));
 
 /*
   =============================================================================
@@ -91,10 +121,15 @@ struct appnic_device {
 	unsigned long rx_base;
 	unsigned long tx_base;
 	unsigned long dma_base;
-	unsigned long interrupt;
+	unsigned long tx_interrupt;
+	unsigned long rx_interrupt;
+	unsigned long dma_interrupt;
 	unsigned long mdio_clock;
 	unsigned long phy_address;
 	unsigned long ad_value;
+	unsigned long phy_link_auto;
+	unsigned long phy_link_speed;
+	unsigned long phy_link_duplex;
 	unsigned char mac_addr[6];
 
 	/* NAPI */
@@ -436,6 +471,36 @@ struct appnic_device {
 #define APPNIC_DMA_TX_TAIL_POINTER_LOCAL_COPY_GB	0x100000
 #define APPNIC_DMA_TX_TAIL_POINTER_LOCAL_COPY_POINTER	0x0fffff
 
+#ifdef CONFIG_ARM
+
+#define read_mac(address)         readl((address))
+#define write_mac(value, address) writel((value), (address))
+
+static inline void
+readdescriptor(unsigned long address, struct appnic_dma_descriptor *descriptor)
+{
+	memcpy(descriptor, (void *)address,
+	       sizeof(struct appnic_dma_descriptor));
+	return;
+}
+
+static inline void
+writedescriptor(unsigned long address,
+		const struct appnic_dma_descriptor *descriptor)
+{
+	memcpy((void *)address, descriptor,
+	       sizeof(struct appnic_dma_descriptor));
+	return;
+}
+
+static inline union appnic_queue_pointer
+swab_queue_pointer(const union appnic_queue_pointer *old_queue)
+{
+	return *old_queue;
+}
+
+#else
+
 #define read_mac(address)         in_le32((u32 *) (address))
 #define write_mac(value, address) out_le32((u32 *) (address), (value))
 
@@ -454,7 +519,7 @@ readdescriptor(unsigned long address, struct appnic_dma_descriptor *descriptor)
 
 static inline void
 writedescriptor(unsigned long address,
-		 const struct appnic_dma_descriptor *descriptor)
+		const struct appnic_dma_descriptor *descriptor)
 {
 	unsigned long *to = (unsigned long *) address;
 	unsigned long *from = (unsigned long *) descriptor;
@@ -473,6 +538,7 @@ swab_queue_pointer(const union appnic_queue_pointer *old_queue)
 	new_queue.raw = swab32(old_queue->raw);
 	return new_queue;
 }
+#endif /* ifdef CONFIG_ARM */
 
 #define SWAB_QUEUE_POINTER(pointer) \
 swab_queue_pointer((const union appnic_queue_pointer *) (pointer))
