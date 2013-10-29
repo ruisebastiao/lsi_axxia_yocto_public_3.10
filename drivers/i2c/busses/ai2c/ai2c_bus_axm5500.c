@@ -23,10 +23,7 @@
 /* #define EXTRA_DEBUG */
 
 #include "ai2c_bus.h"
-#include "ai2c_plat.h"
-#include "ai2c_dev_clock_ext.h"
-#include "regs/ai2c_i2c_regs.h"
-#include "regs/ai2c_axi_timer_regs.h"
+#include "ai2c_i2c_regs.h"
 
 
 /*****************************************************************************
