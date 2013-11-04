@@ -162,8 +162,13 @@ EXPORT_SYMBOL(acp_mdio_write);
 static int
 acp_mdio_initialize(void)
 {
+#if 0
 	WRITE(MDIO_CLK_OFFSET, 0x10);
 	WRITE(MDIO_CLK_PERIOD, 0x2c);
+#else
+	WRITE(MDIO_CLK_OFFSET, 0x1c);
+	WRITE(MDIO_CLK_PERIOD, 0xf0);
+#endif
 
 	return 0;
 }
