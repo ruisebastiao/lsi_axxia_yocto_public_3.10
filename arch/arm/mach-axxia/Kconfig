@@ -29,6 +29,6 @@ config ARCH_AXXIA_DT
 	  say Y here.
 
 config ARCH_AXXIA_SIM
-       bool "Build for Simulation instead of Emulation or ASIC"
+	bool "Build for Simulation instead of Emulation or ASIC"
 
 endmenu

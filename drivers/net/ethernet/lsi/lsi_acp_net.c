@@ -274,7 +274,7 @@ skip_first:
 	}
 
 	ret = phy_connect_direct(dev, phydev,
-				 &appnic_handle_link_change, 0,
+				 &appnic_handle_link_change,
 				 PHY_INTERFACE_MODE_MII);
 
 	if (ret) {
@@ -335,8 +335,8 @@ skip_first:
  * appnic_mii_init
  */
 
-static int __devinit appnic_mii_init(struct platform_device *pdev,
-				     struct net_device *dev)
+static int appnic_mii_init(struct platform_device *pdev,
+			   struct net_device *dev)
 {
 	struct appnic_device *pdata = netdev_priv(dev);
 	int i, err = -ENXIO;
@@ -1806,8 +1806,8 @@ appnic_read_proc(char *page, char **start, off_t offset,
  */
 
 #ifdef CONFIG_OF
-static int __devinit appnic_probe_config_dt(struct net_device *dev,
-					    struct device_node *np)
+static int appnic_probe_config_dt(struct net_device *dev,
+				  struct device_node *np)
 {
 	struct appnic_device *pdata = netdev_priv(dev);
 	const u32 *field;
@@ -1958,7 +1958,7 @@ static inline int appnic_probe_config_dt(struct net_device *dev,
  * appnic_drv_probe
  */
 
-static int __devinit appnic_drv_probe(struct platform_device *pdev)
+static int appnic_drv_probe(struct platform_device *pdev)
 {
 	int rc = 0;
 	struct device_node *np = pdev->dev.of_node;
@@ -2092,9 +2092,12 @@ static int __devinit appnic_drv_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+/* FIXME - convert to seq_file approach in 3.10 */
+#if 0
 	/* Create the /proc entry. */
 	create_proc_read_entry("driver/appnic", 0, NULL,
 				appnic_read_proc, NULL);
+#endif
 
 out:
 	return rc;
@@ -2105,7 +2108,7 @@ out:
  * appnic_drv_remove
  */
 
-static int __devexit appnic_drv_remove(struct platform_device *pdev)
+static int appnic_drv_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
 	struct appnic_device *pdata;
@@ -2143,13 +2146,13 @@ static int __devexit appnic_drv_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id appnic_dt_ids[] = {
-	{ .compatible = "acp-femac", }
+	{ .compatible = "lsi,acp-femac", }
 };
 MODULE_DEVICE_TABLE(of, appnic_dt_ids);
 
 static struct platform_driver appnic_driver = {
 	.probe = appnic_drv_probe,
-	.remove = __devexit_p(appnic_drv_remove),
+	.remove = appnic_drv_remove,
 	.driver = {
 		.name   = LSI_DRV_NAME,
 		.owner  = THIS_MODULE,

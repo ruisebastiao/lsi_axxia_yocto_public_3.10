@@ -1,5 +1,5 @@
 /*
- * arch/arm/boot/dts/axm-sim.dts
+ * arch/arm/boot/dts/axm55xxsim.dts
  *
  * Copyright (C) 2012 LSI
  *
@@ -22,7 +22,7 @@
 
 / {
 	model = "AXM5516";
-	compatible = "arm", "lsi,axm5516";
+	compatible = "arm", "lsi,axm5516-sim";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
 	#size-cells = <2>;
@@ -45,96 +45,112 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <0>;
+			clock-frequency= <0>;
 		};
 
 		cpu@1 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <1>;
+			clock-frequency= <0>;
 		};
 
 		cpu@2 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <2>;
+			clock-frequency= <0>;
 		};
 
 		cpu@3 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <3>;
+			clock-frequency= <0>;
 		};
 
 		cpu@4 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <4>;
+			clock-frequency= <0>;
 		};
 
 		cpu@5 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <5>;
+			clock-frequency= <0>;
 		};
 
 		cpu@6 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <6>;
+			clock-frequency= <0>;
 		};
 
 		cpu@7 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <7>;
+			clock-frequency= <0>;
 		};
 
 		cpu@8 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <8>;
+			clock-frequency= <0>;
 		};
 
 		cpu@9 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <9>;
+			clock-frequency= <0>;
 		};
 
 		cpu@10 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <10>;
+			clock-frequency= <0>;
 		};
 
 		cpu@11 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <11>;
+			clock-frequency= <0>;
 		};
 
 		cpu@12 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <12>;
+			clock-frequency= <0>;
 		};
 
 		cpu@13 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <13>;
+			clock-frequency= <0>;
 		};
 
 		cpu@14 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <14>;
+			clock-frequency= <0>;
 		};
 
 		cpu@15 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a15";
 			reg = <15>;
+			clock-frequency= <0>;
 		};
 	};
 
@@ -150,6 +166,8 @@
 		interrupt-controller;
 		reg = <0x20 0x01001000 0 0x1000>,  /* gic dist base */
 		      <0x20 0x01002000 0 0x100>,   /* gic cpu base */
+		      <0x20 0x01004000 0 0x2000>,  /* vgic control */
+		      <0x20 0x01006000 0 0x2000>,  /* vgic cpu base */
 		      <0x20 0x10030000 0 0x100>,   /* axm IPI mask reg base */
 		      <0x20 0x10040000 0 0x20000>; /* axm IPI send reg base */
 	};

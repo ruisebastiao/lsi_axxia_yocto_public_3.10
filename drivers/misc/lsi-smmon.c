@@ -86,14 +86,15 @@ struct smmon_counts {
 
 static struct smmon_counts counts;
 
-DEFINE_SPINLOCK(counts_lock);
+DEFINE_RAW_SPINLOCK(counts_lock);
 
 /*
   ------------------------------------------------------------------------------
   smmon_isr
 */
 
-static irqreturn_t smmon_isr(int interrupt, void *device)
+static irqreturn_t
+smmon_isr(int interrupt, void *device)
 {
 	unsigned long status;
 	unsigned long region;
@@ -119,7 +120,7 @@ static irqreturn_t smmon_isr(int interrupt, void *device)
 		return IRQ_NONE;
 	}
 
-	spin_lock(&counts_lock);
+	raw_spin_lock(&counts_lock);
 
 	if (0 != (0x00000002 & status) || 0 != (0x00000004 & status))
 		printk(KERN_ERR
@@ -179,13 +180,14 @@ static irqreturn_t smmon_isr(int interrupt, void *device)
 			       "smmon(%d): Parity Error!\n", sm);
 	}
 
-	spin_unlock(&counts_lock);
+	raw_spin_unlock(&counts_lock);
 
 	ncr_write(region, 0x548, 4, &status);
 
 	return IRQ_HANDLED;
 }
 
+#if 0 /* FIXME - /proc interface changed in 3.10! */
 /*
   ------------------------------------------------------------------------------
   smmon_read_proc
@@ -193,12 +195,12 @@ static irqreturn_t smmon_isr(int interrupt, void *device)
 
 static int
 smmon_read_proc(char *page, char **start, off_t offset, int count,
-		int *eof, void *data)
+		     int *eof, void *data)
 {
 	int length;
 	unsigned long flags;
 
-	spin_lock_irqsave(&counts_lock, flags);
+	raw_spin_lock_irqsave(&counts_lock, flags);
 
 	length = sprintf(page,
 			 "------------ Counts for SM0/SM1 ----------\n"
@@ -227,14 +229,16 @@ smmon_read_proc(char *page, char **start, off_t offset, int count,
 			 counts.port_error[1],
 			 counts.wrap_error[0],
 			 counts.wrap_error[1],
-			 counts.parity_error[0], counts.parity_error[1]);
+			 counts.parity_error[0],
+			 counts.parity_error[1]);
 
-	spin_unlock_irqrestore(&counts_lock, flags);
+	raw_spin_unlock_irqrestore(&counts_lock, flags);
 
 	*eof = 1;
 
 	return length;
 }
+#endif
 
 /*
   ==============================================================================
@@ -249,13 +253,16 @@ smmon_read_proc(char *page, char **start, off_t offset, int count,
   smmon_init
 */
 
-static int __init smmon_init(void)
+static int __init
+smmon_init(void)
 {
 	int rc;
 	int mask;
 
 	printk("smmon: log=%d\n", log);
+#if 0 /* FIXME - /proc interface changed in 3.10! */
 	create_proc_read_entry("smmon", 0, NULL, smmon_read_proc, NULL);
+#endif
 	memset(&counts, 0, sizeof(struct smmon_counts));
 
 	/*
@@ -267,16 +274,18 @@ static int __init smmon_init(void)
 	ncr_write(NCP_REGION_ID(0xf, 0), 0x414, 4, &mask);
 
 	rc = request_irq(32 + 161, smmon_isr, IRQF_ONESHOT,
-			"smmon_0", NULL);
+			 "smmon_0", NULL);
 	rc |= request_irq(32 + 160, smmon_isr, IRQF_ONESHOT,
-			"smmon_1", NULL);
+			  "smmon_1", NULL);
 
 	if (0 != rc) {
-		printk(KERN_ERR "smmon: Couldn't connect interrupt handler!\n");
+		printk(KERN_ERR
+		       "smmon: Couldn't connect interrupt handler!\n");
 		return -EBUSY;
 	}
 
-	printk(KERN_INFO "smmon: Monitoring System Memory\n");
+	printk(KERN_INFO
+	       "smmon: Monitoring System Memory\n");
 
 	return 0;
 }
@@ -288,14 +297,16 @@ module_init(smmon_init);
   smmon_exit
 */
 
-static void __exit smmon_exit(void)
+static void __exit
+smmon_exit(void)
 {
 	free_irq(32 + 161, NULL);
 	free_irq(32 + 160, NULL);
 
 	remove_proc_entry("smmon", NULL);
 
-	printk(KERN_INFO "smmon: Not Monitoring System Memory\n");
+	printk(KERN_INFO
+	       "smmon: Not Monitoring System Memory\n");
 
 	return;
 }

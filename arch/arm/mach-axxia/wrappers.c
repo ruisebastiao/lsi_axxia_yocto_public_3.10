@@ -87,6 +87,7 @@ acp_platform_device_register(struct platform_device *pdev)
 {
 	return platform_device_register(pdev);
 }
+
 EXPORT_SYMBOL(acp_platform_device_register);
 
 /*
@@ -101,6 +102,7 @@ acp_platform_device_unregister(struct platform_device *pdev)
 
 	return;
 }
+
 EXPORT_SYMBOL(acp_platform_device_unregister);
 
 /*
@@ -121,6 +123,7 @@ acp_skb_tstamp_tx(struct sk_buff *orig_skb,
 		  struct skb_shared_hwtstamps *hwtstamps) {
 	skb_tstamp_tx(orig_skb, hwtstamps);
 }
+
 EXPORT_SYMBOL(acp_skb_tstamp_tx);
 
 /*
