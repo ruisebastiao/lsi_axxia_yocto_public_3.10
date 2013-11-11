@@ -1,0 +1,5 @@
+# Intel Wireless Drivers
+kconf non-hardware wifi-common.cfg
+include features/iwlegacy/iwlegacy.scc
+include features/iwlwifi/iwlwifi.scc
+kconf hardware wifi-ipw.cfg

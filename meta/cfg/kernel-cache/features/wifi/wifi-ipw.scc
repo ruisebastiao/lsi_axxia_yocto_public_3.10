@@ -1,0 +1,3 @@
+# Intel IPW2XXX drivers
+kconf non-hardware wifi-common.cfg
+kconf hardware wifi-ipw.cfg

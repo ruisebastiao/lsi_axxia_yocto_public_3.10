@@ -1,0 +1,7 @@
+# Everything for wifi, infrastructure, drivers, etc.
+kconf non-hardware wifi-common.cfg
+include wifi-ipw.scc
+include wifi-b43.scc
+include features/iwlegacy/iwlegacy.scc
+include features/iwlwifi/iwlwifi.scc
+kconf hardware wifi-drivers.cfg

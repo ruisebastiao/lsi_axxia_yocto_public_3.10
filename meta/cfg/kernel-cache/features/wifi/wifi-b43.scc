@@ -1,0 +1,3 @@
+# Broadcom 43XX wireless support
+kconf non-hardware wifi-common.cfg
+kconf hardware wifi-b43.cfg
