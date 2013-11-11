@@ -37,6 +37,9 @@
 						\
 	"nop.w"					\
 )
+#elif CONFIG_ARCH_AXXIA || CONFIG_ARCH_AXXIA_SIM
+#define SEV
+#define WFE(cond)
 #else
 #define SEV		ALT_SMP("sev", "nop")
 #define WFE(cond)	ALT_SMP("wfe" cond, "nop")

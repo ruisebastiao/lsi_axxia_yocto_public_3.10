@@ -90,7 +90,7 @@ static struct of_device_id cpu_pll[] __initconst = {
 };
 
 /*
-  --------------------------------------------------------------------
+  -------------------------------------------------------------------------------
   axxia_init_clocks
 
   Clock setup for Emulation/ASIC systems.

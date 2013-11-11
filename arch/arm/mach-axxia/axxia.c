@@ -35,30 +35,36 @@
 #include <linux/delay.h>
 #include <linux/smsc911x.h>
 #include <linux/spi/spi.h>
+#include <linux/clk-provider.h>
 #include <linux/clkdev.h>
 #ifdef CONFIG_ARM_ARCH_TIMER
 #include <asm/arch_timer.h>
 #endif
 #include <asm/mach-types.h>
 #include <asm/sizes.h>
+#include <asm/pmu.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
 #include <asm/hardware/cache-l2x0.h>
-#include <asm/hardware/gic.h>
 #include <mach/timers.h>
 #include <mach/axxia-gic.h>
+#include <linux/irqchip/arm-gic.h>
 #include "axxia.h"
 #include "pci.h"
 #include "i2c.h"
+
+#ifdef CONFIG_SMP
+extern struct smp_operations axxia_smp_ops __initdata;
+#endif
 
 extern void axxia_ddr_retention_init(void);
 
 static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516",		/* AXM5516 */
+	"lsi,axm5516-sim",	/* AXM5516 Simulation */
 	NULL
 };
-
 
 static void __iomem *ssp_base;
 
@@ -72,16 +78,16 @@ void __init axxia_dt_init_early(void)
 }
 
 static struct of_device_id axxia_irq_match[] __initdata = {
-	{
-		.compatible = "arm,cortex-a15-gic",
-		.data = gic_of_init,
-	},
-	{ }
+    {
+        .compatible = "arm,cortex-a15-gic",
+        .data = gic_of_init,
+    },
+    { }
 };
 
 static void __init axxia_dt_init_irq(void)
 {
-	of_irq_init(axxia_irq_match);
+    of_irq_init(axxia_irq_match);
 }
 
 void __init axxia_dt_timer_init(void)
@@ -93,12 +99,8 @@ void __init axxia_dt_timer_init(void)
 	axxia_init_clocks();
 
 #ifdef CONFIG_ARM_ARCH_TIMER
-	{
-		int err = arch_timer_of_register();
-		if (err == 0)
-			err = arch_timer_sched_clock_init();
-		WARN_ON(err);
-	}
+	of_clk_init(NULL);
+	clocksource_of_init();
 #endif
 
 	if (of_property_read_string(of_aliases, "timer", &path)) {
@@ -114,16 +116,8 @@ void __init axxia_dt_timer_init(void)
 	if (WARN_ON(base == NULL))
 		return;
 
-	__sp804_clocksource_and_sched_clock_init(base, "axxia-timer0", 0);
-	sp804_clockevents_init(base + 0x20,
-			       irq_of_parse_and_map(node, 1),
-			       "axxia-timer1");
+	sp804_clocksource_and_sched_clock_init(base, "axxia-timer0");
 }
-
-
-static struct sys_timer axxia_dt_timer = {
-	.init = axxia_dt_timer_init,
-};
 
 static struct mmci_platform_data mmc_plat_data = {
 	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
@@ -164,13 +158,64 @@ static struct of_dev_auxdata axxia_auxdata_lookup[] __initdata = {
 	{}
 };
 
+static struct resource axxia_pmu_resources[] = {
+	[0] = {
+		.start  = IRQ_PMU,
+		.end    = IRQ_PMU,
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+/*
+ * The PMU IRQ lines of two cores are wired together into a single interrupt.
+ * Bounce the interrupt to other cores if it's not ours.
+ */
+#define CORES_PER_CLUSTER  4
+static irqreturn_t axxia_pmu_handler(int irq, void *dev, irq_handler_t handler)
+{
+	irqreturn_t ret = handler(irq, dev);
+	int cpu = smp_processor_id();
+	int cluster = cpu / CORES_PER_CLUSTER;
+	int other;
+
+	if (ret == IRQ_NONE) {
+
+		/* Look until we find another cpu that's online. */
+		do {
+			other = (++cpu % CORES_PER_CLUSTER) +
+				(cluster * CORES_PER_CLUSTER);
+		} while (!cpu_online(other));
+
+		irq_set_affinity(irq, cpumask_of(other));
+	}
+
+	/*
+	 * We should be able to get away with the amount of IRQ_NONEs we give,
+	 * while still having the spurious IRQ detection code kick in if the
+	 * interrupt really starts hitting spuriously.
+	 */
+	return ret;
+}
+
+static struct arm_pmu_platdata axxia_pmu_platdata = {
+	.handle_irq		= axxia_pmu_handler,
+};
+
+static struct platform_device pmu_device = {
+	.name			= "arm-pmu",
+	.id                     = -1,
+	.num_resources		= ARRAY_SIZE(axxia_pmu_resources),
+	.resource		= axxia_pmu_resources,
+	.dev.platform_data	= &axxia_pmu_platdata,
+};
+
 static inline void
 spidev_chip_select(u32 control, unsigned n)
 {
 	if (control == SSP_CHIP_SELECT)
-		writel(~(1<<n) & 0x1F, ssp_base+0x30);
+		writel(~(1<<n) & 0x1F, ssp_base + 0x30);
 	else
-		writel(0x1F, ssp_base+0x30);
+		writel(0x1F, ssp_base + 0x30);
 }
 
 static void spi_cs_eeprom0(u32 control) { spidev_chip_select(control, 0); }
@@ -207,9 +252,7 @@ static struct spi_board_info spi_devs[] __initdata = {
 	}
 };
 
-
-static int
-l3_set_pstate(void __iomem *l3ctrl, unsigned int req, unsigned int act)
+static int l3_set_pstate(void __iomem *l3ctrl, unsigned int req, unsigned int act)
 {
 	static const u8 hn_f[] = {
 		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
@@ -236,6 +279,7 @@ l3_set_pstate(void __iomem *l3ctrl, unsigned int req, unsigned int act)
 
 	return 0;
 }
+
 
 void __init axxia_dt_init(void)
 {
@@ -266,14 +310,12 @@ void __init axxia_dt_init(void)
 	 */
 	ssp_base = of_iomap(of_find_compatible_node(NULL, NULL, "arm,pl022"),
 			    0);
-	if (!WARN_ON(ssp_base == NULL)) {
-		/* Use legacy mode, bits 0..4 control nCS[0..4] pins */
-		writel(0x1F, ssp_base+0x30);
-	}
 
 	axxia_pcie_init();
 
 	axxia_ddr_retention_init();
+
+	platform_device_register(&pmu_device);
 }
 
 static void axxia_restart(char str, const char *cmd)
@@ -290,10 +332,11 @@ static void axxia_restart(char str, const char *cmd)
 
 DT_MACHINE_START(AXXIA_DT, "LSI Axxia")
 	.dt_compat	= axxia_dt_match,
+	.smp		= smp_ops(axxia_smp_ops),
 	.map_io		= axxia_dt_map_io,
 	.init_early	= axxia_dt_init_early,
 	.init_irq	= axxia_dt_init_irq,
-	.timer		= &axxia_dt_timer,
+	.init_time	= axxia_dt_timer_init,
 	.init_machine	= axxia_dt_init,
 	.handle_irq	= axxia_gic_handle_irq,
 	.restart	= axxia_restart,

@@ -33,6 +33,13 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/pm.h>
 
+#ifdef CONFIG_PPC
+#define readb(addr) ((char)readl(addr))
+#define writeb(b, addr) writel(b, addr)
+
+#define GPIO_AFSEL 0x420
+#endif
+
 #define GPIODIR 0x400
 #define GPIOIS  0x404
 #define GPIOIBE 0x408
@@ -60,7 +67,7 @@ static inline void chained_irq_enter(struct irq_chip *chip,
 				     struct irq_desc *desc) {}
 
 static inline void chained_irq_exit(struct irq_chip *chip,
-				   struct irq_desc *desc)
+				    struct irq_desc *desc)
 {
 	if (chip->irq_eoi)
 		chip->irq_eoi(&desc->irq_data);
@@ -290,9 +297,13 @@ static int pl061_probe(struct device *dev,
 		irq_base = pdata->irq_base;
 		if (irq_base <= 0)
 			return -ENODEV;
-	} else {
+	} else if (dev->of_node) {
 		chip->gc.base = -1;
 		irq_base = 0;
+	} else {
+		if (retchip)
+			*retchip = NULL;
+		return -ENODEV;
 	}
 
 	if (!devm_request_mem_region(dev, res->start,
@@ -304,13 +315,13 @@ static int pl061_probe(struct device *dev,
 
 	chip->base = devm_ioremap(dev, res->start,
 				  resource_size(res));
-	if (!chip->base) {
+	if (chip->base == NULL) {
 		if (retchip)
 			*retchip = NULL;
 		return -ENOMEM;
 	}
 
-	chip->domain = irq_domain_add_simple(adev->dev.of_node, PL061_GPIO_NR,
+	chip->domain = irq_domain_add_simple(dev->of_node, PL061_GPIO_NR,
 					     irq_base, &pl061_domain_ops, chip);
 	if (!chip->domain)
 		return -ENODEV;
@@ -362,7 +373,7 @@ static int pl061_probe(struct device *dev,
 		}
 	}
 
-	drv_set_drvdata(dev, chip);
+	dev_set_drvdata(dev, chip);
 
 	return 0;
 }
@@ -420,7 +431,7 @@ static const struct dev_pm_ops pl061_dev_pm_ops = {
 #endif
 
 #ifdef CONFIG_ARM_AMBA
-static int pl061_amba_probe(struct amba_device *dev, struct amba_id *id)
+static int pl061_amba_probe(struct amba_device *dev, const struct amba_id *id)
 {
 	return pl061_probe(&dev->dev, &dev->res, dev->irq[0], NULL);
 }
@@ -477,6 +488,13 @@ static int pl061_of_probe(struct platform_device *ofdev)
 
 	if (ret < 0)
 		return ret;
+
+	prop = of_get_property(ofdev->dev.of_node, "pins-map", &len);
+	if (!prop || len < sizeof(*prop))
+		dev_warn(&ofdev->dev, "no 'pins-map' property\n");
+	else
+		writeb(*prop, chip->base + GPIO_AFSEL);
+
 	return 0;
 }
 
@@ -498,7 +516,12 @@ static struct platform_driver pl061_gpio_driver = {
 
 static int __init pl061_gpio_init(void)
 {
+#ifdef CONFIG_ARM_AMBA
 	return amba_driver_register(&pl061_gpio_driver);
+#else
+	return platform_driver_register(&pl061_gpio_driver);
+#endif
+
 }
 module_init(pl061_gpio_init);
 

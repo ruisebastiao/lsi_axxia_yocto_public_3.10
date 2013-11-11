@@ -47,6 +47,7 @@ config ARM
 	select HAVE_MEMBLOCK
 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
 	select HAVE_PERF_EVENTS
+	select HAVE_PREEMPT_LAZY
 	select HAVE_REGS_AND_STACK_ACCESS_API
 	select HAVE_SYSCALL_TRACEPOINTS
 	select HAVE_UID16
@@ -60,6 +61,7 @@ config ARM
 	select OLD_SIGSUSPEND3
 	select OLD_SIGACTION
 	select HAVE_CONTEXT_TRACKING
+	select HAVE_VIRT_CPU_ACCOUNTING
 	help
 	  The ARM series is a line of low-power-consumption RISC chip designs
 	  licensed by ARM Ltd and targeted at embedded applications and
@@ -154,12 +156,17 @@ config TRACE_IRQFLAGS_SUPPORT
 	bool
 	default y
 
+config GENERIC_LOCKBREAK
+	bool
+	default y
+	depends on SMP
+
 config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
+	def_bool !RWSEM_GENERIC_SPINLOCK && !PREEMPT_RT_FULL
 
 config ARCH_HAS_ILOG2_U32
 	bool

@@ -754,7 +754,7 @@ static const struct of_device_id gpdma_of_ids[] = {
  *
  *
  */
-static int __devinit gpdma_of_probe(struct platform_device *op)
+static int gpdma_of_probe(struct platform_device *op)
 {
 	struct gpdma_engine *engine;
 	struct dma_device   *dma;
@@ -776,7 +776,7 @@ static int __devinit gpdma_of_probe(struct platform_device *op)
 	kref_init(&engine->kref);
 	raw_spin_lock_init(&engine->lock);
 	engine->dev = &op->dev;
-	engine->chip = match->data;
+	engine->chip = (struct lsidma_hw *)match->data;
 
 	/* Initialize dma_device struct */
 	dma = &engine->dma_device;

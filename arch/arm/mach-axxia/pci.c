@@ -47,8 +47,8 @@
 #define PCIE_MPAGE_U(n)          (0x1010 + (n * 8)) /* n = 0..7 */
 #define PCIE_MPAGE_L(n)          (0x1014 + (n * 8)) /* n = 0..7 */
 #define PCIE_TPAGE_BAR0(n)       (0x1050 + (n * 4)) /* n = 0..7 */
-#define   PCIE_TPAGE_32          (0<<31) /* AXI 32-bit access */
-#define   PCIE_TPAGE_128	 (1<<31) /* AXI 128-bit access */
+#define     PCIE_TPAGE_32        (0<<31) /* AXI 32-bit access */
+#define     PCIE_TPAGE_128       (1<<31) /* AXI 128-bit access */
 #define PCIE_TPAGE_BAR1(n)       (0x1070 + (n * 4)) /* n = 0..7 */
 #define PCIE_TPAGE_BAR2(n)       (0x1090 + (n * 4)) /* n = 0..7 */
 #define PCIE_MSG_IN_FIFO         (0x10B0)
@@ -58,10 +58,10 @@
 #define PCIE_INT0_STATUS         (0x10C0)
 #define PCIE_INT0_ENABLE         (0x10C4)
 #define PCIE_INT0_FORCE          (0x10C8)
-#define    INT0_MSI              0x80000000U
-#define    INT0_INT_ASSERTED     0x08000000U
-#define    INT0_INT_DEASSERTED   0x04000000U
-#define    INT0_ERROR            0x73FFFFABU
+#define     INT0_MSI             0x80000000U
+#define     INT0_INT_ASSERTED    0x08000000U
+#define     INT0_INT_DEASSERTED  0x04000000U
+#define     INT0_ERROR           0x73FFFFABU
 #define PCIE_PHY_STATUS0         (0x10CC)
 #define PCIE_PHY_STATUS1         (0x10D0)
 #define PCIE_PHY_CONTROL0        (0x10D4)
@@ -114,25 +114,25 @@ static const struct resource pcie_outbound_default[] = {
 
 struct axxia_pciex_port {
 	char                name[16];
-	unsigned int	    index;
+	unsigned int        index;
 	u8                  root_bus_nr;
 	bool                link_up;
 	int                 irq[17]; /* 1 legacy, 16 MSI */
-	void __iomem	    *regs;
-	void __iomem	    *cfg_data;
+	void __iomem        *regs;
+	void __iomem        *cfg_data;
 	u32                 last_mpage;
 	int                 endpoint;
 	struct device_node  *node;
-	struct resource	    utl_regs;
-	struct resource	    cfg_space;
+	struct resource     utl_regs;
+	struct resource     cfg_space;
 	/* Outbound PCI base address */
 	u64                 pci_addr;
 	/* Outbound range in (physical) CPU addresses */
-	struct resource	    outbound;
+	struct resource     outbound;
 	/* Inbound PCI base address */
 	u64                 pci_bar;
 	/* Inbound range in (physical) CPU addresses */
-	struct resource	    inbound;
+	struct resource     inbound;
 	/* Virtual and physical (CPU space) address for MSI table */
 	void                *msi_virt;
 	dma_addr_t          msi_phys;
@@ -144,7 +144,7 @@ struct axxia_pciex_port {
 static struct axxia_pciex_port *axxia_pciex_ports;
 
 
-static void __init
+static void
 fixup_axxia_pci_bridge(struct pci_dev *dev)
 {
 	/* if we aren't a PCIe don't bother */
@@ -169,7 +169,6 @@ static struct axxia_pciex_port *bus_to_port(struct pci_bus *bus)
 {
 	return axxia_pciex_ports + pci_domain_nr(bus);
 }
-
 
 /*
  * Validate the Bus#/Device#/Function#
@@ -562,7 +561,6 @@ pcie_pei0_msi_handler(unsigned int irq, struct irq_desc *desc)
 	irq_desc_get_chip(desc)->irq_eoi(&desc->irq_data);
 }
 
-
 /* PCIe setup function */
 static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 {
@@ -647,7 +645,6 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	/*
 	 * Setup outbound PCI Memory Window
 	 */
-
 	outbound_size = resource_size(&port->outbound);
 	num_pages = (outbound_size + MPAGE_SIZE - 1) / MPAGE_SIZE;
 	dest = port->pci_addr;
@@ -739,11 +736,10 @@ pcie_alloc_msi_table(struct pci_dev *pdev, struct axxia_pciex_port *port)
 	return msi_virt;
 }
 
-
 /*
  * Scan PCIe bus
  */
-static struct pci_bus __init *
+static struct pci_bus *
 axxia_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 {
 	if (WARN_ON(nr >= PCIE_MAX_PORTS))
@@ -753,9 +749,7 @@ axxia_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 				 sys, &sys->resources);
 }
 
-
-
-static int __init
+static int
 axxia_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
 	struct pci_sys_data *sys = dev->sysdata;
@@ -772,13 +766,11 @@ static struct irq_chip axxia_msi_chip = {
 	.irq_unmask  = unmask_msi_irq,
 };
 
-
 /* Port definition struct */
 static struct hw_pci axxia_pcie_hw[] = {
 	[0] = {
 		.nr_controllers = 1,
 		.domain = 0,
-		.swizzle = pci_std_swizzle,
 		.setup = axxia_pcie_setup,
 		.scan = axxia_pcie_scan_bus,
 		.map_irq = axxia_pcie_map_irq
@@ -786,7 +778,6 @@ static struct hw_pci axxia_pcie_hw[] = {
 	[1] = {
 		.nr_controllers = 1,
 		.domain = 1,
-		.swizzle = pci_std_swizzle,
 		.setup = axxia_pcie_setup,
 		.scan = axxia_pcie_scan_bus,
 		.map_irq = axxia_pcie_map_irq
@@ -933,7 +924,6 @@ axxia_probe_pciex_bridge(struct device_node *np)
 		portno,
 		port->pci_bar,
 		port->inbound.start, port->inbound.end);
-
 }
 
 /*
