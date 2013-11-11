@@ -18,8 +18,9 @@
 #include <linux/of_fdt.h>
 #include <asm/smp_plat.h>
 #include <asm/cacheflush.h>
-#include <asm/hardware/gic.h>
+#include <linux/irqchip/arm-gic.h>
 #include <asm/mach/map.h>
+#include <asm/virt.h>
 
 #include <mach/axxia-gic.h>
 
@@ -27,20 +28,84 @@
  * Control for which core is the next to come out of the secondary
  * boot "holding pen".
  */
-volatile int __cpuinitdata pen_release = -1;
+//volatile int __cpuinitdata pen_release = -1;
 
 extern void axxia_secondary_startup(void);
 
-#define APB2_SER3_PHY_ADDR      0x002010030000ULL
+#define APB2_SER3_PHY_ADDR    0x002010030000ULL
 #define APB2_SER3_ADDR_SIZE   0x10000
+
 
 /*
   flush_l3
 */
-
-static void
-flush_l3(void)
+static void flush_l3(void)
 {
+#if 0
+	unsigned long hnf_offsets[] = {
+		 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
+	};
+	int i;
+	unsigned long status;
+	int retries;
+	void __iomem *dickens;
+
+	dickens = ioremap(0x2000000000, 0x1000000);
+#if 0
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		/* set state NOL3 */
+		writel(0x0, dickens + (0x10000 * hnf_offsets[i]) + 0x10);
+	}
+
+	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		retries = 10000;
+
+		do {
+			status = readl(dickens +
+				       (0x10000 * hnf_offsets[i]) + 0x18);
+			udelay(1);
+		} while ((0 < --retries) && (0x0 != (status & 0xf)));
+
+		if (0 == retries)
+			BUG();
+	}
+#endif
+
+	for (i=0;i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
+		status = readl(dickens + (0x10000 * hnf_offsets[i]) + 0x18);
+
+		/* If L3 not already set to FAM, set it to FAM*/
+		if ((status & 0xf) != 0xc) {
+			printk("JL: Switching L3s to FAM \n\r");
+
+			for (i = 0; i < (sizeof(hnf_offsets) /
+					 sizeof(unsigned long)); ++i) {
+				/* set state FAM */
+				writel(0x3,
+				       (dickens +
+					(0x10000 * hnf_offsets[i]) + 0x10));
+			}
+
+			for (i = 0; i < (sizeof(hnf_offsets) /
+					 sizeof(unsigned long)); ++i) {
+				retries = 10000;
+
+				do {
+					status = readl(dickens +
+						       (0x10000 *
+							hnf_offsets[i]) + 0x18);
+					udelay(1);
+				} while ((0 < --retries) &&
+					 (0xc != (status & 0xf)));
+
+				if (0 == retries)
+					BUG();
+			}
+		}
+	}
+
+	iounmap(dickens);
+#endif
 	return;
 }
 
@@ -60,7 +125,7 @@ static void __cpuinit write_pen_release(int val)
 
 static DEFINE_RAW_SPINLOCK(boot_lock);
 
-void __cpuinit platform_secondary_init(unsigned int cpu)
+void __cpuinit axxia_secondary_init(unsigned int cpu)
 {
 	/*
 	 * If this isn't the first physical core in a secondary cluster
@@ -85,7 +150,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 	_raw_spin_unlock(&boot_lock);
 }
 
-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+int __cpuinit axxia_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	unsigned long timeout;
 	int phys_cpu, cluster;
@@ -132,7 +197,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 #else
 	timeout = jiffies + (10 * HZ);
 #endif
-
 	while (time_before(jiffies, timeout)) {
 		smp_rmb();
 		if (pen_release == -1)
@@ -154,7 +218,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
  * Initialise the CPU possible map early - this describes the CPUs
  * which may be present or become present in the system.
  */
-void __init smp_init_cpus(void)
+static void __init axxia_smp_init_cpus(void)
 {
 	int ncores = 0;
 	struct device_node *np;
@@ -175,11 +239,10 @@ void __init smp_init_cpus(void)
 		}
 	}
 
-	set_smp_cross_call(axxia_gic_raise_softirq);
+	//set_smp_cross_call(axxia_gic_raise_softirq);
 }
 
-void __init
-platform_smp_prepare_cpus(unsigned int max_cpus)
+static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 {
 #ifdef CONFIG_ARCH_AXXIA_SIM
 	int i;
@@ -197,15 +260,16 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 	 * "holding pen".
 	 */
 	*(u32 *)phys_to_virt(0x10000020) =
-		virt_to_phys(axxia_secondary_startup);
+					  virt_to_phys(axxia_secondary_startup);
 #else
 	int i;
+	int cpu_count = 0;
+	u32 phys_cpu = 0;
 	void __iomem *apb2_ser3_base;
 	unsigned long resetVal;
-	int phys_cpu, cpu_count = 0;
 	struct device_node *np;
 	unsigned long release_addr[NR_CPUS] = {0};
-	unsigned long release;
+	u32 release;
 
 	if (of_find_compatible_node(NULL, NULL, "lsi,axm5516")) {
 		for_each_node_by_name(np, "cpu") {
@@ -220,6 +284,10 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 				continue;
 
 			release_addr[phys_cpu] = release;
+			printk(KERN_DEBUG
+			       "%s:%d - set address for %d to 0x%08lx\n",
+			       __FILE__, __LINE__,
+			       phys_cpu, release_addr[phys_cpu]);
 		}
 
 		/*
@@ -227,32 +295,34 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 		 * actually populated at the present time.
 		 */
 
-		apb2_ser3_base =
-			ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
+		apb2_ser3_base = ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
 
 		for (i = 0; i < NR_CPUS; i++) {
 			/* check if this is a possible CPU and
-			   it is within max_cpus range */
+			 * it is within max_cpus range */
 			if ((cpu_possible(i)) &&
-			    (cpu_count < max_cpus) &&
+				(cpu_count < max_cpus) &&
 			    (0 != release_addr[i])) {
 				set_cpu_present(cpu_count, true);
 				cpu_count++;
 			}
 
-			/* Release all physical cpu:s since we might want to
-			 * bring them online later. Also we need to get the
-			 * execution into kernel code (it's currently executing
-			 * in u-boot).
-			 */
-			phys_cpu = cpu_logical_map(i);
+			if (!is_hyp_mode_available()) {
+				/* Release all physical cpu:s when not in hyp mode
+				 * since we might want to bring them online later.
+				 * Also we need to get the execution into kernel
+				 * code (it's currently executing in u-boot).
+				 * u-boot releases the cores from reset in hyp mode.
+				 */
+				phys_cpu = cpu_logical_map(i);
 
-			if (phys_cpu != 0) {
-				resetVal = readl(apb2_ser3_base + 0x1010);
-				writel(0xab, apb2_ser3_base+0x1000);
-				resetVal &= ~(1 << phys_cpu);
-				writel(resetVal, apb2_ser3_base+0x1010);
-				udelay(1000);
+				if (phys_cpu != 0) {
+					resetVal = readl(apb2_ser3_base + 0x1010);
+					writel(0xab, apb2_ser3_base+0x1000);
+					resetVal &= ~(1 << phys_cpu);
+					writel(resetVal, apb2_ser3_base+0x1010);
+					udelay(1000);
+				}
 			}
 		}
 
@@ -263,9 +333,9 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 		 * cores will execute once they are released from their
 		 * "holding pen".
 		 */
-		for (i = 0; i < NR_CPUS; i++) {
-			if (release_addr[i] != 0) {
-				u32 *vrel_addr =
+		for(i = 0; i < NR_CPUS; i++) {
+			if(release_addr[i] != 0) {
+				u32* vrel_addr =
 					(u32 *)phys_to_virt(release_addr[i]);
 				*vrel_addr =
 					virt_to_phys(axxia_secondary_startup);
@@ -285,10 +355,15 @@ platform_smp_prepare_cpus(unsigned int max_cpus)
 		*(u32 *)phys_to_virt(0x10000020) =
 			virt_to_phys(axxia_secondary_startup);
 		smp_wmb();
-		__cpuc_flush_dcache_area((void *)phys_to_virt(0x10000020),
-					 sizeof(u32));
+		__cpuc_flush_dcache_area((void *)phys_to_virt(0x10000020), sizeof(u32));
 	}
-
 	return;
 #endif
 }
+
+struct smp_operations __initdata axxia_smp_ops = {
+	.smp_init_cpus		= axxia_smp_init_cpus,
+	.smp_prepare_cpus	= axxia_smp_prepare_cpus,
+	.smp_secondary_init	= axxia_secondary_init,
+	.smp_boot_secondary	= axxia_boot_secondary,
+};

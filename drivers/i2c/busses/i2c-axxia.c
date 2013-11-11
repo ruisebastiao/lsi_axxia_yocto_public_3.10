@@ -195,7 +195,7 @@ axxia_i2c_init(struct axxia_i2c_dev *idev)
 	tmo_clk = ns_to_clk(SCL_WAIT_TIMEOUT_NS, clk_mhz);
 
 	/*
-	   Find the prescaler value that makes tmo_clk fit in 15-bits counter.
+	 * Find the prescaler value that makes tmo_clk fit in 15-bits counter.
 	 */
 	for (prescale = 0; prescale < 15; ++prescale) {
 		if (tmo_clk <= 0x7fff)
@@ -436,7 +436,7 @@ static const struct i2c_algorithm axxia_i2c_algo = {
 	.functionality	= axxia_i2c_func,
 };
 
-static int __devinit
+static int
 axxia_i2c_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -536,7 +536,7 @@ err_cleanup:
 	return ret;
 }
 
-static int __devexit
+static int
 axxia_i2c_remove(struct platform_device *pdev)
 {
 	struct axxia_i2c_dev *idev = platform_get_drvdata(pdev);
@@ -564,7 +564,7 @@ static int axxia_i2c_resume(struct platform_device *pdev)
 #endif
 
 /* Match table for of_platform binding */
-static const struct of_device_id axxia_i2c_of_match[] __devinitconst = {
+static const struct of_device_id axxia_i2c_of_match[] = {
 	{ .compatible = "lsi,api2c", },
 	{},
 };
@@ -572,7 +572,7 @@ MODULE_DEVICE_TABLE(of, axxia_i2c_of_match);
 
 static struct platform_driver axxia_i2c_driver = {
 	.probe   = axxia_i2c_probe,
-	.remove  = __devexit_p(axxia_i2c_remove),
+	.remove  = axxia_i2c_remove,
 	.suspend = axxia_i2c_suspend,
 	.resume  = axxia_i2c_resume,
 	.driver  = {

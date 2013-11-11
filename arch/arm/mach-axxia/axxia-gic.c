@@ -54,7 +54,7 @@
 #include <asm/exception.h>
 #include <asm/smp_plat.h>
 #include <asm/mach/irq.h>
-#include <asm/hardware/gic.h>
+#include <linux/irqchip/arm-gic.h>
 
 #include <mach/axxia-gic.h>
 
@@ -82,7 +82,7 @@ enum axxia_ext_ipi_num {
 	IPI3_CPU3,
 	MAX_AXM_IPI_NUM
 };
-static u32 mplx_ipi_num_45;
+static u32 mplx_ipi_num_457;
 static u32 mplx_ipi_num_61;
 
 union gic_base {
@@ -159,6 +159,10 @@ static void gic_mask_irq(struct irq_data *d)
 	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
 		return;
 
+	/* Don't mess with the PMU IRQ either. */
+	if (irqid == IRQ_PMU)
+		return;
+
 	/* Deal with PPI interrupts directly. */
 	if ((irqid > 16) && (irqid < 32)) {
 		_gic_mask_irq(d);
@@ -204,11 +208,15 @@ static void gic_unmask_irq(struct irq_data *d)
 	u32 pcpu = cpu_logical_map(smp_processor_id());
 	u32 irqid = gic_irq(d);
 
+	/* Don't mess with the AXM IPIs. */
+	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+		return;
+
 	if (irqid >= 1020)
 		return;
 
-	/* Don't mess with the AXM IPIs. */
-	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+	/* Don't mess with the PMU IRQ either. */
+	if (irqid == IRQ_PMU)
 		return;
 
 	/* Deal with PPI interrupts directly. */
@@ -457,8 +465,8 @@ static int gic_set_affinity(struct irq_data *d,
 	 * different than the prior cluster, remove the IRQ affinity
 	 * on the old cluster.
 	 */
-	if ((cpu_logical_map(cpu) / 4) !=
-		(cpu_logical_map(irq_cpuid[irqid]) / 4)) {
+	if ((irqid != IRQ_PMU) && ((cpu_logical_map(cpu) / 4) !=
+		(cpu_logical_map(irq_cpuid[irqid]) / 4))) {
 		/*
 		 * If old cpu assignment falls within the same cluster as
 		 * the cpu we're currently running on, set the IRQ affinity
@@ -547,7 +555,7 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 			case IPI2_CPU1:
 			case IPI2_CPU2:
 			case IPI2_CPU3:
-				ipinum = mplx_ipi_num_45; /* 4 or 5 */
+				ipinum = mplx_ipi_num_457; /* 4 or 5 or 7*/
 				break;
 
 			case IPI3_CPU0:
@@ -571,6 +579,7 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 				 * is really a SPI interrupt, not a SGI.
 				 */
 				writel_relaxed(irqnr, cpu_base + GIC_CPU_EOI);
+
 #ifdef CONFIG_SMP
 				/* Do the normal IPI handling. */
 				handle_IPI(ipinum, regs);
@@ -683,6 +692,11 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	}
 
 	/*
+	 * Set the PMU IRQ to the first cpu in this cluster.
+	 */
+	writeb_relaxed(0x01, base + GIC_DIST_TARGET + IRQ_PMU);
+
+	/*
 	 * Set Axxia IPI interrupts to be edge triggered.
 	 */
 	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
@@ -704,6 +718,14 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 		writel_relaxed(enablemask,
 			       base + GIC_DIST_ENABLE_SET + enableoff);
 	}
+
+	/*
+	 * Do the initial enable of the PMU IRQ here.
+	 */
+	enablemask = 1 << (IRQ_PMU % 32);
+	enableoff = (IRQ_PMU / 32) * 4;
+	writel_relaxed(enablemask,
+		       base + GIC_DIST_ENABLE_SET + enableoff);
 
 	writel_relaxed(1, base + GIC_DIST_CTRL);
 }
@@ -858,7 +880,6 @@ static void gic_cpu_restore(void)
 static int _gic_notifier(struct notifier_block *self,
 			 unsigned long cmd, void *v)
 {
-	int i;
 	switch (cmd) {
 	case CPU_PM_ENTER:
 		gic_cpu_save();
@@ -1045,6 +1066,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	if (WARN_ON(!gic->domain))
 		return;
 
+#ifdef CONFIG_SMP
+	set_smp_cross_call(axxia_gic_raise_softirq);
+#endif
+
 	gic_axxia_init(gic);
 	gic_dist_init(gic);
 	gic_cpu_init(gic);
@@ -1119,8 +1144,9 @@ void axxia_gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 
 	case 4: /* IPI_CALL_FUNC */
 	case 5: /* IPI_CALL_FUNC_SINGLE */
+	case 7: /* IPI_BACKTRACE */
 		regoffset += 0x8; /* Axxia IPI2 */
-		mplx_ipi_num_45 = irq;
+		mplx_ipi_num_457 = irq;
 		break;
 
 	case 6: /* IPI_CPU_STOP */
@@ -1163,10 +1189,10 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
 	cpu_base = of_iomap(node, 1);
 	WARN(!cpu_base, "unable to map gic cpu registers\n");
 
-	ipi_mask_reg_base = of_iomap(node, 2);
+	ipi_mask_reg_base = of_iomap(node, 4);
 	WARN(!ipi_mask_reg_base, "unable to map Axxia IPI mask registers\n");
 
-	ipi_send_reg_base = of_iomap(node, 3);
+	ipi_send_reg_base = of_iomap(node, 5);
 	WARN(!ipi_send_reg_base, "unable to map Axxia IPI send registers\n");
 
 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))

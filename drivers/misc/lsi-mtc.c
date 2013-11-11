@@ -84,9 +84,7 @@ struct mtc_regs {
 #ifdef __MTC_SIMULATION
 struct mtc_regs _mtc_regs;
 u32 _mtc_tdomem[256] = { 0x11110000, 0x22221111, 0x33332222 };
-
 u32 *_mtc_prgmem = _mtc_tdomem;
-
 #endif
 
 /******************************************************/
@@ -198,7 +196,7 @@ struct ncp_axis_mtc_MTC_INST_PARAMS0_REG_ADDR_r_t {
 	unsigned tdo_memory_size:10;
 	unsigned reserved1:6;
 	unsigned tst_prgm_memory_size:10;
-#else				/* Little Endian */
+#else	/* Little Endian */
 	unsigned tst_prgm_memory_size:10;
 	unsigned reserved1:6;
 	unsigned tdo_memory_size:10;
@@ -2471,8 +2469,8 @@ mtc_dev_read(struct file *filp, char __user *data, size_t len, loff_t *ppose)
 
 	tdo_size_word = (tdo_size_bit + 31) / 32;
 #ifdef DEBUG
-	printk(KERN_DEBUG "mtc_dev_read(), tdo_bit=%d tdo_word=%d\n",
-	       tdo_size_bit, tdo_size_word);
+	pr_debug("mtc_dev_read(), tdo_bit=%d tdo_word=%d\n",
+		 tdo_size_bit, tdo_size_word);
 #endif
 	/* copy tdo data to user space, always read from location 0
 	   because we reset tdomem after each read */
@@ -2496,7 +2494,9 @@ mtc_dev_read(struct file *filp, char __user *data, size_t len, loff_t *ppose)
 
 static ssize_t
 mtc_dev_write(struct file *filp,
-	      const char __user *data, size_t len, loff_t *ppose)
+	      const char __user *data,
+	      size_t len,
+	      loff_t *ppose)
 {
 
 	struct miscdevice *misc = filp->private_data;
@@ -2528,7 +2528,7 @@ mtc_dev_write(struct file *filp,
 
 	/* TEST CODE when mtc sim is used */
 	/* status1Reg.prgm_mem_rd_addr = 253; */
-	/* printk(KERN_DEBUG"buf offset=%d\n",status1Reg.prgm_mem_rd_addr ); */
+	/* pr_debug("buf offset=%d\n",status1Reg.prgm_mem_rd_addr ); */
 	/*END OF TEST CODE */
 
 	/* find starting location of the write */
@@ -2541,19 +2541,18 @@ mtc_dev_write(struct file *filp,
 		size1 = 256 - status1Reg.prgm_mem_rd_addr;
 		/*number of words load from location 0 will be size-size1 */
 #ifdef DEBUG
-		printk(KERN_DEBUG
-		       "Wraparound size=%d, size1=%d size-size1=%d\n", size,
-		       size1, size - size1);
+		pr_debug("Wraparound size=%d, size1=%d size-size1=%d\n", size,
+			 size1, size - size1);
 #endif
 	}
 #ifdef DEBUG
-	printk(KERN_DEBUG "Appending buff size1=%d\n", size1);
+	pr_debug("Appending buff size1=%d\n", size1);
 #endif
 
 	for (i = 0; i < size1; i++) {
 #ifdef DEBUG
-		printk(KERN_DEBUG "i=%d mtc_buf[i]=%d pprg=0x%x\n",
-		       i, mtc_buf[i], (u32) pprg);
+		pr_debug("i=%d mtc_buf[i]=%d pprg=0x%x\n",
+			 i, mtc_buf[i], (u32) pprg);
 #endif
 		*pprg = mtc_buf[i];
 		pprg++;
@@ -2563,14 +2562,13 @@ mtc_dev_write(struct file *filp,
 	if (isWraparound) {
 		pprg = dev->prgmem;	/* reset write pointer to location 0 */
 #ifdef DEBUG
-		printk(KERN_DEBUG "\n\nWraparound buff size=%d\n",
-		       size - size1);
+		pr_debug("\n\nWraparound buff size=%d\n",
+			 size - size1);
 #endif
 		for (i = 0; i < (size - size1); i++) {
 #ifdef DEBUG
-			printk(KERN_DEBUG
-			       "i=%d mtc_buf[size1+i]=%d pprg=0x%x\n", i,
-			       mtc_buf[size1 + i], (u32) pprg);
+			pr_debug("i=%d mtc_buf[size1+i]=%d pprg=0x%x\n", i,
+				 mtc_buf[size1 + i], (u32) pprg);
 #endif
 			*pprg = mtc_buf[size1 + i];
 			pprg++;
@@ -2605,7 +2603,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		    copy_from_user((void *)&addr, (void *)arg,
 				   sizeof(unsigned int));
 		if (numByteCopied) {
-			printk(KERN_DEBUG "MTC Error ioctl\n");
+			pr_debug("MTC Error ioctl\n");
 			return -EFAULT;
 		}
 		tmp2 = *((u32 *) dev->regs + addr / 4);
@@ -2620,7 +2618,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			struct lsi_mtc_cfg_t mtc_cfg;
 			if (copy_from_user
 			    ((void *)&mtc_cfg, (void *)arg, sizeof(mtc_cfg))) {
-				printk(KERN_DEBUG "MTC Error ioctl\n");
+				pr_debug("MTC Error ioctl\n");
 				return -EFAULT;
 			}
 
@@ -2634,7 +2632,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			int single_step;
 			if (copy_from_user
 			    ((void *)&single_step, (void *)arg, sizeof(int))) {
-				printk(KERN_DEBUG "MTC Error ioctl\n");
+				pr_debug("MTC Error ioctl\n");
 				return -EFAULT;
 			}
 
@@ -2647,9 +2645,9 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			cfg0.single_step_en = single_step;
 			dev->regs->config0 = *((u32 *) &cfg0);
 #ifdef DEBUG
-			printk(KERN_DEBUG
-			       "MTC_SINGLESTEP_ENABLE: dev->regs->config0=0x%x\n",
-			       dev->regs->config0);
+			pr_debug(
+			    "MTC_SINGLESTEP_ENABLE: dev->regs->config0=0x%x\n",
+			    dev->regs->config0);
 #endif
 		}
 
@@ -2661,7 +2659,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			int loop_mode;
 			if (copy_from_user
 			    ((void *)&loop_mode, (void *)arg, sizeof(int))) {
-				printk(KERN_DEBUG "MTC Error ioctl\n");
+				pr_debug("MTC Error ioctl\n");
 				return -EFAULT;
 			}
 
@@ -2674,7 +2672,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			cfg0.loop_en = loop_mode;
 			dev->regs->config0 = *((u32 *) &cfg0);
 #ifdef DEBUG
-			printk(KERN_DEBUG
+			pr_debug(
 			       "MTC_LOOPMODE_ENABLE dev->regs->config0=0x%x\n",
 			       dev->regs->config0);
 #endif
@@ -2688,8 +2686,8 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			exec1.sw_reset = 1;
 			dev->regs->execute = *((u32 *) &exec1);
 #ifdef DEBUG
-			printk(KERN_DEBUG "dev->regs->execute=0x%x\n",
-				dev->regs->execute);
+			pr_debug("dev->regs->execute=0x%x\n",
+				 dev->regs->execute);
 #endif
 		}
 
@@ -2702,7 +2700,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 			if (copy_from_user
 			    ((void *)&tckGate, (void *)arg, sizeof(tckGate))) {
-				printk(KERN_DEBUG "MTC Error ioctl\n");
+				pr_debug("MTC Error ioctl\n");
 				return -EFAULT;
 			}
 
@@ -2720,8 +2718,8 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			cfg1.sw_gate_tck = tckGate.gate_tck;
 			dev->regs->config1 = *((u32 *) &cfg1);
 #ifdef DEBUG
-			printk(KERN_DEBUG "dev->regs->config1=0x%x\n",
-			       dev->regs->config1);
+			pr_debug("dev->regs->config1=0x%x\n",
+				 dev->regs->config1);
 #endif
 		}
 
@@ -2733,7 +2731,7 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			int start_stop;
 			if (copy_from_user
 			    ((void *)&start_stop, (void *)arg, sizeof(int))) {
-				printk(KERN_DEBUG "MTC Error ioctl\n");
+				pr_debug("MTC Error ioctl\n");
 				return -EFAULT;
 			}
 
@@ -2746,8 +2744,8 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			cfg0.start_stopn = start_stop;
 			dev->regs->config0 = *((u32 *) &cfg0);
 #ifdef DEBUG
-			printk(KERN_DEBUG "dev->regs->config0=0x%x\n",
-			       dev->regs->config0);
+			pr_debug("dev->regs->config0=0x%x\n",
+				 dev->regs->config0);
 #endif
 		}
 
@@ -2807,8 +2805,8 @@ mtc_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		printk(KERN_DEBUG "Invalid ioctl cmd=%d MTC_DEBUG_OP=%d\n",
-		       cmd, MTC_DEBUG_OP);
+		pr_debug("Invalid ioctl cmd=%d MTC_DEBUG_OP=%d\n",
+			 cmd, MTC_DEBUG_OP);
 		ret = -EINVAL;
 
 	}
@@ -2847,14 +2845,14 @@ static irqreturn_t mtc_isr(int irq_no, void *arg)
  *
  * Initialize device.
  */
-static int __devinit mtc_probe(struct platform_device *pdev)
+static int mtc_probe(struct platform_device *pdev)
 {
 	static struct mtc_device *dev;
 	void __iomem *regs;
 	int rc;
 	u32 *pRegs;
 
-	printk(KERN_DEBUG"!!!!MTC: mtc_probe()\n");
+	pr_debug("!!!!MTC: mtc_probe()\n");
 	/* Allocate space for device private data */
 	dev = kzalloc(sizeof *dev, GFP_KERNEL);
 	if (!dev) {
@@ -2916,7 +2914,7 @@ static int __devinit mtc_probe(struct platform_device *pdev)
 /**
  * mtc_remove
  */
-static int __devexit mtc_remove(struct platform_device *pdev)
+static int mtc_remove(struct platform_device *pdev)
 {
 	struct mtc_device *dev = dev_get_drvdata(&pdev->dev);
 	kref_put(&dev->ref, mtc_destroy);
@@ -3072,13 +3070,11 @@ static long _mtc_config(struct mtc_device *dev, struct lsi_mtc_cfg_t *pMTCCfg)
 	dev->regs->config1 = *((u32 *) &cfg1);
 
 #ifdef DEBUG
-	printk(KERN_DEBUG "buffmode=%d,rate=%d dev->regs->config0 =0x%x\n",
-	       pMTCCfg->buffMode, pMTCCfg->clkSpeed, dev->regs->config0);
+	pr_debug("buffmode=%d,rate=%d dev->regs->config0 =0x%x\n",
+		 pMTCCfg->buffMode, pMTCCfg->clkSpeed, dev->regs->config0);
 
-	printk(KERN_DEBUG
-	       "dev->regs->config1 =0x%x, dev->regs-> execute=0x%x\n",
-	       dev->regs->config1, dev->regs->execute);
-
+	pr_debug("dev->regs->config1 =0x%x, dev->regs-> execute=0x%x\n",
+		 dev->regs->config1, dev->regs->execute);
 #endif
 	/* test */
 	return 0;

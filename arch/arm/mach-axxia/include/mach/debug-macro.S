@@ -29,9 +29,9 @@
 #define UART2_VIRTUAL_ADDRESS 0xf0082000
 #define UART3_VIRTUAL_ADDRESS 0xf0083000
 
-	.macro	addruart, rp, rv, tmp
-	ldr	\rp, =0x10080000
-	ldr	\rv, =0xf0080000
+.macro  addruart, rp, rv, tmp
+	ldr \rp, =0x10080000
+	ldr \rv, =0xf0080000
 	.endm
 
 #include <asm/hardware/debug-pl01x.S>
