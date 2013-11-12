@@ -56,7 +56,7 @@ __delay:
 	nop
 	subs	r4,r4,#1
 	bne	__delay
- 	cmp	r7, r0
+	cmp	r7, r0
 	bne	pen
 
 	/*

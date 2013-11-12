@@ -70,7 +70,7 @@ secondary:	and	r1, r1,0x3			@ CPU number
 	cmp	r1, #0
 	bne 	actlr2_set
 
- 	mrc	p15, 1, r0, c15, c0, 0		@ L2ACTLR
+	mrc	p15, 1, r0, c15, c0, 0			@ L2ACTLR
 	@ Set bit 3 - disable clean/evict push to external
 	orr	r0, r0, #(0x1 << 3)
 	@ Set bit 12 - disable multiple outstanding

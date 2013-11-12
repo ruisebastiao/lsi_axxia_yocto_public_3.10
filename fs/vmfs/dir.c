@@ -28,15 +28,15 @@ static int vmfs_readdir(struct file *, void *, filldir_t);
 static int vmfs_dir_open(struct inode *, struct file *);
 
 static struct dentry *vmfs_lookup(struct inode *, struct dentry *,
-				  struct nameidata *);
-static int vmfs_create(struct inode *, struct dentry *, int,
-		       struct nameidata *);
-static int vmfs_mkdir(struct inode *, struct dentry *, int);
+				  unsigned int flags);
+static int vmfs_create(struct inode *, struct dentry *, umode_t,
+		       bool excl);
+static int vmfs_mkdir(struct inode *, struct dentry *, umode_t);
 static int vmfs_rmdir(struct inode *, struct dentry *);
 static int vmfs_unlink(struct inode *, struct dentry *);
 static int vmfs_rename(struct inode *, struct dentry *,
 		       struct inode *, struct dentry *);
-static int vmfs_make_node(struct inode *, struct dentry *, int, dev_t);
+static int vmfs_make_node(struct inode *, struct dentry *, umode_t, dev_t);
 static int vmfs_link(struct dentry *, struct inode *, struct dentry *);
 
 const struct file_operations vmfs_dir_operations = {
@@ -256,7 +256,7 @@ static int vmfs_dir_open(struct inode *dir, struct file *file)
 /*
  * Dentry operations routines
  */
-static int vmfs_lookup_validate(struct dentry *, struct nameidata *);
+static int vmfs_lookup_validate(struct dentry *, unsigned int flags);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 38)
 static int vmfs_delete_dentry(struct dentry *);
 #else
@@ -272,7 +272,7 @@ static struct dentry_operations vmfs__dentry_operations_case = {
 /*
  * This is the callback when the dcache has a lookup hit.
  */
-static int vmfs_lookup_validate(struct dentry *dentry, struct nameidata *nd)
+static int vmfs_lookup_validate(struct dentry *dentry, unsigned int flags)
 {
 	struct vmfs_sb_info *server = server_from_dentry(dentry);
 	struct inode *inode = dentry->d_inode;
@@ -377,7 +377,7 @@ void vmfs_renew_times(struct dentry *dentry)
 }
 
 static struct dentry *vmfs_lookup(struct inode *dir, struct dentry *dentry,
-				  struct nameidata *nd)
+				  unsigned int flags)
 {
 	struct vmfs_fattr finfo;
 	struct inode *inode;
@@ -473,8 +473,8 @@ out_close:
 
 /* N.B. How should the mode argument be used? */
 static int
-vmfs_create(struct inode *dir, struct dentry *dentry, int mode,
-	    struct nameidata *nd)
+vmfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
+	    bool excl)
 {
 	int32_t fileid;
 	int error;
@@ -496,7 +496,7 @@ vmfs_create(struct inode *dir, struct dentry *dentry, int mode,
 }
 
 /* N.B. How should the mode argument be used? */
-static int vmfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int vmfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int error;
 
@@ -600,7 +600,7 @@ out:
  * matches the connection credentials (and we don't know which those are ...)
  */
 static int
-vmfs_make_node(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+vmfs_make_node(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
 	return -EINVAL;
 }
