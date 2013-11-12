@@ -43,7 +43,7 @@ int vmfs_getopt(char *caller, char **options, struct option *opts,
 	if (val != NULL) {
 		*val++ = 0;
 		if (value)
-			*value = kstrtoul(val, NULL, 0);
+			*value = kstrtoul(val, 0, NULL);
 		*optarg = val;
 	}
 

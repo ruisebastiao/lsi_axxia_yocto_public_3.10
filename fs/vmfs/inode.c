@@ -54,7 +54,7 @@ DEFINE_MUTEX(vmfs_mutex);
 static void vmfs_delete_inode(struct inode *);
 static void vmfs_put_super(struct super_block *);
 static int vmfs_statfs(struct dentry *, struct kstatfs *);
-static int vmfs_show_options(struct seq_file *, struct vfsmount *);
+static int vmfs_show_options(struct seq_file *, struct dentry *);
 
 static struct kmem_cache *vmfs_inode_cachep;
 
@@ -337,7 +337,7 @@ static void vmfs_delete_inode(struct inode *ino)
  * It tries to avoid showing settings that were not changed from their
  * defaults.
  */
-static int vmfs_show_options(struct seq_file *s, struct vfsmount *m)
+static int vmfs_show_options(struct seq_file *s, struct dentry *m)
 {
 
 	return 0;
@@ -486,10 +486,10 @@ int vmfs_notify_change(struct dentry *dentry, struct iattr *attr)
 		goto out;
 
 	error = -EPERM;
-	if ((attr->ia_valid & ATTR_UID) && (attr->ia_uid != server->mnt->uid))
+	if ((attr->ia_valid & ATTR_UID) && ((attr->ia_uid).val != (server->mnt->uid).val))
 		goto out;
 
-	if ((attr->ia_valid & ATTR_GID) && (attr->ia_uid != server->mnt->gid))
+	if ((attr->ia_valid & ATTR_GID) && ((attr->ia_gid).val != (server->mnt->gid).val))
 		goto out;
 
 	if ((attr->ia_valid & ATTR_MODE) && (attr->ia_mode & ~mask))
@@ -508,9 +508,9 @@ int vmfs_notify_change(struct dentry *dentry, struct iattr *attr)
 		error = server->ops->truncate(inode, attr->ia_size);
 		if (error)
 			goto out;
-		error = vmtruncate(inode, attr->ia_size);
+		/*error = vmtruncate(inode, attr->ia_size);
 		if (error)
-			goto out;
+			goto out;*/
 		refresh = 1;
 	}
 

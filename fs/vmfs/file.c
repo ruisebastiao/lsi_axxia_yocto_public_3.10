@@ -33,7 +33,7 @@ static int
 vmfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
 #else
-vmfs_fsync(struct file *file, int datasync)
+vmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	struct dentry *dentry = file->f_path.dentry;
 #endif
@@ -456,7 +456,7 @@ vmfs_file_permission(struct inode *inode, int mask, struct nameidata *nd)
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 38)
 vmfs_file_permission(struct inode *inode, int mask)
 #else
-vmfs_file_permission(struct inode *inode, int mask, unsigned int flags)
+vmfs_file_permission(struct inode *inode, int mask)
 #endif
 {
 	int mode = inode->i_mode;
