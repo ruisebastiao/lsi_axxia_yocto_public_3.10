@@ -45,9 +45,9 @@ struct vmfs_mount_data {
 struct vmfs_mount_data_kernel {
 	int version;
 
-	uid_t mounted_uid;	/* Who may umount() this filesystem? */
-	uid_t uid;
-	gid_t gid;
+	kuid_t mounted_uid;	/* Who may umount() this filesystem? */
+	kuid_t uid;
+	kgid_t gid;
 	mode_t file_mode;
 	mode_t dir_mode;
 

@@ -34,11 +34,11 @@ long vmfs_unlocked_ioctl(struct file *filp, unsigned int cmd,
 		uid16_t uid16;
 		uid_t uid32;
 	case VMFS_IOC_GETMOUNTUID:
-		SET_UID(uid16, server->mnt->mounted_uid);
+		SET_UID(uid16, (server->mnt->mounted_uid).val);
 		result = put_user(uid16, (uid16_t __user *) arg);
 		break;
 	case VMFS_IOC_GETMOUNTUID32:
-		SET_UID(uid32, server->mnt->mounted_uid);
+		SET_UID(uid32, (server->mnt->mounted_uid).val);
 		result = put_user(uid32, (uid_t __user *) arg);
 		break;
 	default:
