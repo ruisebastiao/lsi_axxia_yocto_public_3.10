@@ -539,7 +539,7 @@ static int run_cmos_delay(void *ignore)
 	return 0;
 }
 
-static void notify_cmos_timer(void)
+void ntp_notify_cmos_timer(void)
 {
 	do_cmos_delay = true;
 	/* Make visible before waking up process */
@@ -554,8 +554,6 @@ static __init int create_cmos_delay_thread(void)
 	return 0;
 }
 early_initcall(create_cmos_delay_thread);
-
-void ntp_notify_cmos_timer(void) { }
 
 #else
 void ntp_notify_cmos_timer(void)
