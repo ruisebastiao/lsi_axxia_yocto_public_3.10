@@ -15,7 +15,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
-#include <linux/proc_fs.h>
+#include <linux/slab.h>
 
 #include "lsi-ncr.h"
 
@@ -24,7 +24,7 @@
 #endif
 
 static int log = 1;
-module_param(log, int, 0755);
+module_param(log, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(log, "Log each error on the console.");
 
 /*
@@ -87,6 +87,53 @@ struct smmon_counts {
 static struct smmon_counts counts;
 
 DEFINE_RAW_SPINLOCK(counts_lock);
+
+#define SUMMARY_SIZE 512
+static char *summary;
+module_param(summary, charp, S_IRUGO);
+MODULE_PARM_DESC(summary, "A Summary of the Current Error Counts.");
+
+/*
+  ------------------------------------------------------------------------------
+  update_summary
+*/
+
+static void
+update_summary(void)
+{
+	memset(summary, 0, SUMMARY_SIZE);
+	sprintf(summary,
+		"------------ Counts for SM0/SM1 ----------\n"
+		"                   Illegal Access: %lu/%lu\n"
+		"        Multiple Illegal Accesses: %lu/%lu\n"
+		"            Correctable ECC Error: %lu/%lu\n"
+		"  Multiple Correctable ECC Errors: %lu/%lu\n"
+		"          Uncorrectable ECC Error: %lu/%lu\n"
+		"Multiple Uncorrectable ECC Errors: %lu/%lu\n"
+		"                      Port Errors: %lu/%lu\n"
+		"                      Wrap Errors: %lu/%lu\n"
+		"                    Parity Errors: %lu/%lu\n",
+		counts.illegal_access[0],
+		counts.illegal_access[1],
+		counts.multiple_illegal_access[0],
+		counts.multiple_illegal_access[1],
+		counts.correctable_ecc[0],
+		counts.correctable_ecc[1],
+		counts.multiple_correctable_ecc[0],
+		counts.multiple_correctable_ecc[1],
+		counts.uncorrectable_ecc[0],
+		counts.uncorrectable_ecc[1],
+		counts.multiple_uncorrectable_ecc[0],
+		counts.multiple_uncorrectable_ecc[1],
+		counts.port_error[0],
+		counts.port_error[1],
+		counts.wrap_error[0],
+		counts.wrap_error[1],
+		counts.parity_error[0],
+		counts.parity_error[1]);
+
+	return;
+}
 
 /*
   ------------------------------------------------------------------------------
@@ -180,65 +227,14 @@ smmon_isr(int interrupt, void *device)
 			       "smmon(%d): Parity Error!\n", sm);
 	}
 
+	update_summary();
+
 	raw_spin_unlock(&counts_lock);
 
 	ncr_write(region, 0x548, 4, &status);
 
 	return IRQ_HANDLED;
 }
-
-#if 0 /* FIXME - /proc interface changed in 3.10! */
-/*
-  ------------------------------------------------------------------------------
-  smmon_read_proc
-*/
-
-static int
-smmon_read_proc(char *page, char **start, off_t offset, int count,
-		     int *eof, void *data)
-{
-	int length;
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&counts_lock, flags);
-
-	length = sprintf(page,
-			 "------------ Counts for SM0/SM1 ----------\n"
-			 "		     Illegal Access: %lu/%lu\n"
-			 "	  Multiple Illegal Accesses: %lu/%lu\n"
-			 "	      Correctable ECC Error: %lu/%lu\n"
-			 "  Multiple Correctable ECC Errors: %lu/%lu\n"
-			 "	    Uncorrectable ECC Error: %lu/%lu\n"
-			 "Multiple Uncorrectable ECC Errors: %lu/%lu\n"
-			 "			Port Errors: %lu/%lu\n"
-			 "			Wrap Errors: %lu/%lu\n"
-			 "		      Parity Errors: %lu/%lu\n",
-			 counts.illegal_access[0],
-			 counts.illegal_access[1],
-			 counts.multiple_illegal_access[0],
-			 counts.multiple_illegal_access[1],
-			 counts.correctable_ecc[0],
-			 counts.correctable_ecc[1],
-			 counts.multiple_correctable_ecc[0],
-			 counts.multiple_correctable_ecc[1],
-			 counts.uncorrectable_ecc[0],
-			 counts.uncorrectable_ecc[1],
-			 counts.multiple_uncorrectable_ecc[0],
-			 counts.multiple_uncorrectable_ecc[1],
-			 counts.port_error[0],
-			 counts.port_error[1],
-			 counts.wrap_error[0],
-			 counts.wrap_error[1],
-			 counts.parity_error[0],
-			 counts.parity_error[1]);
-
-	raw_spin_unlock_irqrestore(&counts_lock, flags);
-
-	*eof = 1;
-
-	return length;
-}
-#endif
 
 /*
   ==============================================================================
@@ -259,10 +255,13 @@ smmon_init(void)
 	int rc;
 	int mask;
 
-	printk("smmon: log=%d\n", log);
-#if 0 /* FIXME - /proc interface changed in 3.10! */
-	create_proc_read_entry("smmon", 0, NULL, smmon_read_proc, NULL);
-#endif
+	summary = kmalloc(SUMMARY_SIZE, GFP_KERNEL);
+
+	if (NULL == summary)
+		return -ENOMEM;
+
+	update_summary();
+
 	memset(&counts, 0, sizeof(struct smmon_counts));
 
 	/*
@@ -278,14 +277,11 @@ smmon_init(void)
 	rc |= request_irq(32 + 160, smmon_isr, IRQF_ONESHOT,
 			  "smmon_1", NULL);
 
-	if (0 != rc) {
-		printk(KERN_ERR
-		       "smmon: Couldn't connect interrupt handler!\n");
+	if (0 != rc)
 		return -EBUSY;
-	}
 
 	printk(KERN_INFO
-	       "smmon: Monitoring System Memory\n");
+	       "lsi_smmon: Monitoring System Memory\n");
 
 	return 0;
 }
@@ -303,10 +299,10 @@ smmon_exit(void)
 	free_irq(32 + 161, NULL);
 	free_irq(32 + 160, NULL);
 
-	remove_proc_entry("smmon", NULL);
+	kfree(summary);
 
 	printk(KERN_INFO
-	       "smmon: Not Monitoring System Memory\n");
+	       "lsi_smmon: Not Monitoring System Memory\n");
 
 	return;
 }
