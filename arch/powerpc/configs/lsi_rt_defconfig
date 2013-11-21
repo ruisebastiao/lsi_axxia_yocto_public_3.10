@@ -795,7 +795,7 @@ CONFIG_BLK_DEV_RAM_SIZE=35000
 # CONFIG_PCH_PHUB is not set
 # CONFIG_USB_SWITCH_FSA9480 is not set
 # CONFIG_SRAM is not set
-# CONFIG_LSI_NCR is not set
+CONFIG_LSI_NCR=y
 # CONFIG_LSI_SMMON is not set
 # CONFIG_C2PORT is not set
 
