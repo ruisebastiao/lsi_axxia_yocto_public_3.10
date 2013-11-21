@@ -135,6 +135,10 @@ textofs-$(CONFIG_ARCH_MSM7X30) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
 
+ifneq ($(CONFIG_ARCH_AXXIA_SIM),y)
+textofs-$(CONFIG_ARCH_AXXIA)   := 0x00408000
+endif
+
 # Machine directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
 machine-$(CONFIG_ARCH_AT91)		+= at91
@@ -186,6 +190,7 @@ machine-$(CONFIG_ARCH_U300)		+= u300
 machine-$(CONFIG_ARCH_U8500)		+= ux500
 machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
 machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+machine-$(CONFIG_ARCH_AXXIA)		:= axxia
 machine-$(CONFIG_ARCH_VT8500)		+= vt8500
 machine-$(CONFIG_ARCH_W90X900)		+= w90x900
 machine-$(CONFIG_FOOTBRIDGE)		+= footbridge

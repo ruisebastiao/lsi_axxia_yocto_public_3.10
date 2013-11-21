@@ -2055,7 +2055,7 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
 	 */
 	pl330->mcode_cpu = dma_alloc_coherent(pi->dev,
 				chans * pi->mcbufsz,
-				&pl330->mcode_bus, GFP_KERNEL);
+				(dma_addr_t *)&pl330->mcode_bus, GFP_KERNEL);
 	if (!pl330->mcode_cpu) {
 		dev_err(pi->dev, "%s:%d Can't allocate memory!\n",
 			__func__, __LINE__);
