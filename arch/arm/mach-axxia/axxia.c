@@ -73,7 +73,7 @@ void __init axxia_dt_init_early(void)
 static struct of_device_id axxia_irq_match[] __initdata = {
 	{
 		.compatible = "arm,cortex-a15-gic",
-		.data = gic_of_init,
+		.data = axxia_gic_of_init,
 	},
 	{ }
 };
@@ -360,7 +360,6 @@ DT_MACHINE_START(AXXIA_DT, "LSI Axxia")
 	.init_irq	= axxia_dt_init_irq,
 	.init_time	= axxia_dt_timer_init,
 	.init_machine	= axxia_dt_init,
-	.handle_irq	= axxia_gic_handle_irq,
 	.restart	= axxia_restart,
 #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
 	.dma_zone_size	= (4ULL * SZ_1G) - 1,
