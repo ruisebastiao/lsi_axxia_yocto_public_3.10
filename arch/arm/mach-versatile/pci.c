@@ -351,13 +351,7 @@ static int __init versatile_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 	return irq;
 }
 
-static u8 versatile_swizzle(struct pci_dev *dev, u8 *pinp)
-{
-	return 0;
-}
-
 static struct hw_pci versatile_pci __initdata = {
-	.swizzle		= versatile_swizzle,
 	.map_irq		= versatile_map_irq,
 	.nr_controllers		= 1,
 	.ops			= &pci_versatile_ops,
