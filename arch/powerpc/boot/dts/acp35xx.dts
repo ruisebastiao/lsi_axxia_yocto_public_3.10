@@ -393,8 +393,8 @@
                         0000 0 0 4 &MPIC 55 2
                 >;
         };
-+	SRIO0: srio0 {
-+		compatible = "acp,rapidio-delta";
+	SRIO0: srio0 {
+		compatible = "acp,rapidio-delta";
                 device_type = "rapidio";
 		enabled = <0>;
 		#size = <0>;    /* 0 = (256, small system)

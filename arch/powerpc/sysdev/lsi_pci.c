@@ -20,6 +20,7 @@
 #include <mm/mmu_decl.h>
 
 #include "ppc4xx_pci.h"
+#include "../../../drivers/misc/lsi-ncr.h"
 
 #include <linux/interrupt.h>
 
@@ -70,6 +71,7 @@ fixup_acp_pci_bridge(struct pci_dev *dev)
 
 DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5101, fixup_acp_pci_bridge);
 DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5108, fixup_acp_pci_bridge);
+DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5102, fixup_acp_pci_bridge);
 
 static int __init acp_parse_dma_ranges(struct pci_controller *hose,
 					  void __iomem *reg,
@@ -955,6 +957,7 @@ acp_pciex_port_setup_hose(struct pciex_port *port)
 	u32 pci_status;
 	u32 link_state;
 	u32 pci_config;
+	u32 version;
 
 	/* Check if primary bridge */
 	if (of_get_property(port->node, "primary", NULL))
@@ -1060,6 +1063,15 @@ acp_pciex_port_setup_hose(struct pciex_port *port)
 			goto fail;
 		}
 	}
+
+	/* get the device version */
+	if (0 != ncr_read(NCP_REGION_ID(0x16, 0xff), 0x0, 4, &version)) {
+		printk(KERN_ERR "Unable to detect ACP revision!\n");
+		goto fail;
+	}
+	port->acpChipType = (version & 0xff);
+	printk(KERN_INFO "Using PEI register set for ACP chipType %d\n",
+		port->acpChipType);
 
 	/*
 	 * Set bus numbers on our root port
@@ -1171,11 +1183,6 @@ static void __init probe_acp_pciex_bridge(struct device_node *np)
 		       np->full_name);
 		return;
 	}
-
-
-	port->acpChipType = 0x2;
-	printk(KERN_INFO "Using PEI register set for ACP chipType %d\n",
-	port->acpChipType);
 
 	/* Check for the PLX work-around. */
 	field = of_get_property(np, "plx", NULL);
