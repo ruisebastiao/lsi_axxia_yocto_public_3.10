@@ -81,7 +81,6 @@ static int ehci_ci13612_reinit(struct ehci_hcd *ehci)
 #ifdef CONFIG_LSI_USB_SW_WORKAROUND
 	/* S/W workarounds are not needed in AXM55xx */
 	ci13612_usb_setup(ehci_to_hcd(ehci));
-	ehci_port_power(ehci, 0);
 #endif
 	return 0;
 }
@@ -168,9 +167,9 @@ ci13612_fixup_txpburst(struct ehci_hcd *ehci)
 {
 	unsigned burst_size;
 
-	burst_size = ehci_readl(ehci, &ehci->regs->reserved[1]);
+	burst_size = ehci_readl(ehci, &ehci->regs->reserved1[1]);
 	burst_size = (burst_size & 0xffff00ff) | 0x4000;	/* TXPBURST */
-	ehci_writel(ehci, burst_size, &ehci->regs->reserved[1]);
+	ehci_writel(ehci, burst_size, &ehci->regs->reserved1[1]);
 }
 #else
 #define ci13612_fixup_txpburst(ehci) do { (void)ehci; } while(0)
