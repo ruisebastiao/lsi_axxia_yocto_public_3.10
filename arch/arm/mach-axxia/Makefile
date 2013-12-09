@@ -5,6 +5,7 @@ obj-y					+= wrappers.o
 obj-y					+= axxia.o
 obj-y					+= clock.o
 obj-y                                   += io.o
+obj-y					+= ncr.o
 obj-y					+= timers.o
 obj-y					+= pci.o
 obj-y					+= ddr_retention.o

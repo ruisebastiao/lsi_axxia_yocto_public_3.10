@@ -17,7 +17,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 
-#include "lsi-ncr.h"
+#include <mach/ncr.h>
 
 #ifndef CONFIG_ARCH_AXXIA
 #error "Only AXM55xx is Supported At Present!"

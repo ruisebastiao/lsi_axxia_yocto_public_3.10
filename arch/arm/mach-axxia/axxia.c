@@ -49,6 +49,7 @@
 #include <mach/timers.h>
 #include <mach/axxia-gic.h>
 #include <linux/irqchip/arm-gic.h>
+#include <mach/ncr.h>
 #include "axxia.h"
 #include "pci.h"
 #include "i2c.h"
@@ -324,6 +325,8 @@ void __init axxia_dt_init(void)
 	of_platform_populate(NULL, of_default_bus_match_table,
 			     axxia_auxdata_lookup, NULL);
 	pm_power_off = NULL; /* TBD */
+
+	ncr_init();
 
 	spi_register_board_info(spi_devs, ARRAY_SIZE(spi_devs));
 

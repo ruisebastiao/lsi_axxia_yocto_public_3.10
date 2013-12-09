@@ -82,13 +82,18 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/dma-mapping.h>
-
 #include <linux/uaccess.h>
 #include <linux/io.h>
+
 #include <asm/dma.h>
 
-#include "lsi_acp_net.h"
+#ifdef CONFIG_AXXIA
+#include <mach/ncr.h>
+#else
 #include "../../../misc/lsi-ncr.h"
+#endif
+
+#include "lsi_acp_net.h"
 
 /* Define to disable full duplex mode on Amarillo boards */
 #undef AMARILLO_WA
