@@ -283,6 +283,10 @@ static void gic_mask_irq(struct irq_data *d)
 	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
 		return;
 
+	/* Don't mess with the PMU IRQ either. */
+	if (irqid == IRQ_PMU)
+		return;
+
 	/* Deal with PPI interrupts directly. */
 	if ((irqid > 16) && (irqid < 32)) {
 		_gic_mask_irq(d);
@@ -325,6 +329,10 @@ static void gic_unmask_irq(struct irq_data *d)
 
 	/* Don't mess with the AXM IPIs. */
 	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
+		return;
+
+	/* Don't mess with the PMU IRQ either. */
+	if (irqid == IRQ_PMU)
 		return;
 
 	/* Deal with PPI interrupts directly. */
@@ -565,8 +573,8 @@ static int gic_set_affinity(struct irq_data *d,
 	 * different than the prior cluster, remove the IRQ affinity
 	 * on the old cluster.
 	 */
-	if ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) !=
-		(irq_cpuid[irqid] / CORES_PER_CLUSTER)) {
+	if ((irqid != IRQ_PMU) && ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) !=
+		(irq_cpuid[irqid] / CORES_PER_CLUSTER))) {
 		/*
 		 * If old cpu assignment falls within the same cluster as
 		 * the cpu we're currently running on, set the IRQ affinity
@@ -776,6 +784,11 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	}
 
 	/*
+	 * Set the PMU IRQ to the first cpu in this cluster.
+	 */
+	writeb_relaxed(0x01, base + GIC_DIST_TARGET + IRQ_PMU);
+
+	/*
 	 * Set Axxia IPI interrupts to be edge triggered.
 	 */
 	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
@@ -797,6 +810,14 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 		writel_relaxed(enablemask,
 			       base + GIC_DIST_ENABLE_SET + enableoff);
 	}
+
+	/*
+	 * Do the initial enable of the PMU IRQ here.
+	 */
+	enablemask = 1 << (IRQ_PMU % 32);
+	enableoff = (IRQ_PMU / 32) * 4;
+	writel_relaxed(enablemask,
+		       base + GIC_DIST_ENABLE_SET + enableoff);
 
 	writel_relaxed(1, base + GIC_DIST_CTRL);
 }
