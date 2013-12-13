@@ -106,6 +106,14 @@ config AT_HDMAC
 	help
 	  Support the Atmel AHB DMA controller.
 
+config LSI_DMA
+	tristate "LSI General Purpose DMA support"
+	select DMA_ENGINE
+	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+	help
+	  Enable support for the LSI General Purpose DMA controller found
+	  on ACP34xx, AXM25xx and AXM55xx devices.
+
 config FSL_DMA
 	tristate "Freescale Elo and Elo Plus DMA support"
 	depends on FSL_SOC

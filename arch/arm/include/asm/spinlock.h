@@ -37,6 +37,9 @@
 						\
 	"nop.w"					\
 )
+#elif CONFIG_ARCH_AXXIA || CONFIG_ARCH_AXXIA_SIM
+#define SEV
+#define WFE(cond)
 #else
 #define SEV		ALT_SMP("sev", "nop")
 #define WFE(cond)	ALT_SMP("wfe" cond, "nop")
@@ -88,7 +91,9 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	: "cc");
 
 	while (lockval.tickets.next != lockval.tickets.owner) {
+#if !CONFIG_ARCH_AXXIA && !CONFIG_ARCH_AXXIA_SIM
 		wfe();
+#endif
 		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);
 	}
 

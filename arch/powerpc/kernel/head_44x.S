@@ -220,6 +220,10 @@ _ENTRY(_start);
 	li	r0,0
 	mtspr	SPRN_MCSR,r0
 
+#ifdef CONFIG_PPC_47x
+	bl	init_cpu_features
+#endif
+
 	/* Let's move on */
 	lis	r4,start_kernel@h
 	ori	r4,r4,start_kernel@l
@@ -819,6 +823,9 @@ _GLOBAL(init_cpu_state)
 	/* We use the PVR to differenciate 44x cores from 476 */
 	mfspr	r3,SPRN_PVR
 	srwi	r3,r3,16
+	/* Some X2 chips had a PVR that doesn't conform to the standard */
+	cmplwi	cr0,r3,PVR_476X2@h
+	beq	head_start_47x
 	cmplwi	cr0,r3,PVR_476FPE@h
 	beq	head_start_47x
 	cmplwi	cr0,r3,PVR_476@h
@@ -1005,13 +1012,33 @@ skpinv:	addi	r4,r4,1				/* Increment */
 
 #ifdef CONFIG_PPC_47x
 
-#ifdef CONFIG_SMP
+/*
+ * per-processor initialization that depends on feature sections.
+ *
+ * We can't use the FTR_SECTION in init_cpu_state since early_init
+ * has not yet been called.
+ */
+_GLOBAL(init_cpu_features)
+BEGIN_FTR_SECTION
+	/* DD2 workaround, trap on icbi. Configure IOCR1 and enable
+	 * it in IOCCR.
+	 */
+	LOAD_REG_IMMEDIATE(r3, (31 << 26) | (982 << 16))	/* icbi */
+	lis r4,(IOCCR_IOCR1EN | IOCCR_IOCR1U)@h
+	mtspr	SPRN_IOCR1,r3
+	mtspr	SPRN_IOCCR,r4
+END_FTR_SECTION_IFSET(CPU_FTR_476_DD2)
 
+	blr
+
+#ifdef CONFIG_SMP
 /* Entry point for secondary 47x processors */
-_GLOBAL(start_secondary_47x)
+__CPUINIT
+_ENTRY(start_secondary_47x)
         mr      r24,r3          /* CPU number */
 
 	bl	init_cpu_state
+	bl	init_cpu_features
 
 	/* Now we need to bolt the rest of kernel memory which
 	 * is done in C code. We must be careful because our task
@@ -1044,7 +1071,7 @@ _GLOBAL(start_secondary_47x)
 	mtspr	SPRN_SPRG3,r4
 
 	b	start_secondary
-
+__FINIT
 #endif /* CONFIG_SMP */
 
 /*
@@ -1269,6 +1296,13 @@ empty_zero_page:
 	.globl	swapper_pg_dir
 swapper_pg_dir:
 	.space	PGD_TABLE_SIZE
+
+/*
+ * KEXEC secondary kernel will run at same address as old one
+ * spin in data segment avoid it's flushed by new kernel
+ */
+_GLOBAL(kexec_smp_wait)
+	b .
 
 /*
  * Room for two PTE pointers, usually the kernel and current user pointers
