@@ -663,19 +663,23 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 
 	/* Configure the inbound window size */
 	inbound_size = (u32) resource_size(&port->inbound);
-	writel(inbound_size, port->regs + PCIE_RC_BAR0_SIZE);
+	writel(~(inbound_size-1), port->regs + PCIE_RC_BAR0_SIZE);
 
 	/* Verify BAR0 size */
 	{
 		u32 bar0_size;
 		writel(~0, port->regs + PCI_BASE_ADDRESS_0);
 		bar0_size = readl(port->regs + PCI_BASE_ADDRESS_0);
-		if ((bar0_size & ~0xf) != inbound_size)
+		if ((bar0_size & ~0xf) != ~(inbound_size-1))
 			pr_err("PCIE%d: Config BAR0 failed\n", port->index);
 	}
 
 	/* Set the BASE0 address to start of PCIe base */
 	writel(port->pci_bar, port->regs + PCI_BASE_ADDRESS_0);
+
+        /* Set the BASE1 address to 0x0 */
+        writel(0x0, port->regs + PCI_BASE_ADDRESS_1);
+
 
 	/* Setup TPAGE registers for inbound mapping
 	 *
