@@ -203,7 +203,6 @@ ncr_unlock(int domain)
   ----------------------------------------------------------------------
   ncr_read
 */
-
 int
 ncr_read(unsigned long region, unsigned long address, int number,
 	 void *buffer)
@@ -214,17 +213,17 @@ ncr_read(unsigned long region, unsigned long address, int number,
 	int wfc_timeout = WFC_TIMEOUT;
 
 	if (NULL == nca_address)
-		return -1;
+		return -1;	
 
 #ifdef APB2SER_PHY_PHYS_ADDRESS
 	if (NULL == apb2ser0_address)
-		return -1;
+		return -1;	
 #endif /* APB2SER_PHY_PHYS_ADDRESS */
-	
+
 	if (0 != ncr_lock(LOCK_DOMAIN))
 		return -1;
 
-	if (NCP_NODE_ID(region) != 0x0153) {
+	if ((NCP_NODE_ID(region) != 0x0153) && (NCP_NODE_ID(region) != 0x115)) {
 		/*
 	  	  Set up the read command.
 		*/
@@ -274,6 +273,7 @@ ncr_read(unsigned long region, unsigned long address, int number,
 			*((unsigned long *) buffer) =
 				ncr_register_read((unsigned *) address);
 			address += 4;
+			buffer += 4;
 			number -= 4;
 		}
 
@@ -284,21 +284,80 @@ ncr_read(unsigned long region, unsigned long address, int number,
 		}
 	} else {
 #ifdef APB2SER_PHY_PHYS_ADDRESS
-		void __iomem *targ_address = apb2ser0_address +
+		if (NCP_NODE_ID(region) != 0x115) {
+			void __iomem *targ_address = apb2ser0_address +
 					     (address & (~0x3));
-		/*
-	  	  Copy data words to the buffer.
-		*/
+			/*
+	  	  	Copy data words to the buffer.
+			*/
 
-		while (4 <= number) {
-			*((unsigned long *) buffer) =
-				*((unsigned long *) targ_address);
-			targ_address += 4;
-			number -= 4;
+			while (4 <= number) {
+				*((unsigned long *) buffer) =
+					*((unsigned long *) targ_address);
+				targ_address += 4;
+				number -= 4;
+			}
+		} else {
+			void __iomem *base;
+			if (0xffff < address) {
+				ncr_unlock(LOCK_DOMAIN);
+				return -1;
+			}
+				
+			switch (NCP_TARGET_ID(region)) {
+				case 0:
+					base = (apb2ser0_address + 0x1e0);
+					break;
+				case 1:
+					base = (apb2ser0_address + 0x1f0);
+					break;
+				case 2:
+					base = (apb2ser0_address + 0x200);
+					break;
+				case 3:
+					base = (apb2ser0_address + 0x210);
+					break;
+				case 4:
+					base = (apb2ser0_address + 0x220);
+					break;
+				case 5:
+					base = (apb2ser0_address + 0x230);
+					break;
+				default:
+					ncr_unlock(LOCK_DOMAIN);
+					return -1;
+			}
+			if ((NCP_TARGET_ID(region) == 0x1) ||
+				(NCP_TARGET_ID(region) == 0x4)) {
+				writel((0x84c00000 + address), (base + 4));
+			} else {
+				writel((0x85400000 + address), (base + 4));
+			}
+			do {
+				--wfc_timeout;
+				*((unsigned long *) buffer) = 
+					readl(base + 4);
+			} while (0 != (*((unsigned long *) buffer) & 0x80000000) 
+					&& 0 < wfc_timeout);
+
+			if (0 == wfc_timeout) {
+				ncr_unlock(LOCK_DOMAIN);
+				return -1;
+			}
+
+			if ((NCP_TARGET_ID(region) == 0x1) ||
+				(NCP_TARGET_ID(region) == 0x4)) {
+				*((unsigned short *) buffer) = 
+					readl(base + 8);
+			} else {
+				*((unsigned long *) buffer) = 
+					readl(base + 8);
+			}
+
 		}
 #else
-		ncr_unlock(LOCK_DOMAIN);
-		return -1;
+			ncr_unlock(LOCK_DOMAIN);
+			return -1;
 #endif /* APB2SER_PHY_PHYS_ADDRESS */
 	}
 
@@ -334,7 +393,7 @@ ncr_write(unsigned long region, unsigned long address, int number,
 	if (0 != ncr_lock(LOCK_DOMAIN))
 		return -1;
 
-	if (NCP_NODE_ID(region) != 0x0153) {
+	if ((NCP_NODE_ID(region) != 0x0153) && (NCP_NODE_ID(region) != 0x115)) {
 		/*
 		  Set up the write.
 		*/
@@ -417,6 +476,7 @@ ncr_write(unsigned long region, unsigned long address, int number,
 		}
 	} else {
 #ifdef APB2SER_PHY_PHYS_ADDRESS
+	if (NCP_NODE_ID(region) != 0x115) {
 		void __iomem *targ_address = apb2ser0_address +
 					     (address & (~0x3));
 		/*
@@ -428,6 +488,56 @@ ncr_write(unsigned long region, unsigned long address, int number,
 				*((unsigned long *) buffer);
 			targ_address += 4;
 			number -= 4;
+		}
+	} else {
+		void __iomem *base;
+		if (0xffff < address) {
+			ncr_unlock(LOCK_DOMAIN);
+			return -1;
+		}
+
+		switch (NCP_TARGET_ID(region)) {
+			case 0:
+				base = (apb2ser0_address + 0x1e0);
+				break;
+			case 1:
+				base = (apb2ser0_address + 0x1f0);
+				break;
+			case 2:
+				base = (apb2ser0_address + 0x200);
+				break;
+			case 3:
+				base = (apb2ser0_address + 0x210);
+				break;
+			case 4:
+				base = (apb2ser0_address + 0x220);
+				break;
+			case 5:
+				base = (apb2ser0_address + 0x230);
+				break;
+			default:
+				ncr_unlock(LOCK_DOMAIN);
+				return -1;
+		}
+		if ((NCP_TARGET_ID(region) == 0x1) ||
+				(NCP_TARGET_ID(region) == 0x4)) {
+			writel(*((unsigned short *) buffer), base);
+			writel((0xc4c00000 + address), (base + 4));
+		} else {
+			writel(*((unsigned long *) buffer), base);
+			writel((0xc5400000 + address), (base + 4));
+		}
+			do {
+				--wfc_timeout;
+				*((unsigned long *) buffer) = 
+					readl(base + 4);
+			} while (0 != (*((unsigned long *) buffer) & 0x80000000) 
+				&& 0 < wfc_timeout);
+
+			if (0 == wfc_timeout) {
+				ncr_unlock(LOCK_DOMAIN);
+				return -1;
+			}
 		}
 #else
 		ncr_unlock(LOCK_DOMAIN);
