@@ -161,7 +161,7 @@ static struct resource axxia_pmu_resources[] = {
 };
 
 /*
- * The PMU IRQ lines of two cores are wired together into a single interrupt.
+ * The PMU IRQ lines of four cores are wired together into a single interrupt.
  * Bounce the interrupt to other cores if it's not ours.
  */
 #define CORES_PER_CLUSTER  4

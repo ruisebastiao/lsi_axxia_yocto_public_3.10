@@ -38,14 +38,6 @@ static void __iomem *nca = NULL;
 static void __iomem *apb = NULL;
 static void __iomem *dickens = NULL;
 
-static inline void
-kill_time(int cnt)
-{
-	while (cnt--);
-
-	return;
-}
-
 unsigned long ncp_caal_regions_acp55xx[] = {
 	NCP_REGION_ID(0x0b, 0x05),      /* SPPV2   */
 	NCP_REGION_ID(0x0c, 0x05),      /* SED     */
@@ -132,6 +124,7 @@ flush_l3(void)
 	}
 
 	asm volatile ("dsb" : : : "memory");
+	asm volatile ("dmb" : : : "memory");
 
 	return;
 }
@@ -204,7 +197,6 @@ ncp_ddr_shutdown(void)
 		/* CDR0 - */
 		ncr_register_write(0x80050003, (unsigned *) (nca + 0xf0));
 		do {
-			kill_time(100000);
 			value = ncr_register_read((unsigned *)
 						  (nca + 0xf0));
 		} while ((0x80000000UL & value));
@@ -225,7 +217,6 @@ ncp_ddr_shutdown(void)
 			ncr_register_write(0x80040003, (unsigned *)
 					   (nca + 0xf0));
 			do {
-				kill_time(100000);
 				value = ncr_register_read((unsigned *)
 							  (nca + 0xf0));
 			} while ((0x80000000UL & value));
@@ -265,18 +256,22 @@ initiate_retention_reset(void)
 {
 	unsigned long ctl_244 = 0;
 	unsigned long value;
+	unsigned long delay;
 
-	if (NULL == nca)
+	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
 
-	/* send stop message to other CPUs */
-	local_irq_disable();
+	system_state = SYSTEM_RESTART;
 	asm volatile ("dsb" : : : "memory");
 	asm volatile ("dmb" : : : "memory");
-	system_state = SYSTEM_RESTART;
+	usermodehelper_disable();
+	device_shutdown();
+	cpu_hotplug_disable();
+	syscore_shutdown();
 	smp_send_stop();
 
-	kill_time(1000000);
+	for (delay = 0; delay < 10000; ++delay)
+		udelay(1000);
 
 	flush_cache_all();
 	flush_l3();
@@ -297,7 +292,6 @@ initiate_retention_reset(void)
 	/* first read the CTL_244 register and OR in the LP_CMD value */
 	ncr_read(NCP_REGION_ID(34,0), 0x3d0, 4, &ctl_244);
 	ctl_244 |= 0x000a0000;
-
 
 	/* 
 	 * set up for CRBW operation
