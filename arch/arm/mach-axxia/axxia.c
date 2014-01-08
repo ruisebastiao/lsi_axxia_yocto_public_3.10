@@ -56,8 +56,8 @@
 #include "i2c.h"
 
 static const char *axxia_dt_match[] __initconst = {
-	"lsi,axm5516",		/* AXM5516 */
-	"lsi,axm5516-sim",	/* AXM5516 Simulation */
+	"lsi,axm5516",
+	"lsi,axm5516-sim",
 	NULL
 };
 
@@ -102,8 +102,11 @@ void __init axxia_dt_timer_init(void)
 	const char *path;
 	struct device_node *node;
 	void __iomem *base;
+	int is_sim;
 
-	axxia_init_clocks();
+	is_sim = of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim") != NULL;
+
+	axxia_init_clocks(is_sim);
 
 #ifdef CONFIG_ARM_ARCH_TIMER
 	of_clk_init(NULL);
@@ -259,37 +262,6 @@ static struct spi_board_info spi_devs[] __initdata = {
 	}
 };
 
-#ifndef CONFIG_ARCH_AXXIA_SIM
-static int
-l3_set_pstate(void __iomem *l3ctrl, unsigned int req, unsigned int act)
-{
-	static const u8 hn_f[] = {
-		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
-	};
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(hn_f); ++i) {
-		/* set state NOL3 */
-		writel(req, l3ctrl + (hn_f[i] << 16) + 0x10);
-	}
-
-	for (i = 0; i < ARRAY_SIZE(hn_f); ++i) {
-		unsigned long status;
-		int retries = 10000;
-
-		do {
-			status = readl(l3ctrl + (hn_f[i] << 16) + 0x18);
-			udelay(1);
-		} while ((0 < --retries) && (act != (status & 0xf)));
-
-		if (0 == retries)
-			return -ENODEV;
-	}
-
-	return 0;
-}
-#endif
-
 static int
 axxia_bus_notifier(struct notifier_block *nb, unsigned long event, void *obj)
 {
@@ -316,22 +288,6 @@ static struct notifier_block axxia_amba_nb = {
 
 void __init axxia_dt_init(void)
 {
-#ifndef CONFIG_ARCH_AXXIA_SIM
-	void __iomem *l3ctrl;
-	int rc;
-
-	/* Enable L3-cache */
-	l3ctrl = ioremap(0x2000000000ULL, SZ_4M);
-	if (l3ctrl) {
-		rc = l3_set_pstate(l3ctrl, 0x3, 0xc);
-		if (rc < 0)
-			pr_warn("axxia: Failed to intialize L3-cache\n");
-		iounmap(l3ctrl);
-	} else {
-		pr_warn("axxia: Failed to map L3-cache control regs\n");
-	}
-#endif
-
 	bus_register_notifier(&platform_bus_type, &axxia_platform_nb);
 	bus_register_notifier(&amba_bustype, &axxia_amba_nb);
 

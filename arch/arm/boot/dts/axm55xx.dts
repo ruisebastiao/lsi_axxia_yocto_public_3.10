@@ -213,6 +213,17 @@
 			     <1 10 0xf08>;
 	};
 
+	sm0@00220000 {
+		compatible = "lsi,smmon";
+		reg = <0 0x00220000 0 0x1000>;
+		interrupts = <0 192 4>;
+	};
+
+	sm1@00220000 {
+		compatible = "lsi,smmon";
+		reg = <0 0x000f0000 0 0x1000>;
+		interrupts = <0 193 4>;
+	};
 
 	gpdma@2020140000 {
 		compatible = "lsi,dma32";
