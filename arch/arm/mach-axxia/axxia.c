@@ -46,6 +46,7 @@
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
 #include <asm/hardware/cache-l2x0.h>
+#include <mach/hardware.h>
 #include <mach/timers.h>
 #include <mach/axxia-gic.h>
 #include <linux/irqchip/arm-gic.h>
@@ -62,8 +63,20 @@ static const char *axxia_dt_match[] __initconst = {
 
 static void __iomem *ssp_base;
 
+static struct map_desc axxia_static_mappings[] __initdata = {
+#ifdef CONFIG_DEBUG_LL
+	{
+		.virtual	=  AXXIA_DEBUG_UART_VIRT,
+		.pfn		= __phys_to_pfn(AXXIA_DEBUG_UART_PHYS),
+		.length		= SZ_4K,
+		.type		= MT_DEVICE
+	},
+#endif
+};
+
 void __init axxia_dt_map_io(void)
 {
+	iotable_init(axxia_static_mappings, ARRAY_SIZE(axxia_static_mappings));
 }
 
 void __init axxia_dt_init_early(void)
