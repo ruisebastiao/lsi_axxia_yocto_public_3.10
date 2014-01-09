@@ -72,6 +72,102 @@
 			clock-frequency= <0>;
 			cpu-release-addr = <0x10000020>;
 		};
+
+		cpu@4 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <4>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <5>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@6 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <6>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@7 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <7>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@8 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <8>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@9 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <9>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@10 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <10>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@11 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <11>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@12 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <12>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@13 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <13>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@14 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <14>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+
+		cpu@15 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <15>;
+			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
 	};
 
 	clocks {
