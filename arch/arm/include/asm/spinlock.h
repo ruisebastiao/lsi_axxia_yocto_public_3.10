@@ -37,7 +37,8 @@
 						\
 	"nop.w"					\
 )
-#elif CONFIG_ARCH_AXXIA || CONFIG_ARCH_AXXIA_SIM
+#elif defined(CONFIG_ARCH_AXXIA)
+/* Disable use of wfe/sev in Axxia. */
 #define SEV
 #define WFE(cond)
 #else
@@ -91,7 +92,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	: "cc");
 
 	while (lockval.tickets.next != lockval.tickets.owner) {
-#if !CONFIG_ARCH_AXXIA && !CONFIG_ARCH_AXXIA_SIM
+#if !defined(CONFIG_ARCH_AXXIA)
 		wfe();
 #endif
 		lockval.tickets.owner = ACCESS_ONCE(lock->tickets.owner);

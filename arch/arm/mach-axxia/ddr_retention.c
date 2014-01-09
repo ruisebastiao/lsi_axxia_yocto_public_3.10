@@ -21,15 +21,12 @@
  */
 
 #include <linux/module.h>
-
-#ifndef CONFIG_ARCH_AXXIA_SIM
-
 #include <linux/cpu.h>
 #include <linux/reboot.h>
 #include <linux/syscore_ops.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
-
+#include <linux/of.h>
 #include <asm/io.h>
 #include <asm/cacheflush.h>
 #include <mach/ncr.h>
@@ -317,6 +314,7 @@ initiate_retention_reset(void)
 
 	return;
 }
+EXPORT_SYMBOL(initiate_retention_reset);
 
 static ssize_t
 axxia_ddr_retention_trigger(struct file *file, const char __user *buf,
@@ -326,35 +324,25 @@ axxia_ddr_retention_trigger(struct file *file, const char __user *buf,
 	return 0;
 }
      
-static const struct file_operations axxia_ddr_retention_proc_ops = {
+static const struct file_operations proc_ops = {
 	.write      = axxia_ddr_retention_trigger,
 	.llseek     = noop_llseek,
 };
 
+#define PROC_PATH "driver/axxia_ddr_retention_reset"
+
 void
 axxia_ddr_retention_init(void)
 {
-#ifndef CONFIG_ARCH_AXXIA_SIM
-	if (!proc_create("driver/axxia_ddr_retention_reset", S_IWUSR, NULL, 
-			 &axxia_ddr_retention_proc_ops))
-		printk("Failed to register DDR retention proc interface\n");
-#endif
+	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5516"))
+		return;
+
+	if (!proc_create(PROC_PATH, S_IWUSR, NULL, &proc_ops)) {
+		pr_err("Failed to register DDR retention proc interface\n");
+		return;
+	}
 
 	apb = ioremap(0x2010000000, 0x40000);
 	nca = ioremap(0x002020100000ULL, 0x20000);
 	dickens = ioremap(0x2000000000, 0x1000000);
-
-	printk("ddr_retention: ready\n");
 }
-
-EXPORT_SYMBOL(initiate_retention_reset);
-
-#else
-
-void
-axxia_ddr_retention_init(void)
-{
-	return;
-}
-
-#endif
