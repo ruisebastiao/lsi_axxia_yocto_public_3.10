@@ -2453,3 +2453,9 @@ CONFIG_KVM_ARM_TIMER=y
 #
 # Virtio drivers
 #
+
+#
+# RapidIO management options
+#
+CONFIG_HAS_RAPIDIO=y
+# CONFIG_RAPIDIO is not set
