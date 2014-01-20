@@ -21,14 +21,13 @@
  */
 
 #include <linux/module.h>
-
-#ifndef CONFIG_ARCH_AXXIA_SIM
-
 #include <linux/cpu.h>
 #include <linux/reboot.h>
 #include <linux/syscore_ops.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
+#include <linux/prefetch.h>
+#include <linux/of.h>
 
 #include <asm/io.h>
 #include <asm/cacheflush.h>
@@ -37,16 +36,10 @@
 static void __iomem *nca = NULL;
 static void __iomem *apb = NULL;
 static void __iomem *dickens = NULL;
+static int ddr_retention_enabled = 0;
 
-static inline void
-kill_time(int cnt)
-{
-	while (cnt--);
-
-	return;
-}
-
-unsigned long ncp_caal_regions_acp55xx[] = {
+static unsigned long
+ncp_caal_regions_acp55xx[] = {
 	NCP_REGION_ID(0x0b, 0x05),      /* SPPV2   */
 	NCP_REGION_ID(0x0c, 0x05),      /* SED     */
 	NCP_REGION_ID(0x0e, 0x05),      /* DPI_HFA */
@@ -204,7 +197,6 @@ ncp_ddr_shutdown(void)
 		/* CDR0 - */
 		ncr_register_write(0x80050003, (unsigned *) (nca + 0xf0));
 		do {
-			kill_time(100000);
 			value = ncr_register_read((unsigned *)
 						  (nca + 0xf0));
 		} while ((0x80000000UL & value));
@@ -225,7 +217,6 @@ ncp_ddr_shutdown(void)
 			ncr_register_write(0x80040003, (unsigned *)
 					   (nca + 0xf0));
 			do {
-				kill_time(100000);
 				value = ncr_register_read((unsigned *)
 							  (nca + 0xf0));
 			} while ((0x80000000UL & value));
@@ -266,7 +257,12 @@ initiate_retention_reset(void)
 	unsigned long ctl_244 = 0;
 	unsigned long value;
 
-	if (NULL == nca)
+	if (0 == ddr_retention_enabled) {
+		pr_info("DDR Retention Reset is Not Enabled\n");
+		return;
+	}
+
+	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
 
 	/* send stop message to other CPUs */
@@ -275,8 +271,6 @@ initiate_retention_reset(void)
 	asm volatile ("dmb" : : : "memory");
 	system_state = SYSTEM_RESTART;
 	smp_send_stop();
-
-	kill_time(1000000);
 
 	flush_cache_all();
 	flush_l3();
@@ -317,12 +311,14 @@ initiate_retention_reset(void)
 	 * into cache 
 	 */
 	asm volatile ("dsb" : : : "memory");
-	prefetch(ncp_ddr_shutdown);
+	prefetch_range(ncp_ddr_shutdown, 0x1000);
 
 	ncp_ddr_shutdown();
 
 	return;
 }
+
+EXPORT_SYMBOL(initiate_retention_reset);
 
 static ssize_t
 axxia_ddr_retention_trigger(struct file *file, const char __user *buf,
@@ -340,27 +336,25 @@ static const struct file_operations axxia_ddr_retention_proc_ops = {
 void
 axxia_ddr_retention_init(void)
 {
-#ifndef CONFIG_ARCH_AXXIA_SIM
-	if (!proc_create("driver/axxia_ddr_retention_reset", S_IWUSR, NULL, 
-			 &axxia_ddr_retention_proc_ops))
-		printk("Failed to register DDR retention proc interface\n");
-#endif
+	/*
+	  Only available on ASIC systems.
+	*/
 
-	apb = ioremap(0x2010000000, 0x40000);
-	nca = ioremap(0x002020100000ULL, 0x20000);
-	dickens = ioremap(0x2000000000, 0x1000000);
+	if (of_find_compatible_node(NULL, NULL, "lsi,axm5516")) {
+		/* Create /proc entry. */
+		if (!proc_create("driver/axxia_ddr_retention_reset",
+				 S_IWUSR, NULL, &axxia_ddr_retention_proc_ops)) {
+			pr_info("Failed to register DDR retention proc entry\n");
+		} else {
+			apb = ioremap(0x2010000000, 0x40000);
+			nca = ioremap(0x002020100000ULL, 0x20000);
+			dickens = ioremap(0x2000000000, 0x1000000);
+			ddr_retention_enabled = 1;
+			pr_info("DDR Retention Reset Initialized\n");
+		}
+	} else {
+		pr_info("DDR Retention Reset is Not Available\n");
+	}
 
-	printk("ddr_retention: ready\n");
-}
-
-EXPORT_SYMBOL(initiate_retention_reset);
-
-#else
-
-void
-axxia_ddr_retention_init(void)
-{
 	return;
 }
-
-#endif

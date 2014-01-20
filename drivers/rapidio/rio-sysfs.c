@@ -10,18 +10,23 @@
  * option) any later version.
  */
 
+#include <linux/slab.h>
+#include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/rio.h>
 #include <linux/rio_drv.h>
 #include <linux/stat.h>
 #include <linux/capability.h>
+#ifdef NEW_STYLE
+#include <linux/radix-tree.h>
+#endif
 
 #include "rio.h"
 
 /* Sysfs support */
-#define rio_config_attr(field, format_string)					\
+#define rio_config_attr(field, format_string)				\
 static ssize_t								\
-field##_show(struct device *dev, struct device_attribute *attr, char *buf)			\
+field##_show(struct device *dev, struct device_attribute *attr, char *buf) \
 {									\
 	struct rio_dev *rdev = to_rio_dev(dev);				\
 									\
@@ -37,23 +42,151 @@ rio_config_attr(asm_rev, "0x%04x\n");
 rio_config_attr(destid, "0x%04x\n");
 rio_config_attr(hopcount, "0x%02x\n");
 
-static ssize_t routes_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t routes_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct rio_dev *rdev = to_rio_dev(dev);
+	char *str = buf;
+	int i;
+	u8 port;
+
+	if (rio_hw_lock_wait(rdev->hport, rdev->destid, rdev->hopcount, 1))
+		goto done;
+
+	for (i = 0; i < RIO_MAX_ROUTE_ENTRIES(rdev->hport->sys_size);
+			i++) {
+		if (rio_route_get_port(rdev, i, &port, 0))
+			continue;
+
+		if (port == RIO_INVALID_ROUTE)
+			continue;
+		str +=
+		    sprintf(str, "%04x %02x\n", i, port);
+	}
+
+	rio_hw_unlock(rdev->hport, rdev->destid, rdev->hopcount);
+
+done:
+	return str - buf;
+}
+
+static ssize_t port_status_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct rio_dev *rdev = to_rio_dev(dev);
+	char *str = buf;
+	int no_ports, port, rc, link_ok;
+	u32 value, status_reg, ctrl_reg;
+
+	rc = rio_read_config_32(rdev, RIO_SWP_INFO_CAR, &value);
+	if (rc) {
+		pr_debug(
+		   "RIO: (%s) Failed to read status reg addr=%08x result=%d\n",
+		   __func__, RIO_SWP_INFO_CAR, rc);
+		goto done;
+	}
+	no_ports = (value & RIO_SWP_INFO_PORT_TOTAL_MASK) >> 8;
+
+	str += sprintf(str, "\nPort\tLink\tPORT_N_ERR\tPORT_N_CTL\n");
+	str += sprintf(str, "------------------------------------------\n");
+
+	for (port = 0; port < no_ports; port++) {
+		rc = rio_read_config_32(rdev,
+					rdev->phys_efptr +
+					RIO_PORT_N_ERR_STS_CSR(port),
+					&status_reg);
+		if (rc) {
+			pr_debug("RIO: (%s) Failed to read status reg addr=%08x result=%d\n",
+				 __func__, rdev->phys_efptr +
+				 RIO_PORT_N_ERR_STS_CSR(port), rc);
+			goto done;
+		}
+		rc = rio_read_config_32(rdev,
+					rdev->phys_efptr +
+					RIO_PORT_N_CTL_CSR(port),
+					&ctrl_reg);
+		if (rc) {
+			pr_debug("RIO: (%s) Failed to read control reg addr=%08x result=%d\n",
+				 __func__, rdev->phys_efptr +
+				 RIO_PORT_N_CTL_CSR(port), rc);
+			goto done;
+		}
+
+		link_ok = ((status_reg & RIO_PORT_N_ERR_STS_PORT_OK) != 0);
+
+		str += sprintf(str, "%3d\t%s\t0x%08x\t0x%08x\n",
+			       port,
+			       (link_ok) ? "OK" : "NOK",
+			       status_reg,
+			       ctrl_reg);
+	}
+	str += sprintf(str, "------------------------------------------\n\n");
+
+done:
+	return str - buf;
+}
+
+static ssize_t lut_show(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	struct rio_dev *rdev = to_rio_dev(dev);
+	char *str = buf;
+	u16 destid;
+
+	for (destid = 0;
+	     destid < RIO_ANY_DESTID(rdev->hport->sys_size); destid++) {
+		u8 route_port;
+		rdev->rswitch->get_entry(rdev->hport, rdev->destid,
+					 rdev->hopcount, RIO_GLOBAL_TABLE,
+					 destid, &route_port);
+		if (route_port != RIO_INVALID_ROUTE)
+			str += sprintf(str, "%04x %02x\n", destid, route_port);
+	}
+	return str - buf;
+}
+
+#ifdef NEW_STYLE
+static ssize_t lprev_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct rio_dev *rdev = to_rio_dev(dev);
+	struct rio_dev *prev;
+	ssize_t count;
+
+	rcu_read_lock();
+	prev = radix_tree_lookup(&rdev->hport->net.dev_tree,
+				 rdev->prev_destid);
+	count = sprintf(buf, "%s\n",
+			(prev) ? rio_name(prev) : "root");
+	rcu_read_unlock();
+	return count;
+}
+
+static ssize_t lnext_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
 	struct rio_dev *rdev = to_rio_dev(dev);
 	char *str = buf;
 	int i;
 
-	for (i = 0; i < RIO_MAX_ROUTE_ENTRIES(rdev->net->hport->sys_size);
-			i++) {
-		if (rdev->rswitch->route_table[i] == RIO_INVALID_ROUTE)
-			continue;
-		str +=
-		    sprintf(str, "%04x %02x\n", i,
-			    rdev->rswitch->route_table[i]);
+	if (rdev->pef & RIO_PEF_SWITCH) {
+		for (i = 0; i < RIO_GET_TOTAL_PORTS(rdev->swpinfo); i++) {
+			struct rio_dev *next = lookup_rdev_next(rdev, i);
+
+			if (!IS_ERR(next)) {
+				str += sprintf(str, "%s\n",
+					       rio_name(next));
+				rio_dev_put(next);
+			} else
+				str += sprintf(str, "null\n");
+		}
 	}
 
-	return (str - buf);
+	return str - buf;
 }
+
+#else
 
 static ssize_t lprev_show(struct device *dev,
 			  struct device_attribute *attr, char *buf)
@@ -73,9 +206,9 @@ static ssize_t lnext_show(struct device *dev,
 
 	if (rdev->pef & RIO_PEF_SWITCH) {
 		for (i = 0; i < RIO_GET_TOTAL_PORTS(rdev->swpinfo); i++) {
-			if (rdev->rswitch->nextdev[i])
+			if (rdev->rswitch->port[i].rdev)
 				str += sprintf(str, "%s\n",
-					rio_name(rdev->rswitch->nextdev[i]));
+					rio_name(rdev->rswitch->port[i].rdev));
 			else
 				str += sprintf(str, "null\n");
 		}
@@ -83,6 +216,7 @@ static ssize_t lnext_show(struct device *dev,
 
 	return str - buf;
 }
+#endif
 
 struct device_attribute rio_dev_attrs[] = {
 	__ATTR_RO(did),
@@ -99,6 +233,9 @@ struct device_attribute rio_dev_attrs[] = {
 static DEVICE_ATTR(routes, S_IRUGO, routes_show, NULL);
 static DEVICE_ATTR(lnext, S_IRUGO, lnext_show, NULL);
 static DEVICE_ATTR(hopcount, S_IRUGO, hopcount_show, NULL);
+static DEVICE_ATTR(port_status, S_IRUGO, port_status_show, NULL);
+static DEVICE_ATTR(lut, S_IRUGO, lut_show, NULL);
+
 
 static ssize_t
 rio_read_config(struct file *filp, struct kobject *kobj,
@@ -257,8 +394,12 @@ int rio_create_sysfs_dev_files(struct rio_dev *rdev)
 		err |= device_create_file(&rdev->dev, &dev_attr_routes);
 		err |= device_create_file(&rdev->dev, &dev_attr_lnext);
 		err |= device_create_file(&rdev->dev, &dev_attr_hopcount);
+		err |= device_create_file(&rdev->dev, &dev_attr_port_status);
+		err |= device_create_file(&rdev->dev, &dev_attr_lut);
+
 		if (!err && rdev->rswitch->sw_sysfs)
-			err = rdev->rswitch->sw_sysfs(rdev, RIO_SW_SYSFS_CREATE);
+			err = rdev->rswitch->sw_sysfs(rdev,
+						      RIO_SW_SYSFS_CREATE);
 	}
 
 	if (err)
@@ -281,52 +422,62 @@ void rio_remove_sysfs_dev_files(struct rio_dev *rdev)
 		device_remove_file(&rdev->dev, &dev_attr_routes);
 		device_remove_file(&rdev->dev, &dev_attr_lnext);
 		device_remove_file(&rdev->dev, &dev_attr_hopcount);
+
 		if (rdev->rswitch->sw_sysfs)
 			rdev->rswitch->sw_sysfs(rdev, RIO_SW_SYSFS_REMOVE);
 	}
 }
 
-static ssize_t bus_scan_store(struct bus_type *bus, const char *buf,
-				size_t count)
+#if defined(CONFIG_RAPIDIO_HOTPLUG) || defined(CONFIG_RAPIDIO_STATIC_DESTID)
+static ssize_t rio_devices_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
-	long val;
-	struct rio_mport *port = NULL;
-	int rc;
+	struct rio_mport *mport = container_of(dev, struct rio_mport, dev);
+	char *str = buf;
+	int i, num = 0;
+	struct rio_dev **dptr = NULL;
 
-	if (kstrtol(buf, 0, &val) < 0)
+	if (!mport)
 		return -EINVAL;
 
-	if (val == RIO_MPORT_ANY) {
-		rc = rio_init_mports();
-		goto exit;
+	dptr = rio_get_all_devices(mport, &num);
+	if (!dptr)
+		return 0;
+
+	if (IS_ERR(dptr))
+		return PTR_ERR(dptr);
+
+	str += sprintf(str, "Device table:\n");
+	str += sprintf(str,
+		       "name\t\tdid\tvid\tswpinfo\t\thops\thwlock\tlocal\n");
+	for (i = 0; i < num; i++) {
+		struct rio_dev *node = dptr[i];
+
+		if (unlikely(!node))
+			continue;
+
+		str += sprintf(str,
+			       "%s\t%4.4x\t%4.4x\t%8.8x\t%d\t%d\t%d\n",
+			       rio_name(node),
+			       node->did,
+			       node->vid,
+			       node->swpinfo,
+			       node->hopcount,
+			       node->use_hw_lock,
+			       node->local_domain);
+		rio_dev_put(node);
 	}
+	kfree(dptr);
+	return str - buf;
+}
+static DEVICE_ATTR(devices, S_IRUGO, rio_devices_show, NULL);
 
-	if (val < 0 || val >= RIO_MAX_MPORTS)
-		return -EINVAL;
+int rio_sysfs_init(struct rio_mport *mport)
+{
+	int rc = 0;
 
-	port = rio_find_mport((int)val);
-
-	if (!port) {
-		pr_debug("RIO: %s: mport_%d not available\n",
-			 __func__, (int)val);
-		return -EINVAL;
-	}
-
-	if (!port->nscan)
-		return -EINVAL;
-
-	if (port->host_deviceid >= 0)
-		rc = port->nscan->enumerate(port, 0);
-	else
-		rc = port->nscan->discover(port, RIO_SCAN_ENUM_NO_WAIT);
-exit:
-	if (!rc)
-		rc = count;
+	rc |= device_create_file(&mport->dev, &dev_attr_devices);
 
 	return rc;
 }
-
-struct bus_attribute rio_bus_attrs[] = {
-	__ATTR(scan, (S_IWUSR|S_IWGRP), NULL, bus_scan_store),
-	__ATTR_NULL
-};
+#endif

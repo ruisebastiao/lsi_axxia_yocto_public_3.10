@@ -14,21 +14,18 @@
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/spinlock.h>
+#include <linux/platform_device.h>
+#include <linux/ratelimit.h>
 #include <linux/slab.h>
 
 #include <mach/ncr.h>
 
-#ifndef CONFIG_ARCH_AXXIA
-#error "Only AXM55xx is Supported At Present!"
-#endif
-
 static int log = 1;
-module_param(log, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-MODULE_PARM_DESC(log, "Log each error on the console.");
+module_param(log, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(log, "Log each error to kernel log.");
 
 /*
-  AXM55xx Interrupt Status Bits
+  AXM55xx memory controller interrupt status bits:
 
   Bit [24] = The software-initiated control word write has completed.
   Bit [23] = The user-initiated DLL resync has completed.
@@ -71,229 +68,202 @@ MODULE_PARM_DESC(log, "Log each error on the console.");
 
   Of these, 1, 2, 3, 4, 5, 6, 7, 11, and 19 are of interest.
 */
+#define SM_INT_MASK (0x1f7f701)
 
-struct smmon_counts {
-	unsigned long illegal_access[2];
-	unsigned long multiple_illegal_access[2];
-	unsigned long correctable_ecc[2];
-	unsigned long multiple_correctable_ecc[2];
-	unsigned long uncorrectable_ecc[2];
-	unsigned long multiple_uncorrectable_ecc[2];
-	unsigned long port_error[2];
-	unsigned long wrap_error[2];
-	unsigned long parity_error[2];
+enum events {
+	EV_ILLEGAL = 0,
+	EV_MULT_ILLEGAL,
+	EV_CORR_ECC,
+	EV_MULT_CORR_ECC,
+	EV_UNCORR_ECC,
+	EV_MULT_UNCORR_ECC,
+	EV_PORT_ERROR,
+	EV_WRAP_ERROR,
+	EV_PARITY_ERROR,
+	NR_EVENTS
 };
 
-static struct smmon_counts counts;
+static const u32 event_mask[NR_EVENTS] = {
+	[EV_ILLEGAL]          = 0x00000002,
+	[EV_MULT_ILLEGAL]     = 0x00000004,
+	[EV_CORR_ECC]         = 0x00000008,
+	[EV_MULT_CORR_ECC]    = 0x00000010,
+	[EV_UNCORR_ECC]       = 0x00000020,
+	[EV_MULT_UNCORR_ECC]  = 0x00000040,
+	[EV_PORT_ERROR]       = 0x00000080,
+	[EV_WRAP_ERROR]       = 0x00000800,
+	[EV_PARITY_ERROR]     = 0x00080000,
+};
 
-DEFINE_RAW_SPINLOCK(counts_lock);
+static const struct event_logging {
+	const char *level;
+	const char *name;
+} event_logging[NR_EVENTS] = {
+	[EV_ILLEGAL]         = {KERN_ERR, "Illegal access"},
+	[EV_MULT_ILLEGAL]    = {KERN_ERR, "Illegal access"},
+	[EV_CORR_ECC]        = {KERN_NOTICE, "Correctable ECC error"},
+	[EV_MULT_CORR_ECC]   = {KERN_NOTICE, "Correctable ECC error"},
+	[EV_UNCORR_ECC]      = {KERN_CRIT, "Uncorrectable ECC error"},
+	[EV_MULT_UNCORR_ECC] = {KERN_CRIT, "Uncorrectable ECC error"},
+	[EV_PORT_ERROR]      = {KERN_CRIT, "Port error"},
+	[EV_WRAP_ERROR]      = {KERN_CRIT, "Wrap error"},
+	[EV_PARITY_ERROR]    = {KERN_CRIT, "Parity error"},
+};
 
-#define SUMMARY_SIZE 512
-static char *summary;
-module_param(summary, charp, S_IRUGO);
-MODULE_PARM_DESC(summary, "A Summary of the Current Error Counts.");
+struct smmon_attr {
+	struct device_attribute attr;
+	int                     event;
+};
 
-/*
-  ------------------------------------------------------------------------------
-  update_summary
-*/
+#define SMMON_ATTR(_name, _event) \
+	{ \
+		.attr = __ATTR(_name, S_IRUGO, smmon_show, NULL), \
+		.event = _event \
+	}
 
-static void
-update_summary(void)
+struct sm_dev {
+	struct platform_device *pdev;
+	u32 region; /* NCR region address */
+	u32 counter[NR_EVENTS];
+};
+
+
+static ssize_t
+smmon_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	memset(summary, 0, SUMMARY_SIZE);
-	sprintf(summary,
-		"------------ Counts for SM0/SM1 ----------\n"
-		"                   Illegal Access: %lu/%lu\n"
-		"        Multiple Illegal Accesses: %lu/%lu\n"
-		"            Correctable ECC Error: %lu/%lu\n"
-		"  Multiple Correctable ECC Errors: %lu/%lu\n"
-		"          Uncorrectable ECC Error: %lu/%lu\n"
-		"Multiple Uncorrectable ECC Errors: %lu/%lu\n"
-		"                      Port Errors: %lu/%lu\n"
-		"                      Wrap Errors: %lu/%lu\n"
-		"                    Parity Errors: %lu/%lu\n",
-		counts.illegal_access[0],
-		counts.illegal_access[1],
-		counts.multiple_illegal_access[0],
-		counts.multiple_illegal_access[1],
-		counts.correctable_ecc[0],
-		counts.correctable_ecc[1],
-		counts.multiple_correctable_ecc[0],
-		counts.multiple_correctable_ecc[1],
-		counts.uncorrectable_ecc[0],
-		counts.uncorrectable_ecc[1],
-		counts.multiple_uncorrectable_ecc[0],
-		counts.multiple_uncorrectable_ecc[1],
-		counts.port_error[0],
-		counts.port_error[1],
-		counts.wrap_error[0],
-		counts.wrap_error[1],
-		counts.parity_error[0],
-		counts.parity_error[1]);
-
-	return;
+	struct sm_dev *sm = dev_get_drvdata(dev);
+	struct smmon_attr *sma = container_of(attr, struct smmon_attr, attr);
+	return sprintf(buf, "%u", sm->counter[sma->event]);
 }
 
-/*
-  ------------------------------------------------------------------------------
-  smmon_isr
-*/
+static struct smmon_attr smmon_attr_counter[] = {
+	SMMON_ATTR(illegal_access, EV_ILLEGAL),
+	SMMON_ATTR(illegal_access_mult, EV_MULT_ILLEGAL),
+	SMMON_ATTR(correctable_ecc_error, EV_CORR_ECC),
+	SMMON_ATTR(correctable_ecc_error_mult, EV_MULT_CORR_ECC),
+	SMMON_ATTR(uncorrectable_ecc_error, EV_UNCORR_ECC),
+	SMMON_ATTR(uncorrectable_ecc_error_mult, EV_MULT_UNCORR_ECC),
+	SMMON_ATTR(port_error, EV_PORT_ERROR),
+	SMMON_ATTR(wrap_error, EV_WRAP_ERROR),
+	SMMON_ATTR(parity_error, EV_PARITY_ERROR),
+};
+
+static struct attribute *smmon_attr[] = {
+	&smmon_attr_counter[EV_ILLEGAL].attr.attr,
+	&smmon_attr_counter[EV_MULT_ILLEGAL].attr.attr,
+	&smmon_attr_counter[EV_CORR_ECC].attr.attr,
+	&smmon_attr_counter[EV_MULT_CORR_ECC].attr.attr,
+	&smmon_attr_counter[EV_UNCORR_ECC].attr.attr,
+	&smmon_attr_counter[EV_MULT_UNCORR_ECC].attr.attr,
+	&smmon_attr_counter[EV_PORT_ERROR].attr.attr,
+	&smmon_attr_counter[EV_WRAP_ERROR].attr.attr,
+	&smmon_attr_counter[EV_PARITY_ERROR].attr.attr,
+	NULL
+};
+
+static struct attribute_group smmon_attr_group = {
+	.name  = "counters",
+	.attrs = smmon_attr
+};
 
 static irqreturn_t
 smmon_isr(int interrupt, void *device)
 {
-	unsigned long status;
-	unsigned long region;
-	int rc;
-	int sm;
+	struct sm_dev *sm = device;
+	u32 status;
+	int i;
 
-	if ((32 + 161) == interrupt) {
-		region = NCP_REGION_ID(0x22, 0);
-		sm = 1;
-	} else if ((32 + 160) == interrupt) {
-		region = NCP_REGION_ID(0xf, 0);
-		sm = 0;
-	} else {
+	if (ncr_read(sm->region, 0x410, 4, &status)) {
+		pr_err("%s: Error reading interrupt status\n",
+		       dev_name(&sm->pdev->dev));
 		return IRQ_NONE;
 	}
 
-	rc = ncr_read(region, 0x410, 4, &status);
-
-	if (0 != rc) {
-		pr_err("smmon(%d): Error reading interrupt status!\n", sm);
-		return IRQ_NONE;
+	for (i = 0; i < NR_EVENTS; ++i) {
+		if ((status & event_mask[i]) != 0) {
+			++sm->counter[i];
+			if (log)
+				printk_ratelimited("%s%s: %s\n",
+						   event_logging[i].level,
+						   dev_name(&sm->pdev->dev),
+						   event_logging[i].name);
+		}
 	}
 
-	raw_spin_lock(&counts_lock);
-
-	if (0 != (0x00000002 & status) || 0 != (0x00000004 & status))
-		pr_err("smmon(%d): Illegal Access!\n", sm);
-
-	if (0 != (0x00000002 & status))
-		++counts.illegal_access[sm];
-
-	if (0 != (0x00000004 & status))
-		++counts.multiple_illegal_access[sm];
-
-	if ((0 != (0x00000008 & status) || 0 != (0x00000010 & status)) &&
-	    0 != log)
-		pr_notice("smmon(%d): Correctable ECC Error!\n", sm);
-
-	if (0 != (0x00000008 & status))
-		++counts.correctable_ecc[sm];
-
-	if (0 != (0x00000010 & status))
-		++counts.multiple_correctable_ecc[sm];
-
-	if ((0 != (0x00000020 & status) ||
-	     0 != (0x00000040 & status)) &&
-	    0 != log)
-		pr_crit("smmon(%d): Uncorrectable ECC Error!\n", sm);
-
-	if (0 != (0x00000020 & status))
-		++counts.uncorrectable_ecc[sm];
-
-	if (0 != (0x00000040 & status))
-		++counts.multiple_uncorrectable_ecc[sm];
-
-	if (0 != (0x00000080 & status)) {
-		++counts.port_error[sm];
-
-		if (0 != log)
-			pr_crit("smmon(%d): Port Error!\n", sm);
-	}
-
-	if (0 != (0x00000800 & status)) {
-		++counts.wrap_error[sm];
-
-		if (0 != log)
-			pr_crit("smmon(%d): Wrap Error!\n", sm);
-	}
-
-	if (0 != (0x00080000 & status)) {
-		++counts.parity_error[sm];
-
-		if (0 != log)
-			pr_crit("smmon(%d): Parity Error!\n", sm);
-	}
-
-	update_summary();
-
-	raw_spin_unlock(&counts_lock);
-
-	ncr_write(region, 0x548, 4, &status);
+	/* Clear interrupt */
+	ncr_write(sm->region, 0x548, 4, &status);
 
 	return IRQ_HANDLED;
 }
 
-/*
-  ==============================================================================
-  ==============================================================================
-  Linux Interface
-  ==============================================================================
-  ==============================================================================
-*/
-
-/*
-  ------------------------------------------------------------------------------
-  smmon_init
-*/
-
-static int __init
-smmon_init(void)
+static int
+smmon_probe(struct platform_device *pdev)
 {
-	int rc;
-	int mask;
+	struct sm_dev *sm;
+	struct resource *io;
+	struct resource *irq;
+	u32 mask = SM_INT_MASK;
+	int rc = 0;
 
-	summary = kmalloc(SUMMARY_SIZE, GFP_KERNEL);
+	sm = devm_kzalloc(&pdev->dev, sizeof *sm, GFP_KERNEL);
+	if (!sm) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	sm->pdev = pdev;
 
-	if (NULL == summary)
-		return -ENOMEM;
+	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!io) {
+		rc = -EINVAL;
+		goto out;
+	}
+	sm->region = io->start;
 
-	update_summary();
+	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (!irq) {
+		rc = -EINVAL;
+		goto out;
+	}
 
-	memset(&counts, 0, sizeof(struct smmon_counts));
+	rc = devm_request_irq(&pdev->dev, irq->start, smmon_isr,
+			      IRQF_ONESHOT, dev_name(&pdev->dev), pdev);
+	if (rc)
+		goto out;
 
-	/*
-	  Set the interrupt mask for each controller.
-	*/
+	/* Enable memory controller interrupts */
+	ncr_write(sm->region, 0x414, 4, &mask);
 
-	mask = 0x1f7f701;
-	ncr_write(NCP_REGION_ID(0x22, 0), 0x414, 4, &mask);
-	ncr_write(NCP_REGION_ID(0xf, 0), 0x414, 4, &mask);
+	rc = sysfs_create_group(&pdev->dev.kobj, &smmon_attr_group);
+	if (rc)
+		goto out;
 
-	rc = request_irq(32 + 161, smmon_isr, IRQF_ONESHOT,
-			 "smmon_0", NULL);
-	rc |= request_irq(32 + 160, smmon_isr, IRQF_ONESHOT,
-			  "smmon_1", NULL);
+	dev_set_drvdata(&pdev->dev, sm);
+	pr_info("%s: Memory controller monitor\n", dev_name(&pdev->dev));
+out:
+	return rc;
+}
 
-	if (0 != rc)
-		return -EBUSY;
-
-	pr_info("lsi_smmon: Monitoring System Memory\n");
-
+static int
+smmon_remove(struct platform_device *pdev)
+{
+	sysfs_remove_group(&pdev->dev.kobj, &smmon_attr_group);
 	return 0;
 }
 
-module_init(smmon_init);
+static const struct of_device_id smmon_id_table[] = {
+	{ .compatible = "lsi,smmon" },
+	{ }
+};
+MODULE_DEVICE_TABLE(platform, smmon_id_table);
 
-/*
-  ------------------------------------------------------------------------------
-  smmon_exit
-*/
+static struct platform_driver smmon_driver = {
+	.driver = {
+		.name = "lsi-smmon",
+		.of_match_table = smmon_id_table
+	},
+	.probe = smmon_probe,
+	.remove = smmon_remove,
+};
 
-static void __exit
-smmon_exit(void)
-{
-	free_irq(32 + 161, NULL);
-	free_irq(32 + 160, NULL);
+module_platform_driver(smmon_driver);
 
-	kfree(summary);
-
-	pr_info("lsi_smmon: Not Monitoring System Memory\n");
-
-	return;
-}
-
-module_exit(smmon_exit);

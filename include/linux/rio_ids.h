@@ -40,5 +40,12 @@
 #define RIO_DID_IDTVPS1616		0x0377
 #define RIO_DID_IDTSPS1616		0x0378
 #define RIO_DID_TSI721			0x80ab
+#define RIO_VID_JENNIC                  0x005a
+#define RIO_DID_ERICSSON_ULMA           0x0000
+#define RIO_DID_ERICSSON_MERCURY        0x0006
+#define RIO_DID_ERICSSON_HERMES         0x0007
+#define RIO_VID_TEXAS                   0x0030
+#define RIO_DID_TEXAS_TCI6616           0xb941
+#define RIO_DID_TEXAS_TCI6616X          0x009d
 
 #endif				/* LINUX_RIO_IDS_H */

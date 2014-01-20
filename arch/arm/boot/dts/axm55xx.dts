@@ -35,6 +35,8 @@
 		serial0	  = &axxia_serial0;
 		timer	  = &axxia_timers;
 		ethernet0 = &axxia_femac0;
+		rapidio0  = &rio0;
+		rapidio1  = &rio1;
 	};
 
 	cpus {
@@ -213,6 +215,17 @@
 			     <1 10 0xf08>;
 	};
 
+	sm0@00220000 {
+		compatible = "lsi,smmon";
+		reg = <0 0x00220000 0 0x1000>;
+		interrupts = <0 192 4>;
+	};
+
+	sm1@00220000 {
+		compatible = "lsi,smmon";
+		reg = <0 0x000f0000 0 0x1000>;
+		interrupts = <0 193 4>;
+	};
 
 	gpdma@2020140000 {
 		compatible = "lsi,dma32";
@@ -444,6 +457,37 @@
 		reg = <0x20 0x10098000 0 0x3000>;
 		interrupts = <0 45 4>;
 	};
+
+        rio0: rapidio@0x3100000000 {
+                index = <0>;
+                status = "okay";
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "axxia,rapidio-delta";
+                device_type = "rapidio";
+                reg = <0x0020 0x20142000 0x0 0x1000>; /* SRIO Conf 0 region */
+                ranges = <0x0 0x0 0x0031 0x00000000 0x0 0x40000000>;
+                linkdown-reset = <0x0200 0x100 0x0020 0x10000000 0x0 0x000010000>;
+                interrupts = <0 89 4>;
+                outb-dmes = <2 0x00000003 1 0x00000000>;
+		enable_ds = <1>;
+        };
+
+        rio1: rapidio@0x3140000000 {
+                index = <1>;
+                status = "okay";
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "axxia,rapidio-delta";
+                device_type = "rapidio";
+                reg = <0x0020 0x20143000 0x0 0x1000>; /* SRIO Conf 1 region */
+                ranges = <0x0 0x0 0x0031 0x40000000 0x0 0x40000000>;
+                linkdown-reset = <0x0200 0x200 0x0020 0x10000000 0x0 0x000010000>;
+                interrupts = <0 90 4>;
+                outb-dmes = <2 0x00000003 1 0x00000000>;
+		enable_ds = <1>;
+        };
+
 };
 
 /*

@@ -1,0 +1,55 @@
+
+config AXXIA_RIO
+	bool "LSI Embedded SRIO Controller support"
+	depends on RAPIDIO && (ACP || ARCH_AXXIA)
+	default "n"
+	---help---
+	  Include support for RapidIO controller for LSI Axxia
+
+config RIO_MAINT_WIN_SIZE
+       hex "RIO mport maintenance window size"
+       depends on RAPIDIO
+       default "0x400000"
+       ---help---
+         Size of RAPIDIO maintenance transaction window.
+         If RapidIO LAW size in your platform is less than 0x400000,
+         you may use this option to adjust the maintenance transaction
+         window accordingly.
+
+config RIO_MAX_IRQS
+       hex "AXXIA RIO Interrupt queue size"
+       depends on RAPIDIO
+       default "0x20"
+       ---help---
+         Number of interrupt service requests that are accepted before
+	 the AXXIA RapidIO port driver asserts backpressure.
+
+config AXXIA_RIO_STAT
+       bool "AXXIA RIO driver statistics"
+       depends on AXXIA_RIO
+       default n
+       ---help---
+       	 If you say Y here, you will be able to view state and interrupt
+	 counters for the Axxia RapidIO controller via sysfs.
+
+config SRIO_IRQ_TIME
+       bool "AXXIA RIO IB DME IRQ latency statistics"
+       depends on AXXIA_RIO
+       select AXXIA_RIO_STAT
+       default n
+       ---help---
+       	 If you say Y here, timestamps may be added to inbound message
+	 payload. Enable/Disable is controller via sysfs.
+
+config AXXIA_RIO_16B_ID
+       bool "RapidIO large common transport system"
+	 depends on AXXIA_RIO
+	 default n
+	 ---help---
+	   Say yes here to enable use of 16 bit transport ID otherwise
+	   transport ID has 8 bits.
+
+config AXXIA_RIO_DEBUG
+        bool "Switch on debug info for AXXIA RIO driver"
+        depends on AXXIA_RIO
+        default n

@@ -1,0 +1,295 @@
+Sysfs interface attributes:
+==========================
+
+Following is a description of the attribute files supported for read
+and write operations to the AXXIA RIO driver.  Data is read or written
+to the 'sysfs' attribute files in text format.
+
+Note that additional comments of the form "# <note>' may be added to some
+input or output lines below for additional description, but their content
+is *not* to part of the actual data stream!
+
+1.0 Path /sys/devices/<reg address>.rapidio/
+
+2.0 Attributes:
+
+2.1 stat
+
+2.1.1 Read:
+
+Master Port state: <counters>+
+Master Port event counters: <counters>+
+Master Port interrupt counters: <counters>+
+
+2.1.2 Write: N/a
+
+2.2 irq
+
+2.2.1 Read:
+
+Interrupt enable bits:
+General Interrupt Enable (<%p>) <%8.8x>:       # register address, curr value
+Outbound Message Engine  (<%p>) <%8.8x>:       # register address, curr value
+Inbound Message Engine   (<%p>) <%8.8x>:       # register address, curr value
+Miscellaneous Events     (<%p>) <%8.8x>:       # register address, curr value
+Axxi Bus to RIO Events   (<%p>) <%8.8x>:       # register address, curr value
+Rio to Axxi Bus Events   (<%p>) <%8.8x>:       # register address, curr value
+
+2.2.2 Write: N/a
+
+2.3 ob_dme_event
+
+2.3.1 Read:
+
+Outbound Message Engine event counters:
+Mailbox <%d>:
+<%s:    %d>             # For 0..3, For all OB engine events
+
+2.3.2 Write:
+
+For each write to this attribute, set "Outbound Message Engine event counters"
+to zero.
+
+2.3 ib_dme_event
+
+2.3.1 Read:
+
+Inbound Message Engine event counters:
+Mailbox <%d> Letter <%d>:
+<%s:    %d>             # For 0..31, For all IB engine events
+
+2.3.2 Write:
+
+For each write to this attribute, set "Inbound Message Engine event counters"
+to zero.
+
+#ifdef CONFIG_SRIO_IRQ_TIME
+2.4 ib_dme_time
+
+2.4.1 Read:
+
+Read several 'lines' of statistics per mailbox, per letter, formatted
+as follows:
+
+mailbox <%d> letter <%d>
+start_irq_tb   <%llu>
+stop_irq_tb    <%llu>
+start_thrd_tb  <%llu>
+stop_thrd_tb   <%llu>
+min_lat        <%llu>
+max_lat        <%llu>
+pkt            <%llu>
+bytes          <%llu>
+
+2.4.2 Write:
+
+For each write of,
+
+<%d:    %d>             # Choose <mbox>: <letter>
+
+reset the time event counters for the corresponding inbound mailbox/letter
+combination.
+
+#endif
+
+2.5 tmo
+
+2.5.1 Read:
+
+Port Link Timeout Control Registers:
+PLT0CCSR (<%p>)
+PLT0CCSR (<%p>) <%8.8x>:       # register address, curr value
+PRT0CCSR (<%p>) <%8.8x>:       # register address, curr value
+RAB_STAT (<%p>) <%8.8x>:       # register address, curr value
+RAB_APIO_STAT (<%p>) <%8.8x>:  # register address, curr value
+PNESCSR (<%p>) <%8.8x>:        # register address, curr value
+
+2.5.2 Write: N/a
+
+2.6 dme_log
+
+2.6.1 Read:
+
+mbox[1:0]       <%x>            # RAB_INTR_STAT_MISC register bits[25:24]
+letter[1:0]     <%x>            # RAB_INTR_STAT_MISC register bits[27:26]
+xmbox[3:0]      <%x>            # RAB_INTR_STAT_MISC register bits[31:28]
+
+2.6.2 Write: N/a
+
+2.7 apio_enable
+
+2.7.1 Read: N/A
+
+2.7.2 Write:
+
+For each write to this attribute,
+
+     <%x>                       # New value for APIO Enable bits
+
+2.8 apio_disable
+
+2.8.1 Read: N/A
+
+2.8.2 Write:
+
+For each write to this attribute,
+
+     <%x>                       # New value for APIO Disable bits (if val != 0)
+
+2.9 dev_attr_rpio_enable
+
+2.9.1 Read: N/A
+
+2.9.2 Write:
+
+For each write to this attribute,
+
+     <%x>                       # New value for RPIO Enable bits
+
+2.10 rpio_disable
+
+2.10.1 Read: N/A
+
+2.10.2 Write:
+
+For each write to this attribute,
+
+     <%x>                       # New value for RPIO Disable bits (if val != 0)
+
+2.11 ob_mbox_stat
+
+2.11.1 Read:
+
+Read a series of lines from this file for each mailbox (0..63),
+where each set of lines is,
+
+mbox id      <%d>
+tx_cb        <%d>
+desc_error   <%d>
+desc_done    <%d>
+seq_no       <%d>
+tx_seq_no    <%d>
+out_of_order <%d>
+
+2.11.2 Write: N/a
+
+2.12 ib_mbox_stat
+
+2.12.1 Read:
+
+2.12.1.1 Read a series of lines from this file for each mailbox (0..63),
+         where each set of lines is,
+
+mbox id      <%d>
+tx_cb        <%d>
+desc_error   <%d>
+desc_done    <%d>
+
+2.12.1.2 Read a series of lines from this file for each DME engine (0..31),
+         where each set of lines is,
+
+dme <%d> state <%8.8x> <%s> <%s>
+
+        # where <%d> is dme_no,
+        #       <%8.8x> is state bitmask,
+        #       oneof{ "DME_ERROR", "OK" },
+        #       oneof{ "DME_SLEEP", "OK" },
+
+2.12.1.3 Read a couple of lines from this file summarizing all DME descriptor
+         entries (inbound & outbound) where each line has the form,
+
+2.12.1.3.1 ACP class devices with internal message descriptor memory
+
+External Message Descriptor Memory (<%d>)
+        # where <%d> is a count of descriptors allocated to the open DMEs
+
+desc ready <%d> desc valid <%d> desc not valid <%d>
+
+        # where each <%d> is a count of descriptors for the corresponding
+	# status
+
+2.12.1.3.2 AXXIA class devices with external message descriptor memory
+
+Internal Message Descriptor Memory (<%d>)
+        # where <%d> is a count of descriptors available
+
+desc ready <%d> desc valid <%d> desc not valid <%d>
+
+        # where each <%d> is a count of descriptors for the corresponding
+	# status
+
+2.12.2 Write: N/a
+
+2.13 open_ob_mbox
+
+2.13.1 Read: N/A
+
+2.13.2 Write:
+
+For each write of a string of the following form to this attribute,
+
+     <%d> <%d>                  # <mailbox/DME index> <num entries>
+
+an outbond mailbox/DME engine is opened, descriptor entries are associated
+to it, and other resources are allocated.  The mailbox/DME engine remains
+open until another 'sysfs' or 'API' call that closes and releases resources.
+
+2.14 open_ib_mbox
+
+2.14.1 Read: N/A
+
+2.14.2 Write:
+
+For each write of a string of the following form to this attribute,
+
+     <%d> <%d>                  # <mailbox index> <num entries>
+
+an inbound mailbox/DME engine is opened, descriptor entries (* 4 for all
+possible 'letters') are associated to it, and other resources are allocated.
+The mailbox/DME engine remains open until another 'sysfs' or 'API' call that
+closes and releases resources.
+
+2.15 close_ob_mbox
+
+2.15.1 Read: N/A
+
+2.15.2 Write:
+
+For each write of a string of the following form to this attribute,
+
+     <%d>                       # <mailbox index>
+
+an outbound mailbox/DME engine that was previously opened by 'sysfs' or 'API'
+call is closed and all resources are released back to the system for reuse.
+
+2.16 close_ib_mbox
+
+2.16.1 Read: N/A
+
+2.16.2 Write:
+
+For each write of a string of the following form to this attribute,
+
+     <%d>                       # <mailbox index>
+
+an inbound mailbox/DME engine that was previously opened by 'sysfs' or 'API'
+call is closed and all resources are released back to the system for reuse.
+
+2.17 ob_send
+
+2.17.1 Read: N/A
+
+2.17.2 Write:
+
+For each write of a string of the following form to this attribute,
+
+     <%d> <%hu> <%d> <%x> %<%d> # <mbox id>
+                                # <dest id>
+                                # <letter>
+                                # <flags>
+                                # <message size>
+
+an outbound message is generated to the mailbox <mbox id>/<letter>, on the
+target device denoted by <dest id>, with control <flags>, consisting of the
+rotating byte pattern of 0..255 for the specified <message size> in bytes.
+

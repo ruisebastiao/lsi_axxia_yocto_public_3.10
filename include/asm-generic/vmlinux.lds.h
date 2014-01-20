@@ -286,6 +286,16 @@
 	}								\
 									\
 	/* RapidIO route ops */						\
+	.rio_dev_fixup : AT(ADDR(.rio_dev_fixup) - LOAD_OFFSET) {	\
+		VMLINUX_SYMBOL(__start_rio_dev_fixup_early) = .;	\
+		*(.rio_dev_fixup_early)					\
+		VMLINUX_SYMBOL(__end_rio_dev_fixup_early) = .;		\
+		VMLINUX_SYMBOL(__start_rio_dev_fixup_enable) = .;	\
+		*(.rio_dev_fixup_enable)				\
+		VMLINUX_SYMBOL(__end_rio_dev_fixup_enable) = .;		\
+	}								\
+									\
+	/* RapidIO route ops */						\
 	.rio_ops        : AT(ADDR(.rio_ops) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start_rio_switch_ops) = .;		\
 		*(.rio_switch_ops)					\
