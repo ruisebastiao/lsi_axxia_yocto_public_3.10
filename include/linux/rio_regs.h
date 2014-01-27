@@ -42,8 +42,13 @@
 #define  RIO_PEF_INB_MBOX2		0x00200000	/* [II, <= 1.2] Mailbox 2 */
 #define  RIO_PEF_INB_MBOX3		0x00100000	/* [II, <= 1.2] Mailbox 3 */
 #define  RIO_PEF_INB_DOORBELL		0x00080000	/* [II, <= 1.2] Doorbells */
+#define  RIO_PEF_FLOW_ARB     0x00000800 /* [III] Flow Arbitration support */
+#define  RIO_PEF_MCAST	      0x00000400 /* [III] Multicast support */
 #define  RIO_PEF_EXT_RT			0x00000200	/* [III, 1.3] Extended route table support */
 #define  RIO_PEF_STD_RT			0x00000100	/* [III, 1.3] Standard route table support */
+#define  RIO_PEF_FCS	      0x00000080 /* [III] Flow Control Support */
+#define  RIO_PEF_CRC_ERR_REC  0x00000040 /* [III] CRC Error Recovery */
+#define  RIO_PEF_CRFS	      0x00000020 /* [III] Critical Request Flow Supt */
 #define  RIO_PEF_CTLS			0x00000010	/* [III] CTLS */
 #define  RIO_PEF_EXT_FEATURES		0x00000008	/* [I] EFT_PTR valid */
 #define  RIO_PEF_ADDR_66		0x00000004	/* [I] 66 bits */
@@ -167,6 +172,25 @@
 #define RIO_STD_RTE_CONF_PORT_SEL_CSR	0x74
 #define RIO_STD_RTE_DEFAULT_PORT	0x78
 
+#define  RIO_MCAST_MASK_PORT_CSR	0x80	/* Multicast Mask Port CSR */
+#define  RIO_MCAST_MASK(x)		((x) << 16)  /* Multicast Mask */
+#define  RIO_EGRESS_PORT_NUMBER(x)	((x) << 8)   /* Port Number */
+#define  RIO_MASK_CMD_ADD_PORT		(0x1 << 4)   /* Add Port Command */
+#define  RIO_MASK_CMD_DEL_PORT		(0x2 << 4)   /* Delete Port Command */
+#define  RIO_MASK_CMD_DEL_ALL_PORTS	(0x4 << 4)   /* Delete All Ports Cmd */
+#define  RIO_MASK_CMD_ADD_ALL_PORTS	(0x5 << 4)   /* Add All Ports Cmd */
+#define  RIO_MCAST_PORT_PRESENT		(0x00000001) /* Port Present from Write
+							to Verify command */
+
+#define  RIO_MCAST_ASSOC_SEL_CSR	0x84  /* Multicast Assoc Select CSR */
+#define  RIO_MCAST_LARGE_DEST_ID(x)	((x) << 24)  /* Large Destination Id */
+#define  RIO_MCAST_DEST_ID(x)		((x) << 16)  /* Destination Id */
+#define  RIO_MCAST_MASK_NO(x)		(x)	     /* Multicast Mask # */
+
+#define  RIO_MCAST_ASSOC_OP_CSR	0x88 /* Multicast Assoc Operation CSR */
+#define  RIO_MCAST_TRANS_ASSOC(x)	((x) << 7)  /* Transport Association */
+#define  RIO_MCAST_DEL_ASSOC		(0x1 << 5)  /* Delete Association */
+#define  RIO_MCAST_ADD_ASSOC		(0x3 << 5)  /* Add Association */
 					/* 0x7c-0xf8 *//* Reserved */
 					/* 0x100-0xfff8 *//* [I] Extended Features Space */
 					/* 0x10000-0xfffff8 *//* [I] Implementation-defined Space */
@@ -251,10 +275,12 @@
 #define  RIO_PORT_N_CTL_PWIDTH_4	0x40000000
 #define  RIO_PORT_N_CTL_P_TYP_SER	0x00000001
 #define  RIO_PORT_N_CTL_LOCKOUT		0x00000002
+#define RIO_PORT_N_CTL_PORT_DIS		0x00800000
 #define  RIO_PORT_N_CTL_EN_RX_SER	0x00200000
 #define  RIO_PORT_N_CTL_EN_TX_SER	0x00400000
 #define  RIO_PORT_N_CTL_EN_RX_PAR	0x08000000
 #define  RIO_PORT_N_CTL_EN_TX_PAR	0x40000000
+#define RIO_PORT_N_CTL_ENUM_BOUNDARY	0x00020000
 
 /*
  * Error Management Extensions (RapidIO 1.3+, Part 8)

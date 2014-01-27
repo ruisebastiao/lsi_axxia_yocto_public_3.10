@@ -20,6 +20,8 @@
 
 /dts-v1/;
 
+/memreserve/ 0x00000000 0x00400000;
+
 / {
 	model = "AXM5516";
 	compatible = "arm", "lsi,axm5516-sim";
@@ -30,11 +32,9 @@
 	chosen { };
 
 	aliases {
-		serial0 = &axxia_serial0;
-		serial1 = &axxia_serial1;
-		serial2 = &axxia_serial2;
-		serial3 = &axxia_serial3;
-		timer   = &axxia_timers;
+		serial0   = &axxia_serial0;
+		timer	  = &axxia_timers;
+		ethernet0 = &axxia_net0;
 	};
 
 	cpus {
@@ -46,6 +46,7 @@
 			compatible = "arm,cortex-a15";
 			reg = <0>;
 			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
 		};
 
 		cpu@1 {
@@ -53,6 +54,7 @@
 			compatible = "arm,cortex-a15";
 			reg = <1>;
 			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
 		};
 
 		cpu@2 {
@@ -60,6 +62,7 @@
 			compatible = "arm,cortex-a15";
 			reg = <2>;
 			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
 		};
 
 		cpu@3 {
@@ -67,90 +70,24 @@
 			compatible = "arm,cortex-a15";
 			reg = <3>;
 			clock-frequency= <0>;
+			cpu-release-addr = <0x10000020>;
+		};
+	};
+
+	clocks {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu {
+			frequency = <1400000000>;
 		};
 
-		cpu@4 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <4>;
-			clock-frequency= <0>;
+		peripheral {
+			frequency = <400000000>;
 		};
 
-		cpu@5 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <5>;
-			clock-frequency= <0>;
-		};
-
-		cpu@6 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <6>;
-			clock-frequency= <0>;
-		};
-
-		cpu@7 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <7>;
-			clock-frequency= <0>;
-		};
-
-		cpu@8 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <8>;
-			clock-frequency= <0>;
-		};
-
-		cpu@9 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <9>;
-			clock-frequency= <0>;
-		};
-
-		cpu@10 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <10>;
-			clock-frequency= <0>;
-		};
-
-		cpu@11 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <11>;
-			clock-frequency= <0>;
-		};
-
-		cpu@12 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <12>;
-			clock-frequency= <0>;
-		};
-
-		cpu@13 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <13>;
-			clock-frequency= <0>;
-		};
-
-		cpu@14 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <14>;
-			clock-frequency= <0>;
-		};
-
-		cpu@15 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			reg = <15>;
-			clock-frequency= <0>;
+		emmc {
+			frequency = <25000000>;
 		};
 	};
 
@@ -197,7 +134,6 @@
 	};
 
 	gpdma@2020141000 {
-		status = "disabled";
 		compatible = "lsi,dma32";
 		reg = <0x20 0x20141000 0x00 0x1000>;
 		interrupts = <0 64 4>, /* busy */
@@ -223,7 +159,7 @@
 		interrupts = <0 45 4>;
 	};
 
-	ethernet@201100000000 {
+	axxia_net0: ethernet@201100000000 {
 		compatible = "smsc,lan91c111";
 		device_type = "network";
 		reg = <0x20 0x11000000 0 0x10000>;

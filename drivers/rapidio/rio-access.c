@@ -17,9 +17,11 @@
  * These interrupt-safe spinlocks protect all accesses to RIO
  * configuration space and doorbell access.
  */
-static DEFINE_SPINLOCK(rio_config_lock);
-static DEFINE_SPINLOCK(rio_doorbell_lock);
+/* static DEFINE_SPINLOCK(rio_config_lock); */
+/* static DEFINE_SPINLOCK(rio_doorbell_lock); */
 
+static DEFINE_RAW_SPINLOCK(rio_config_lock);
+static DEFINE_RAW_SPINLOCK(rio_doorbell_lock);
 /*
  *  Wrappers for all RIO configuration access functions.  They just check
  *  alignment, do locking and call the low-level functions pointed to
@@ -39,18 +41,19 @@ static DEFINE_SPINLOCK(rio_doorbell_lock);
  * Generates rio_local_read_config_* functions used to access
  * configuration space registers on the local device.
  */
-#define RIO_LOP_READ(size,type,len) \
-int __rio_local_read_config_##size \
+#define RIO_LOP_READ(size, type, len)					\
+int __rio_local_read_config_##size					\
 	(struct rio_mport *mport, u32 offset, type *value)		\
 {									\
 	int res;							\
 	unsigned long flags;						\
 	u32 data = 0;							\
-	if (RIO_##size##_BAD) return RIO_BAD_SIZE;			\
-	spin_lock_irqsave(&rio_config_lock, flags);			\
+	if (RIO_##size##_BAD)						\
+		return RIO_BAD_SIZE;					\
+	raw_spin_lock_irqsave(&rio_config_lock, flags);			\
 	res = mport->ops->lcread(mport, mport->id, offset, len, &data);	\
 	*value = (type)data;						\
-	spin_unlock_irqrestore(&rio_config_lock, flags);		\
+	raw_spin_unlock_irqrestore(&rio_config_lock, flags);		\
 	return res;							\
 }
 
@@ -63,31 +66,31 @@ int __rio_local_read_config_##size \
  * Generates rio_local_write_config_* functions used to access
  * configuration space registers on the local device.
  */
-#define RIO_LOP_WRITE(size,type,len) \
-int __rio_local_write_config_##size \
+#define RIO_LOP_WRITE(size, type, len)					\
+int __rio_local_write_config_##size					\
 	(struct rio_mport *mport, u32 offset, type value)		\
 {									\
 	int res;							\
 	unsigned long flags;						\
-	if (RIO_##size##_BAD) return RIO_BAD_SIZE;			\
-	spin_lock_irqsave(&rio_config_lock, flags);			\
+	if (RIO_##size##_BAD)						\
+		return RIO_BAD_SIZE;					\
+	raw_spin_lock_irqsave(&rio_config_lock, flags);			\
 	res = mport->ops->lcwrite(mport, mport->id, offset, len, value);\
-	spin_unlock_irqrestore(&rio_config_lock, flags);		\
+	raw_spin_unlock_irqrestore(&rio_config_lock, flags);		\
 	return res;							\
 }
 
 RIO_LOP_READ(8, u8, 1)
-RIO_LOP_READ(16, u16, 2)
-RIO_LOP_READ(32, u32, 4)
-RIO_LOP_WRITE(8, u8, 1)
-RIO_LOP_WRITE(16, u16, 2)
-RIO_LOP_WRITE(32, u32, 4)
-
 EXPORT_SYMBOL_GPL(__rio_local_read_config_8);
+RIO_LOP_READ(16, u16, 2)
 EXPORT_SYMBOL_GPL(__rio_local_read_config_16);
+RIO_LOP_READ(32, u32, 4)
 EXPORT_SYMBOL_GPL(__rio_local_read_config_32);
+RIO_LOP_WRITE(8, u8, 1)
 EXPORT_SYMBOL_GPL(__rio_local_write_config_8);
+RIO_LOP_WRITE(16, u16, 2)
 EXPORT_SYMBOL_GPL(__rio_local_write_config_16);
+RIO_LOP_WRITE(32, u32, 4)
 EXPORT_SYMBOL_GPL(__rio_local_write_config_32);
 
 /**
@@ -99,18 +102,21 @@ EXPORT_SYMBOL_GPL(__rio_local_write_config_32);
  * Generates rio_mport_read_config_* functions used to access
  * configuration space registers on the local device.
  */
-#define RIO_OP_READ(size,type,len) \
-int rio_mport_read_config_##size \
-	(struct rio_mport *mport, u16 destid, u8 hopcount, u32 offset, type *value)	\
+#define RIO_OP_READ(size, type, len)					\
+int rio_mport_read_config_##size					\
+	(struct rio_mport *mport, u16 destid, u8 hopcount,		\
+		u32 offset, type *value)				\
 {									\
 	int res;							\
 	unsigned long flags;						\
 	u32 data = 0;							\
-	if (RIO_##size##_BAD) return RIO_BAD_SIZE;			\
-	spin_lock_irqsave(&rio_config_lock, flags);			\
-	res = mport->ops->cread(mport, mport->id, destid, hopcount, offset, len, &data); \
+	if (RIO_##size##_BAD)						\
+		return RIO_BAD_SIZE;					\
+	raw_spin_lock_irqsave(&rio_config_lock, flags);			\
+	res = mport->ops->cread(mport, mport->id, destid,		\
+				hopcount, offset, len, &data);		\
 	*value = (type)data;						\
-	spin_unlock_irqrestore(&rio_config_lock, flags);		\
+	raw_spin_unlock_irqrestore(&rio_config_lock, flags);		\
 	return res;							\
 }
 
@@ -123,31 +129,33 @@ int rio_mport_read_config_##size \
  * Generates rio_mport_write_config_* functions used to access
  * configuration space registers on the local device.
  */
-#define RIO_OP_WRITE(size,type,len) \
-int rio_mport_write_config_##size \
-	(struct rio_mport *mport, u16 destid, u8 hopcount, u32 offset, type value)	\
+#define RIO_OP_WRITE(size, type, len)					\
+int rio_mport_write_config_##size					\
+	(struct rio_mport *mport, u16 destid, u8 hopcount,		\
+		 u32 offset, type value)				\
 {									\
 	int res;							\
 	unsigned long flags;						\
-	if (RIO_##size##_BAD) return RIO_BAD_SIZE;			\
-	spin_lock_irqsave(&rio_config_lock, flags);			\
-	res = mport->ops->cwrite(mport, mport->id, destid, hopcount, offset, len, value); \
-	spin_unlock_irqrestore(&rio_config_lock, flags);		\
+	if (RIO_##size##_BAD)						\
+		return RIO_BAD_SIZE;					\
+	raw_spin_lock_irqsave(&rio_config_lock, flags);			\
+	res = mport->ops->cwrite(mport, mport->id, destid, hopcount,	\
+				 offset, len, value);			\
+	raw_spin_unlock_irqrestore(&rio_config_lock, flags);		\
 	return res;							\
 }
 
 RIO_OP_READ(8, u8, 1)
-RIO_OP_READ(16, u16, 2)
-RIO_OP_READ(32, u32, 4)
-RIO_OP_WRITE(8, u8, 1)
-RIO_OP_WRITE(16, u16, 2)
-RIO_OP_WRITE(32, u32, 4)
-
 EXPORT_SYMBOL_GPL(rio_mport_read_config_8);
+RIO_OP_READ(16, u16, 2)
 EXPORT_SYMBOL_GPL(rio_mport_read_config_16);
+RIO_OP_READ(32, u32, 4)
 EXPORT_SYMBOL_GPL(rio_mport_read_config_32);
+RIO_OP_WRITE(8, u8, 1)
 EXPORT_SYMBOL_GPL(rio_mport_write_config_8);
+RIO_OP_WRITE(16, u16, 2)
 EXPORT_SYMBOL_GPL(rio_mport_write_config_16);
+RIO_OP_WRITE(32, u32, 4)
 EXPORT_SYMBOL_GPL(rio_mport_write_config_32);
 
 /**
@@ -165,11 +173,10 @@ int rio_mport_send_doorbell(struct rio_mport *mport, u16 destid, u16 data)
 	int res;
 	unsigned long flags;
 
-	spin_lock_irqsave(&rio_doorbell_lock, flags);
+	raw_spin_lock_irqsave(&rio_doorbell_lock, flags);
 	res = mport->ops->dsend(mport, mport->id, destid, data);
-	spin_unlock_irqrestore(&rio_doorbell_lock, flags);
+	raw_spin_unlock_irqrestore(&rio_doorbell_lock, flags);
 
 	return res;
 }
-
 EXPORT_SYMBOL_GPL(rio_mport_send_doorbell);

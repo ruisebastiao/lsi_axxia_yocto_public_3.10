@@ -12,3 +12,4 @@ obj-$(CONFIG_ISS4xx)	+= iss4xx.o
 obj-$(CONFIG_CANYONLANDS)+= canyonlands.o
 obj-$(CONFIG_CURRITUCK)	+= currituck.o
 obj-$(CONFIG_ACP)	+= acpx1.o acpclock.o
+obj-$(CONFIG_AXXIA_RIO)	+= acprio.o

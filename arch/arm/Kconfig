@@ -373,6 +373,7 @@ config ARCH_AXXIA
 	select PCI
 	select PCI_DOMAINS if PCI
 	select ARCH_SUPPORTS_MSI if PCI
+	select HAS_RAPIDIO if (!PREEMPT_RTB)
 	help
 	  This enables support for the LSI Axxia boards.
 
@@ -2276,3 +2277,20 @@ source "crypto/Kconfig"
 source "lib/Kconfig"
 
 source "arch/arm/kvm/Kconfig"
+
+menu "RapidIO management options"
+
+config HAS_RAPIDIO
+	bool
+	default n
+
+config RAPIDIO
+	bool "RapidIO support"
+	depends on HAS_RAPIDIO || PCI
+	help
+	  If you say Y here, the kernel will include drivers and
+	  infrastructure code to support RapidIO interconnect devices.
+
+source "drivers/rapidio/Kconfig"
+
+endmenu

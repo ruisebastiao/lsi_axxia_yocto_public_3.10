@@ -22,19 +22,90 @@ config RAPIDIO_ENABLE_RX_TX_PORTS
 	  ports for Input/Output direction to allow other traffic
 	  than Maintenance transfers.
 
-config RAPIDIO_DMA_ENGINE
-	bool "DMA Engine support for RapidIO"
-	depends on RAPIDIO
-	select DMADEVICES
-	select DMA_ENGINE
-	help
-	  Say Y here if you want to use DMA Engine frameork for RapidIO data
-	  transfers to/from target RIO devices. RapidIO uses NREAD and
-	  NWRITE (NWRITE_R, SWRITE) requests to transfer data between local
-	  memory and memory on remote target device. You need a DMA controller
-	  capable to perform data transfers to/from RapidIO.
+config RAPIDIO_DIO_DMA
+       bool "Use DMA for direct I/O access"
+       depends on RAPIDIO
+       default n
+       select DMA_ENGINE
+       ---help---
+         Say Y here if you want the RapidIO driver to use DMA for direct I/O
+	 data transfers.
 
-	  If you are unsure about this, say Y here.
+config RAPIDIO_ACCESS_ERR_LIMIT
+       int "Number of device access errors accepted during net configuration, before giving up."
+       depends on RAPIDIO
+       default 0
+       ---help---
+         RIO net setup will be aborted if the core driver discovers that
+	 contact is lost to devices, which has previously been probed, during
+	 final LUT setup phase.
+	 Failed SRIO access attempts may result in machine check errors:
+	 Depending on SRIO port controller, the SRIO driver may have the
+	 ability to recover from such faults. If your port controller supports
+	 MC recovery for SRIO access errors you may chose to tolerate a certain
+	 number of faults.
+	 MC fault recovery, however, take some time and the user is advised
+	 not to set this value to high.
+
+config RAPIDIO_DYNAMIC_ROUTES
+       bool "Use dynamic routing (Experimental)"
+       depends on RAPIDIO
+       default n
+       ---help---
+         Say Y here if you want the RapidIO driver to use dynamic routing and
+	 calculate and adopt to the cheapest path between nodes.
+
+config RAPIDIO_MULTICAST_PW
+       bool "Port Write Multicast (Experimental)"
+       depends on RAPIDIO
+       default n
+       ---help---
+         Say Y here if you want the RapidIO driver to enable multicast of
+	 prot write messages.
+
+config RAPIDIO_HOTPLUG
+       bool "Support for RAPIDIO Hotplug"
+       depends on RAPIDIO && HOTPLUG && SYSFS
+       default n
+       ---help---
+         This allows you to add and remove RIO devices while the machine is
+         powered up and running.
+
+         When in doubt, say N.
+
+config RAPIDIO_STATIC_DESTID
+       bool "Use static RIO device destID"
+       depends on RAPIDIO
+       default n
+       ---help---
+         The default enumeration mode in the rapidio driver is to assign destIDs
+	 to RIO devices dynamically. If you say Y here, the rapidio driver allows
+	 static or user defined numbering.
+
+config RAPIDIO_ENUM_DOMAIN
+       bool "Support multiple enumeration hosts in the RIO network (Experimental)"
+       depends on RAPIDIO && RAPIDIO_HOTPLUG && RAPIDIO_STATIC_DESTID
+       default n
+       ---help---
+         Support multiple enumeration hosts in the RIO network
+
+config RAPIDIO_SECOND_DEST_ID
+         hex "Add a second destination id to main RIO port"
+         depends on RAPIDIO_HOTPLUG
+         default "0xdc"
+         ---help---
+	   Add a second destination id that will be recognized by the main RIO
+           port. Can for example be used to receive multicasts or equivalent
+	   that has multiple recipients.
+
+config RAPIDIO_PW_MULTICAST_MASK_ID
+       int "Multicast mask id to use for multicast port writes in switches"
+       depends on RAPIDIO_HOTPLUG
+       default "1"
+       ---help---
+	 When using domains we need to multicast all port writes to all
+	 domains. For this we need to set up a multicast mask dedicated for
+	 this on all switches. This is the number for that mask.
 
 config RAPIDIO_DEBUG
 	bool "RapidIO subsystem debug messages"
@@ -46,25 +117,5 @@ config RAPIDIO_DEBUG
 	  going on.
 
 	  If you are unsure about this, say N here.
-
-choice
-	prompt "Enumeration method"
-	depends on RAPIDIO
-	default RAPIDIO_ENUM_BASIC
-	help
-	  There are different enumeration and discovery mechanisms offered
-	  for RapidIO subsystem. You may select single built-in method or
-	  or any number of methods to be built as modules.
-	  Selecting a built-in method disables use of loadable methods.
-
-	  If unsure, select Basic built-in.
-
-config RAPIDIO_ENUM_BASIC
-	tristate "Basic"
-	help
-	  This option includes basic RapidIO fabric enumeration and discovery
-	  mechanism similar to one described in RapidIO specification Annex 1.
-
-endchoice
 
 source "drivers/rapidio/switches/Kconfig"

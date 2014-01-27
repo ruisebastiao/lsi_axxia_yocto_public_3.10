@@ -1,0 +1,115 @@
+Linux kernel and the RapidIO driver
+===================================
+
+1.0 Kernel Command Line
+
+The standard Linux RIO driver reads the kernel command line to look for the
+'riohdid' parameter, if any.  This value is used to specify the default
+host device id of each mport (hardware endpoint) on the board.
+
+    riohdid=[<int>]+
+
+There is provision for multiple hardware endpoints, but none of the current
+boards makes use of that feature.
+
+2.0 U-Boot DTS Parameter Settings
+
+Many parameters to configure the AXXIA RIO driver are stored in the '.dts'
+file (DTB blob) for the board.  An example configuration for one of the
+AXXIA RIO devices might look like the following:
+
+        rio0: rapidio {
+                index = <0>;
+                enabled = <1>;
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "axxia,rapidio-delta";
+                device_type = "rapidio";
+                reg = <0x0020 0x20142000 0x1000>; /* SRIO Conf region */
+                ranges = <0x0 0x0 0x0031 0x00000000 0x0 0x40000000>;
+                interrupt-parent = <&MPIC>;
+                interrupts = <30 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
+                outb-dmes = <2 0x00000003 1 0x00000000>;
+                inb-dmes = <32 0xffffffff 0 0x00000000>;
+        };
+
+The parameters of this block are defined as follows:
+
+2.1 index = < <int> >;
+
+    Specify which instance of the AXXIA RIO endpoint is being initialized
+    for the kernel.  Some AXXIA chip sets include multiple SRIO modules,
+    and it is possible to initialize and load multiple endpoints to the
+    kernel.
+
+2.2 enabled = < <int> >;
+
+    Specify whether the corresponding device instance is enabled/available.
+    Usually the value of this item is filled in by UBoot directly.
+
+2.3 #address-cells = < <int> >;
+
+    Specify number of 32-bit values needed for an address in this section
+    of the DTB file e.g. in "ranges" attribute.
+
+2.4 #size-cells = < <int> >;
+
+    Specify number of 32-bit values needed for a size in this section of
+    the DTB file e.g. in "ranges" attribute.
+
+2.5 compatible = "axxia,rapidio-delta";
+    device_type = "rapidio";
+
+    'Type' parameters used to associate one of the blocks of the '.dts'
+    file with a specific kernel driver instance.
+
+2.6 reg = < <int 0> <int 1> <int 2> >;
+
+    Specify the AXI address and size of the SRIO Configuration block used
+    to page through and read the SRIO Space associated with this hardware
+    device endpoint.  <int 0> is the upper 32-bits of the address,
+    <int 1> is the lower 32-bits of the address, and <int 2> is the size
+    of the block (which must be at least 4KB).
+
+2.7 ranges = < <int 0> <int 1> <int 2> <int 3> <int 4> <int 5> >;
+
+    Specify the AXI address and size of the SRIO Space associated with this
+    hardware device endpoint.  <int 2> is the upper 32-bits of the address,
+    <int 3> is the lower 32-bits of the address. <int 4> is the upper 32-bits
+    of the size, and <int 5> is the lower 32-bits of the size.
+
+2.8 interrupt-parent = <&intControl>;
+    interrupts < <int 0> <int 1> >;
+
+    Specify the interrupt vector appropriate to this hardware device
+    endpoint, and the associated interrupt controller.
+
+2.9 outb-dmes = < <int 0> <int 1> <int 2> <int 3> >;
+
+    Specify the number and kind of DMEs available for Type 11 outbound
+    messaging by this hardware device endpoint.  Different versions of
+    the AXXIA chips may include more or fewer DMEs.
+
+        <int 0> is the number of DMEs for outbound multi-segment messages
+        <int 1> is the bitmask showing which of the outbound multi-segment
+                DMEs is working on this platform
+        <int 2> is the number of DMEs for outbound single-segment messages
+        <int 3> is the bitmask showing which of the outbound single-segment
+
+    This attribute is optional.  Default value is <2 0x3 1 0x1>.
+
+2.10 inb-dmes = < <int 0> <int 1> <int 2> <int 3> >;
+
+    Specify the number and kind of DMEs available for Type 11 inbound
+    messaging by this hardware device endpoint.  Different versions of
+    the AXXIA chips may include more or fewer DMEs.
+
+        <int 0> is the number of DMEs for inbound multi-segment messages
+        <int 1> is the bitmask showing which of the inbound multi-segment
+                DMEs is working on this platform
+        <int 2> is the number of DMEs for inbound single-segment messages
+        <int 3> is the bitmask showing which of the inbound single-segment
+                DMEs is working on this platform
+
+    This attribute is optional.  Default value is <32 0xffffffff 0 0x0>.
+
