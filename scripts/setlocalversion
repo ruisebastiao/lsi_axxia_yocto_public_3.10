@@ -51,11 +51,11 @@ scm_version()
 	        if [ 0 -eq $? ]
 		then
 		    echo -n "-`git describe`"
-		fi
-
-		# If we are at a tagged commit (like "v2.6.30-rc6"), we ignore
-		# it, because this version is defined in the top level Makefile.
-		if [ -z "`git describe --exact-match 2>/dev/null`" ]; then
+		else
+		    # If we are at a tagged commit (like "v2.6.30-rc6"),
+		    # we ignore it, because this version is defined in the
+                    # top level Makefile.
+		    if [ -z "`git describe --exact-match 2>/dev/null`" ]; then
 
 			# If only the short version is requested, don't bother
 			# running further git commands
@@ -72,6 +72,7 @@ scm_version()
 			else
 				printf '%s%s' -g $head
 			fi
+		    fi
 		fi
 
 		# Is this git on svn?
