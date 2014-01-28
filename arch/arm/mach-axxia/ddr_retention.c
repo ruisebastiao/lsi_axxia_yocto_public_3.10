@@ -36,36 +36,50 @@
 static void __iomem *nca = NULL;
 static void __iomem *apb = NULL;
 static void __iomem *dickens = NULL;
+static void __iomem *femac = NULL;
 static int ddr_retention_enabled = 0;
 
-static unsigned long
-ncp_caal_regions_acp55xx[] = {
-	NCP_REGION_ID(0x0b, 0x05),      /* SPPV2   */
-	NCP_REGION_ID(0x0c, 0x05),      /* SED     */
-	NCP_REGION_ID(0x0e, 0x05),      /* DPI_HFA */
-	NCP_REGION_ID(0x14, 0x05),      /* MTM     */
-	NCP_REGION_ID(0x14, 0x0a),      /* MTM2    */
-	NCP_REGION_ID(0x15, 0x00),      /* MME     */
-	NCP_REGION_ID(0x16, 0x05),      /* NCAV2   */
-	NCP_REGION_ID(0x16, 0x10),      /* NCAV22  */
-	NCP_REGION_ID(0x17, 0x05),      /* EIOAM1  */
-	NCP_REGION_ID(0x19, 0x05),      /* TMGR    */
-	NCP_REGION_ID(0x1a, 0x05),      /* MPPY    */
-	NCP_REGION_ID(0x1a, 0x23),      /* MPPY2   */
-	NCP_REGION_ID(0x1a, 0x21),      /* MPPY3   */
-	NCP_REGION_ID(0x1b, 0x05),      /* PIC     */
-	NCP_REGION_ID(0x1c, 0x05),      /* PAB     */
-	NCP_REGION_ID(0x1f, 0x05),      /* EIOAM0  */
-	NCP_REGION_ID(0x31, 0x05),      /* ISB     */
-	NCP_REGION_ID(0x28, 0x05),      /* EIOASM0 */
-	NCP_REGION_ID(0x29, 0x05),      /* EIOASM1 */
-	NCP_REGION_ID(0x2a, 0x05),      /* EIOAS2  */
-	NCP_REGION_ID(0x2b, 0x05),      /* EIOAS3  */
-	NCP_REGION_ID(0x2c, 0x05),      /* EIOAS4  */
-	NCP_REGION_ID(0x2d, 0x05),      /* EIOAS5  */
-	NCP_REGION_ID(0x32, 0x05),      /* ISBS    */
-	NCP_REGION_ID(0xff, 0xff)
+enum {
+        AXXIA_ENGINE_CAAL,
+        AXXIA_ENGINE_CNAL
 };
+
+unsigned long
+ncp_caal_regions_acp55xx[] =
+{
+    NCP_REGION_ID(0x0b, 0x05),      /* SPPV2   */
+    NCP_REGION_ID(0x0c, 0x05),      /* SED     */
+    NCP_REGION_ID(0x0e, 0x05),      /* DPI_HFA */
+    NCP_REGION_ID(0x14, 0x05),      /* MTM     */
+    NCP_REGION_ID(0x14, 0x0a),      /* MTM2    */
+    NCP_REGION_ID(0x15, 0x00),      /* MME     */
+    NCP_REGION_ID(0x16, 0x05),      /* NCAV2   */
+    NCP_REGION_ID(0x16, 0x10),      /* NCAV22  */
+    NCP_REGION_ID(0x17, 0x05),      /* EIOAM1  */
+    NCP_REGION_ID(0x19, 0x05),      /* TMGR    */
+    NCP_REGION_ID(0x1a, 0x05),      /* MPPY    */
+    NCP_REGION_ID(0x1a, 0x23),      /* MPPY2   */
+    NCP_REGION_ID(0x1a, 0x21),      /* MPPY3   */
+    NCP_REGION_ID(0x1b, 0x05),      /* PIC     */
+    NCP_REGION_ID(0x1c, 0x05),      /* PAB     */
+    NCP_REGION_ID(0x1f, 0x05),      /* EIOAM0  */
+    NCP_REGION_ID(0x31, 0x05),      /* ISB     */
+    NCP_REGION_ID(0xff, 0xff) 
+};
+
+unsigned long
+ncp_cnal_regions_acp55xx[] =
+{
+    NCP_REGION_ID(0x28, 0x05),      /* EIOASM0 */
+    NCP_REGION_ID(0x29, 0x05),      /* EIOASM1 */
+    NCP_REGION_ID(0x2a, 0x05),      /* EIOAS2  */
+    NCP_REGION_ID(0x2b, 0x05),      /* EIOAS3  */
+    NCP_REGION_ID(0x2c, 0x05),      /* EIOAS4  */
+    NCP_REGION_ID(0x2d, 0x05),      /* EIOAS5  */
+    NCP_REGION_ID(0x32, 0x05),      /* ISBS    */
+    NCP_REGION_ID(0xff, 0xff) 
+};
+
 
 /*
   ------------------------------------------------------------------------------
@@ -130,17 +144,37 @@ flush_l3(void)
 }
 
 static void
-quiesce_vp_engine(void)
+quiesce_vp_engine(int engineType)
 {
-	unsigned long   *pCnalRegions = ncp_caal_regions_acp55xx;
+	unsigned long   *pEngineRegions;
 	unsigned long     *pRegion;
+    unsigned long    ortOff, owtOff;
 	unsigned ort, owt;
 	unsigned long      buf = 0;
 	unsigned short     node, target;
 	int      loop;
 
 	printk("quiescing VP engines...\n");
-	pRegion = pCnalRegions;
+
+    switch (engineType)
+    {
+        case AXXIA_ENGINE_CNAL:
+	        pEngineRegions = ncp_cnal_regions_acp55xx;
+            ortOff = 0x1c0;
+            owtOff = 0x1c4;
+            break;
+
+        case AXXIA_ENGINE_CAAL:
+	        pEngineRegions = ncp_caal_regions_acp55xx;
+            ortOff = 0xf8;
+            owtOff = 0xfc;
+            break;
+
+        default:
+            return;
+    }
+
+	pRegion = pEngineRegions;
 
 	while (*pRegion != NCP_REGION_ID(0xff, 0xff)) {
 		/* set read/write transaction limits to zero */
@@ -149,15 +183,15 @@ quiesce_vp_engine(void)
 		pRegion++;
 	}
 
-	pRegion = pCnalRegions;
+	pRegion = pEngineRegions;
 	loop = 0;
 
 	while (*pRegion != NCP_REGION_ID(0xff, 0xff)) {
 		node = (*pRegion & 0xffff0000) >> 16;
 		target = *pRegion & 0x0000ffff;
 		/* read the number of outstanding read/write transactions */
-		ncr_read(*pRegion, 0xf8, 4, &ort);
-		ncr_read(*pRegion, 0xfc, 4, &owt);
+		ncr_read(*pRegion, ortOff, 4, &ort);
+		ncr_read(*pRegion, owtOff, 4, &owt);
 
 		if ((ort == 0) && (owt == 0)) {
 			/* this engine has been quiesced, move on to the next */
@@ -177,76 +211,73 @@ quiesce_vp_engine(void)
 	return;
 }
 
+static inline void cpu_disable_l2_prefetch(void)
+{
+	unsigned int v;
+
+    /*
+     * MRC p15, 1, <Rt>, c15, c0, 3; Read L2 Prefetch Control Register
+     * MCR p15, 1, <Rt>, c15, c0, 3; Write L2 Prefetch Control Register
+     *
+     */
+	asm volatile(
+	"       mrc     p15, 1, %0, c15, c0, 3\n"
+	"       and     %0, %0, #0x0000\n"
+	"       mcr     p15, 1, %0, c15, c0, 3\n"
+	: "=&r" (v)
+	:
+	: "cc");
+
+	isb();
+}
+
 static inline void
-ncp_ddr_shutdown(void)
+ncp_ddr_shutdown(unsigned long ctl_244)
 {
 	unsigned long value;
-	int loop=1;
-	unsigned long cdr2[2] = {0x00002200, 0x00000f00};
-	int smId;
 
+    cpu_disable_l2_prefetch();
 
-	/* 
-	 * Most of the PIO command has already been set up. 
-	 * issue config ring write - enter DDR self-refresh mode
-	 */
-
-	for (smId = 0; smId < 2; smId++) {
-		/* CDR2 - Node.target */
-		ncr_register_write(cdr2[smId], (unsigned *) (nca + 0xf8));
-		/* CDR0 - */
-		ncr_register_write(0x80050003, (unsigned *) (nca + 0xf0));
-		do {
-			value = ncr_register_read((unsigned *)
-						  (nca + 0xf0));
-		} while ((0x80000000UL & value));
-	}
+    /* 
+     * put SDRAM in self-refresh mode 
+     */
+	ncr_write(NCP_REGION_ID(34,0), 0x3d0, 4, &ctl_244);
+	ncr_write(NCP_REGION_ID(15,0), 0x3d0, 4, &ctl_244);
 
 	/* check interrupt status for completion */
 	/* CDR1 - word offset 0x104 (byte offset 0x410) */
-	ncr_register_write(0x00000104, (unsigned *) (nca + 0xf4));
+    do {
+        ncr_read(NCP_REGION_ID(34,0), 0x410, 4, &value);
+    } while ( (value & 0x0200) == 0) ;
 
-	for (smId = 0; smId < 2; smId++) {
-		/* CDR2 - Node.target */
-		ncr_register_write(cdr2[smId], (unsigned *) (nca + 0xf8));
-		do { 
-			ncr_register_write(loop, (unsigned *)
-					   (nca + 0x11f0));
+    do {
+        ncr_read(NCP_REGION_ID(15,0), 0x410, 4, &value);
+    } while ( (value & 0x0200) == 0) ;
 
-			/* issue config ring read */
-			ncr_register_write(0x80040003, (unsigned *)
-					   (nca + 0xf0));
-			do {
-				value = ncr_register_read((unsigned *)
-							  (nca + 0xf0));
-			} while ((0x80000000UL & value));
-
-			value = ncr_register_read((unsigned *)
-						  (nca + 0x1000));
-			ncr_register_write(value, (unsigned *)
-					   (nca + 0x1200));
-
-			loop++;
-		} while ( (value & 0x0200) == 0) ;
-	}
 
 	/*
 	  Indicate DDR Retention Reset
 	*/
 
 	/* set bit 0 of persist_scratch */
-	writel(0x00000001, apb + 0x300dc);
+	writel_relaxed(0x00000001, apb + 0x300dc);
 
 	/*
 	  Issue Chip Reset
 	*/
 
 	/* Intrnl Boot, 0xffff0000 Target */
-	writel(0x00000040, apb + 0x31004);
+	writel_relaxed(0x00000040, apb + 0x31004);
 	/* Set ResetReadDone */
-	writel(0x80000000, apb + 0x3180c);
+	writel_relaxed(0x80000000, apb + 0x3180c);
 	/* Chip Reset */
-	writel(0x00080802, apb + 0x31008);
+	writel_relaxed(0x00080802, apb + 0x31008);
+
+
+    wfi();
+    while (1);
+    __asm__ __volatile__( " nop \n\t" );
+
 
 	return;
 }
@@ -256,6 +287,7 @@ initiate_retention_reset(void)
 {
 	unsigned long ctl_244 = 0;
 	unsigned long value;
+    unsigned cpu_id ;
 
 	if (0 == ddr_retention_enabled) {
 		pr_info("DDR Retention Reset is Not Enabled\n");
@@ -265,6 +297,13 @@ initiate_retention_reset(void)
 	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
 
+    /* kill the femac */
+    writel(0x80000000, (femac+0x2000));
+    value = readl(femac + 0x2000);
+
+    preempt_disable(); 
+    cpu_id = smp_processor_id();
+    udelay(1000);
 	/* send stop message to other CPUs */
 	local_irq_disable();
 	asm volatile ("dsb" : : : "memory");
@@ -276,10 +315,10 @@ initiate_retention_reset(void)
 	flush_l3();
 
 	/* TODO - quiesce VP engines */
-	quiesce_vp_engine();
+	quiesce_vp_engine(AXXIA_ENGINE_CAAL);
+	quiesce_vp_engine(AXXIA_ENGINE_CNAL);
 
 	/* disable sysmem interrupts */
-	printk("disabling sysmem interrupts\n");
 	value = 0;
 	ncr_write(NCP_REGION_ID(34,0), 0x414, 4, &value);
 	ncr_write(NCP_REGION_ID(15,0), 0x414, 4, &value);
@@ -293,17 +332,10 @@ initiate_retention_reset(void)
 	ctl_244 |= 0x000a0000;
 
 
-	/* 
-	 * set up for CRBW operation
-	 */
-	/* write register value into CDAR[0] */
-	ncr_register_write(ctl_244, (unsigned *) (nca + 0x1000));
-
-	/* CDR2 - Node.target = 34.0 */
-	ncr_register_write(0x00002200, (unsigned *) (nca + 0xf8));
-
-	/* CDR1 - word offset 0xf4 (byte offset 0x3d0) */
-	ncr_register_write(0x000000f4, (unsigned *) (nca + 0xf4));
+    /* put secondary CPUs into reset */
+    value = ~(1 << cpu_id);
+    value &= 0xffff;
+    ncr_register_write(htonl(value), (unsigned *) (apb + 0x31030));
 
 	/* 
 	 * issue instruction barrier 
@@ -311,9 +343,9 @@ initiate_retention_reset(void)
 	 * into cache 
 	 */
 	asm volatile ("dsb" : : : "memory");
-	prefetch_range(ncp_ddr_shutdown, 0x1000);
+	asm volatile ("isb" : : : "memory");
 
-	ncp_ddr_shutdown();
+	ncp_ddr_shutdown(ctl_244);
 
 	return;
 }
@@ -346,9 +378,10 @@ axxia_ddr_retention_init(void)
 				 S_IWUSR, NULL, &axxia_ddr_retention_proc_ops)) {
 			pr_info("Failed to register DDR retention proc entry\n");
 		} else {
-			apb = ioremap(0x2010000000, 0x40000);
+			apb = ioremap(0x2010000000, 0x80000);
 			nca = ioremap(0x002020100000ULL, 0x20000);
 			dickens = ioremap(0x2000000000, 0x1000000);
+			femac = ioremap(0x2010120000, 0x10000);
 			ddr_retention_enabled = 1;
 			pr_info("DDR Retention Reset Initialized\n");
 		}

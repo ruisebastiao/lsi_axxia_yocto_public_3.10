@@ -165,6 +165,7 @@ axxia_i2c_init(struct axxia_i2c_dev *idev)
 	u32 divisor = clk_get_rate(idev->i2c_clk) / idev->bus_clk_rate;
 	u32 clk_mhz = clk_get_rate(idev->i2c_clk) / 1000000;
 	u32 t_setup;
+	u32 t_high, t_low;
 	u32 tmo_clk;
 	u32 prescale;
 	unsigned long timeout;
@@ -185,15 +186,22 @@ axxia_i2c_init(struct axxia_i2c_dev *idev)
 	/* Enable Master Mode */
 	writel(0x1, &idev->regs->global_control);
 
+	if (idev->bus_clk_rate <= 100000) {
+		/* Standard mode SCL 50/50, tSU:DAT = 250 ns */
+		t_high  = divisor*1/2;
+		t_low   = divisor*1/2;
+		t_setup = ns_to_clk(250, clk_mhz);
+	} else {
+		/* Fast mode SCL 33/66, tSU:DAT = 100 ns */
+		t_high  = divisor*1/3;
+		t_low   = divisor*2/3;
+		t_setup = ns_to_clk(100, clk_mhz);
+	}
+
 	/* SCL High Time */
-	writel(divisor/2, &idev->regs->scl_high_period);
+	writel(t_high, &idev->regs->scl_high_period);
 	/* SCL Low Time */
-	writel(divisor/2, &idev->regs->scl_low_period);
-
-	t_setup = (idev->bus_clk_rate <= 100000) ?
-		ns_to_clk(250, clk_mhz) : /* Standard mode tSU:DAT = 250 ns */
-		ns_to_clk(100, clk_mhz); /* Fast mode tSU:DAT = 100 ns */
-
+	writel(t_low, &idev->regs->scl_low_period);
 	/* SDA Setup Time */
 	writel(t_setup, &idev->regs->sda_setup_time);
 	/* SDA Hold Time, 300ns */
