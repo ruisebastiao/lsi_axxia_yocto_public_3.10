@@ -25,8 +25,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/of.h>
-#include <linux/irqchip.h>
-
+#include <linux/memblock.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
@@ -40,9 +39,29 @@
 
 void __iomem *zynq_scu_base;
 
+/**
+ * zynq_memory_init() - Initialize special memory
+ *
+ * We need to stop things allocating the low memory as DMA can't work in
+ * the 1st 512K of memory.  Using reserve vs remove is not totally clear yet.
+ */
+static void __init zynq_memory_init(void)
+{
+	/*
+	 * Reserve the 0-0x4000 addresses (before page tables and kernel)
+	 * which can't be used for DMA
+	 */
+	if (!__pa(PAGE_OFFSET))
+		memblock_reserve(0, 0x4000);
+}
+
 static struct of_device_id zynq_of_bus_ids[] __initdata = {
 	{ .compatible = "simple-bus", },
 	{}
+};
+
+static struct platform_device zynq_cpuidle_device = {
+	.name = "cpuidle-zynq",
 };
 
 /**
@@ -57,6 +76,8 @@ static void __init zynq_init_machine(void)
 	l2x0_of_init(0x02060000, 0xF0F0FFFF);
 
 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+
+	platform_device_register(&zynq_cpuidle_device);
 }
 
 static void __init zynq_timer_init(void)
@@ -98,17 +119,16 @@ static void zynq_system_reset(char mode, const char *cmd)
 }
 
 static const char * const zynq_dt_match[] = {
-	"xlnx,zynq-zc702",
 	"xlnx,zynq-7000",
 	NULL
 };
 
-MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
 	.smp		= smp_ops(zynq_smp_ops),
 	.map_io		= zynq_map_io,
-	.init_irq	= irqchip_init,
 	.init_machine	= zynq_init_machine,
 	.init_time	= zynq_timer_init,
 	.dt_compat	= zynq_dt_match,
+	.reserve	= zynq_memory_init,
 	.restart	= zynq_system_reset,
 MACHINE_END
