@@ -15,9 +15,11 @@
 
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
+#include <linux/dma-mapping.h>
 #include <linux/device.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include "virt-dma.h"
 
 #define MAX_GPDMA_CHANNELS      4
 #define GPDMA_MAX_DESCRIPTORS  128
@@ -151,14 +153,16 @@ struct gpdma_engine;
 
 struct gpdma_desc {
 	struct descriptor               hw;
-	struct list_head                node;
 	dma_addr_t                      src;
 	dma_addr_t                      dst;
-	enum dma_status                 dma_status;
-	struct dma_async_tx_descriptor	txd;
+	struct gpdma_engine            *engine;
+	struct virt_dma_desc	        vdesc;
 } __aligned(32);
 
-#define txd_to_desc(n) container_of(n, struct gpdma_desc, txd)
+static struct gpdma_desc *to_gpdma_desc(struct virt_dma_desc *vdesc)
+{
+	return container_of(vdesc, struct gpdma_desc, vdesc);
+}
 
 struct gpdma_channel {
 	/* Back reference to DMA engine */
@@ -166,22 +170,19 @@ struct gpdma_channel {
 	/* Channel registers */
 	void __iomem			*base;
 	/* Channel id */
-	int			        channel;
+	int			        id;
 	/* IRQ number as passed to request_irq() */
 	int				irq;
-	/* Cookie for last completed transaction */
-	dma_cookie_t			last_completed;
-	/* List of prep'ed descriptors */
-	struct list_head                waiting;
 	/* Currently running descriptor */
 	struct gpdma_desc               *active;
-	/* Lock for accessing 'waiting' and 'active' */
-	raw_spinlock_t			lock;
 	/* Channel parameters (DMA engine framework) */
-	struct dma_chan			chan;
+	struct virt_dma_chan		vc;
 };
 
-#define dchan_to_gchan(n) container_of(n, struct gpdma_channel, chan)
+static inline struct gpdma_channel *to_gpdma_chan(struct dma_chan *chan)
+{
+	return container_of(chan, struct gpdma_channel, vc.chan);
+}
 
 struct lsidma_hw {
 	unsigned int num_channels;
@@ -194,20 +195,16 @@ struct lsidma_hw {
 };
 
 struct gpdma_engine {
-	unsigned long                   state;
-#define GPDMA_INIT      0U
-	struct kref                     kref;
 	struct device			*dev;
 	struct lsidma_hw		*chip;
 	struct gpdma_channel		channel[MAX_GPDMA_CHANNELS];
-	/* Bit mask where bit[n] == 1 if channel busy */
+	/** Bit mask where bit[n] == 1 if channel busy */
 	unsigned long                   ch_busy;
-	struct tasklet_struct           job_task;
 	int                             err_irq;
 	void __iomem			*iobase;
 	void __iomem			*gbase;
 	void __iomem			*gpreg;
-	raw_spinlock_t			lock;
+	spinlock_t			lock;
 	struct {
 		u32                     order;
 		dma_addr_t              phys;
@@ -219,11 +216,5 @@ struct gpdma_engine {
 };
 
 #define desc_to_engine(n) container_of(n, struct gpdma_engine, desc)
-
-
-static inline void __iomem *BASE(struct gpdma_channel *dmac)
-{
-	return dmac->base;
-}
 
 #endif

@@ -229,7 +229,8 @@
 
 	gpdma@2020140000 {
 		compatible = "lsi,dma32";
-		reg = <0x20 0x20140000 0x00 0x1000>;
+		reg = <0x20 0x20140000 0x00 0x1000>,
+		      <0x20 0x10094000 0x00 0x1000>;
 		interrupts = <0 60 4>, /* busy */
 			     <0 61 4>; /* error */
 
@@ -244,7 +245,8 @@
 
 	gpdma@2020141000 {
 		compatible = "lsi,dma32";
-		reg = <0x20 0x20141000 0x00 0x1000>;
+		reg = <0x20 0x20141000 0x00 0x1000>,
+		      <0x20 0x10094000 0x00 0x1000>;
 		interrupts = <0 64 4>, /* busy */
 			     <0 65 4>; /* error */
 
