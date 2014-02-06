@@ -90,64 +90,64 @@
                         clock-frequency = <0>; // Filled in by zImage
                         UART0: serial@00404000 {
                                 device_type = "serial";
-                                compatible = "acp-uart0";
+                                compatible = "lsi,acp-uart0";
                                 enabled = <1>;
                                 reg = <0x00404000 0x1000>;
                                 clock-reg = <0x00408040 0x20>;
                                 clock-frequency = <0xbebc200>;
                                 current-speed = <9600>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <22 4>;
+                                interrupts = <22>;
                         };
                         UART1: serial@00405000 {
                                 device_type = "serial";
-                                compatible = "acp-uart1";
+                                compatible = "lsi,acp-uart1";
                                 enabled = <0>;
                                 reg = <0x00405000 0x1000>;
                                 clock-reg = <0x00408060 0x20>;
                                 clock-frequency = <200000000>;
                                 current-speed = <9600>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <23 4>;
+                                interrupts = <23>;
                         };
                         USB0: usb@004a4000 {
                                 device_type = "usb";
-                                compatible = "acp-usb";
+                                compatible = "lsi,acp-usb";
                                 enabled = <0>;
                                 reg = <0x004a4000 0x00020000>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <31 4>;
+                                interrupts = <31>;
                         };
                         I2C: i2c@00403000 {
-                                compatible = "acp-i2c";
+                                compatible = "lsi,acp-i2c";
                                 enabled = <0>;
                                 reg = <0x00403000 0x00001000>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <21 4>;
+                                interrupts = <21>;
                         };
                         SSP: ssp@00402000 {
-                                compatible = "acp-ssp";
+                                compatible = "arm,acp-ssp";
                                 enabled = <0>;
                                 reg = <0x00402000 0x00001000>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <20 4>;
+                                interrupts = <20>;
                         };
                         NAND: nand@00440000 {
                                 device_type = "nand";
-                                compatible = "acp-nand";
+                                compatible = "lsi,acp-nand";
                                 enabled = <1>;
                                 reg = <0x00440000 0x20000
                                        0x0040c000 0x1000>;
                         };
                         FEMAC: femac@00480000 {
                                 device_type = "network";
-                                compatible = "acp-femac";
+                                compatible = "lsi,acp-femac";
                                 enabled = <1>;
                                 reg = <0x00480000 0x1000
                                        0x00481000 0x1000
                                        0x00482000 0x1000>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <33 4>;
+                                interrupts = <33>;
                                 mdio-reg = <0x00409000 0x1000>;
                                 // The following will get filled in by
                                 // the boot loader.
@@ -283,27 +283,22 @@
                 >;
         };
 
-        rio0: rapidio@f0020000 {
-                compatible = "acp,rapidio-delta";
+        rio0: rapidio@0x2080000000 {
+                index = <0>;
+                status = "okay";
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "axxia,rapidio-delta";
                 device_type = "rapidio";
-                enabled = <0>;
-                #size = <0>;    /* 0 = (256, small system)
-                                 * 1 = (65536, large system) */
-/*
-                #host-device-id = <1>;
-*/
-                                /* >=0 for enum; < 0 for disc */
-/*
-                num-dme = <1 0 1>;
-*/
-                                /* (#outb-mseg>, <#outb-sseg>, <#inb> */
-/*
-                num-odme-mseg-desc = <2 128 128>;
-                num-odme-sseg-desc = <1 256>;
-                num-idme-desc = <1 512>;
-*/
-                reg = <0xf0020000 0x20000 0x1000>; /* SRIO Conf region */
-                interrupt-parent = <&MPIC>;
-                interrupts = <30 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
+                reg = <0x0020 0x00420000 0x0 0x1000>; /* SRIO Conf 0 region */
+                ranges = <0x0 0x0 0x0020 0x80000000 0x0 0x40000000>;
+		/*
+                linkdown-reset = <0x0200 0x100 0x0020 0x00430000 0x0 0x000010000>;
+		*/
+		interrupt-parent = <&MPIC>;
+                interrupts = <30 2>;
+                outb-dmes = <2 0x00000003 1 0x00000001>;
+		enable_ds = <1>;
         };
+
 };

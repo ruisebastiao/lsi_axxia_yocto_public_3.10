@@ -53,16 +53,17 @@ static const char *state_str[] = {
 
 static const char *irq_str[] = {
 	/* Axxia Error Events - really bad! */
-	"Axxia Master Write timouts                            ",
-	"Axxia Master Read timouts                             ",
-	"Axxia Slave write decode error response               ",
-	"Axxia Slave write error response                      ",
-	"Axxia Slave read decode error response                ",
-	"Axxia Slave read error response                       ",
-	"Axxia Slave unsupported cmds                          ",
+	"Axxia Master Write timouts                           ",
+	"Axxia Master Read timouts                            ",
+	"Axxia Slave write decode error response              ",
+	"Axxia Slave write error response                     ",
+	"Axxia Slave read decode error response               ",
+	"Axxia Slave read error response                      ",
+	"Axxia Slave unsupported cmds                         ",
 	"Logical/Transport layer errors                       ",
 	"General RapidIO Controller errors                    ",
 	"Unsupported RIO req received                         ",
+	"Link Reset RIO req received                          ",
 	"Linkdown per Deadman Monitor IRQ                     ",
 	/*
 	 * Peripheral Bus bridge, RapidIO -> Peripheral
@@ -639,8 +640,8 @@ static ssize_t ib_dme_show(struct device *dev,
 			int desc_no = i;
 			u32 data;
 			__rio_local_read_config_32(mport,
-					   	DESC_TABLE_W0(desc_no),
-					   	&data);
+						DESC_TABLE_W0(desc_no),
+						&data);
 			if (data & DME_DESC_DW0_READY_MASK)
 				ready++;
 			if (data  & DME_DESC_DW0_VALID)

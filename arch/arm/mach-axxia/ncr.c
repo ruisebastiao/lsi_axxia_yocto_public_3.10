@@ -92,11 +92,18 @@ typedef union {
 #ifdef CONFIG_ARM
 
 /*
+ * like iowrite32be but without the barrier. 
+ * The iowmb barrier in the standard macro includes a outer_cache_sync
+ * which we don't want for Axxia register IO.
+ */
+#define axxia_write32be(v,p) ({  __raw_writel((__force __u32)cpu_to_be32(v), p); })
+
+/*
   ----------------------------------------------------------------------
   ncr_register_read
 */
 
-unsigned long
+inline unsigned long
 ncr_register_read(unsigned *address)
 {
 	unsigned long value;
@@ -112,9 +119,10 @@ ncr_register_read(unsigned *address)
 */
 
 void
-ncr_register_write(const unsigned value, unsigned *address)
+inline ncr_register_write(const unsigned value, unsigned *address)
 {
-	iowrite32be(value, address);
+	axxia_write32be(value, address);
+    asm volatile ("mcr p15,0,%0,c7,c5,4" : : "r" (0));  /* isb */
 
 	return;
 }
@@ -126,7 +134,7 @@ ncr_register_write(const unsigned value, unsigned *address)
   ncr_register_read
 */
 
-unsigned long
+inline unsigned long
 ncr_register_read(unsigned *address)
 {
 	unsigned long value;
@@ -141,7 +149,7 @@ ncr_register_read(unsigned *address)
   ncr_register_write
 */
 
-void
+inline void
 ncr_register_write(const unsigned value, unsigned *address)
 {
 	out_be32(address, value);

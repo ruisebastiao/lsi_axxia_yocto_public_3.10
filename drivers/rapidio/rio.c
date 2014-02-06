@@ -344,7 +344,10 @@ int rio_release_inb_mbox(struct rio_mport *mport, int mbox)
 		mport->ops->close_inb_mbox(mport, mbox);
 
 		/* Release the mailbox resource */
-		return release_resource(mport->inb_msg[mbox].res);
+		if (mport->inb_msg[mbox].res)
+			return release_resource(mport->inb_msg[mbox].res);
+		else
+			return -ENOMEM;
 	} else
 		return -ENOSYS;
 }
@@ -414,7 +417,10 @@ int rio_release_outb_mbox(struct rio_mport *mport, int mbox)
 		mport->ops->close_outb_mbox(mport, mbox);
 
 		/* Release the mailbox resource */
-		return release_resource(mport->outb_msg[mbox].res);
+		if (mport->outb_msg[mbox].res)
+			return release_resource(mport->outb_msg[mbox].res);
+		else
+			return -ENOMEM;
 	} else
 		return -ENOSYS;
 }

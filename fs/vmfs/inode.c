@@ -486,11 +486,25 @@ int vmfs_notify_change(struct dentry *dentry, struct iattr *attr)
 		goto out;
 
 	error = -EPERM;
-	if ((attr->ia_valid & ATTR_UID) && ((attr->ia_uid).val != (server->mnt->uid).val))
+#ifdef CONFIG_UIDGID_STRICT_TYPE_CHECKS
+	if ((attr->ia_valid & ATTR_UID) &&
+	    (attr->ia_uid.val != (server->mnt->uid).val))
 		goto out;
+#else
+	if ((attr->ia_valid & ATTR_UID) &&
+	    (attr->ia_uid != server->mnt->uid))
+		goto out;
+#endif
 
-	if ((attr->ia_valid & ATTR_GID) && ((attr->ia_gid).val != (server->mnt->gid).val))
+#ifdef CONFIG_UIDGID_STRICT_TYPE_CHECKS
+	if ((attr->ia_valid & ATTR_GID) &&
+	    ((attr->ia_gid).val != (server->mnt->gid).val))
 		goto out;
+#else
+	if ((attr->ia_valid & ATTR_GID) &&
+	    (attr->ia_gid != server->mnt->gid))
+		goto out;
+#endif
 
 	if ((attr->ia_valid & ATTR_MODE) && (attr->ia_mode & ~mask))
 		goto out;

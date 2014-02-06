@@ -35,19 +35,4 @@ config LSI_NET_TX_BUF_SZ
 	help
 	  The size of the transmit buffer.
 
-config DISABLE_TX_INTERRUPTS
-	bool "NIC driver: Disable Tx interrupts"
-	depends on LSI_NET
-	default y
-	help
-	  If set to "yes", disables Transmit interrupts
-
-config PRELOAD_RX_BUFFERS
-	bool "NIC driver: Preload Rx buffers"
-	depends on LSI_NET
-	default n
-	help
-	  If set to "yes", enables preloading of Rx buffer prior to
-	  copying into device
-
 endif # LSI_NET

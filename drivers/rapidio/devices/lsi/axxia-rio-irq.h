@@ -59,6 +59,7 @@ enum rio_irq_dbg {
 	RIO_MISC_TL,
 	RIO_MISC_GRIO,
 	RIO_MISC_UNSUP,
+	RIO_MISC_LINK_REQ,
 	RIO_LINKDOWN,
 	/**
 	 * Peripheral Bus bridge, RapidIO -> Peripheral bus events - mostly bad!
@@ -216,7 +217,8 @@ struct rio_msg_dme {
 	int entries_in_use;
 	int write_idx;
 	int read_idx;
-	atomic_t pending;
+	int last_invalid_desc;
+	int last_compl_idx;
 	int tx_dme_tmo;
 	void *dev_id;
 	int dme_no;
@@ -307,8 +309,8 @@ void axxia_rio_port_irq_disable(struct rio_mport *mport);
 **                  calls this function as well */
 int alloc_irq_handler(
 	struct rio_irq_handler *h,
-        void *data,
-        const char *name);
+	void *data,
+	const char *name);
 
 void release_irq_handler(struct rio_irq_handler *h);
 

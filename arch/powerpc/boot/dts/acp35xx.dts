@@ -27,7 +27,7 @@
 		serial0   = &UART0;
 		serial1   = &UART1;
 		ethernet0 = &FEMAC;
-		rapidio0  = &SRIO0;
+		rapidio0  = &rio0;
 	};
 
 	cpus {
@@ -86,7 +86,7 @@
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
-
+		
 		cpu@3 {
 			device_type = "cpu";
 			model = "PowerPC,4xx"; // real CPU changed in sim
@@ -141,7 +141,7 @@
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
-
+		
 
 	};
 
@@ -302,13 +302,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xa0000000
+                ranges = <0x02000000 0x00000000 0xa0000000 
                           0x20 0x40000000
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                     interrupt-parent = <&MPIC>;
                 interrupts = <52 2>;
@@ -338,13 +338,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xb0000000
+                ranges = <0x02000000 0x00000000 0xb0000000 
                           0x20 0x80000000
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                 interrupt-parent = <&MPIC>;
                 interrupts = <54 2>;
@@ -393,14 +393,23 @@
                         0000 0 0 4 &MPIC 55 2
                 >;
         };
-	SRIO0: srio0 {
-		compatible = "acp,rapidio-delta";
+
+        rio0: rapidio@0x2100000000 {
+                index = <0>;
+                status = "okay";
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "axxia,rapidio-delta";
                 device_type = "rapidio";
-		enabled = <0>;
-		#size = <0>;    /* 0 = (256, small system)
-				 * 1 = (65536, large system) */
-		reg = <0xf0020000 0x20000 0x1000>; /* SRIO Conf region */
+                reg = <0x0020 0x00560000 0x0 0x1000>; /* SRIO Conf 0 region */
+                ranges = <0x0 0x0 0x0021 0x00000000 0x0 0x40000000>;
+		/*
+                linkdown-reset = <0x0200 0x100 0x0020 0x0040A000 0x0 0x000010000>;
+		*/
 		interrupt-parent = <&MPIC>;
-		interrupts = <56 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
-	};
+                interrupts = <56 2>;
+                outb-dmes = <2 0x00000003 1 0x00000001>;
+		enable_ds = <1>;
+        };
+
 };

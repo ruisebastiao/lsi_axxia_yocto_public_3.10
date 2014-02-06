@@ -26,8 +26,38 @@
 
 extern void axxia_secondary_startup(void);
 
-#define APB2_SER3_PHY_ADDR    0x002010030000ULL
-#define APB2_SER3_ADDR_SIZE   0x10000
+#define SYSCON_PHYS_ADDR 0x002010030000ULL
+
+static int __cpuinitdata wfe_fixup = 0;
+
+/*
+ * Check if we need to enable cross-cluster SEV workaround for a bug in
+ * revision 1.0 silicon (which could cause event signals (from SEV instruction)
+ * to get lost between clusters). As a workaround, we set the bit 7 in CP15
+ * ACTLR (enable WFE as a no-operation) for each core.
+ */
+static void __init check_fixup_sev(void __iomem *syscon)
+{
+	u32 pfuse = readl(syscon + 0x34);
+	u32 chip_type = pfuse & 0x1f;
+	u32 chip_ver  = (pfuse >> 5) & 0x3f;
+
+	/* Set flag for secondary cores */
+	wfe_fixup = (chip_type == 0 || chip_type == 9) && (chip_ver == 0);
+	pr_info("axxia: Cross-cluster SEV fixup: %s\n", wfe_fixup ? "yes":"no");
+}
+
+static void __init do_fixup_sev(void)
+{
+	u32 tmp;
+
+	if (wfe_fixup) {
+		asm volatile("mrc\tp15, 0, %0, c1, c0, 1" : "=r"(tmp));
+		tmp |= (1<<7);
+		asm volatile("mcr\tp15, 0, %0, c1, c0, 1" :: "r"(tmp));
+		isb();
+	}
+}
 
 /*
  * Write pen_release in a way that is guaranteed to be visible to all
@@ -46,6 +76,9 @@ static DEFINE_RAW_SPINLOCK(boot_lock);
 
 void __cpuinit axxia_secondary_init(unsigned int cpu)
 {
+	/* Fixup for cross-cluster SEV */
+	do_fixup_sev();
+
 	/*
 	 * If this isn't the first physical core in a secondary cluster
 	 * then run the standard GIC secondary init routine. Otherwise,
@@ -144,13 +177,16 @@ static __init struct device_node *get_cpu_node(int cpu)
 
 static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 {
-	void __iomem *apb2_ser3_base;
+	void __iomem *syscon;
 	int cpu_count = 0;
 	int cpu;
 
-	apb2_ser3_base = ioremap(APB2_SER3_PHY_ADDR, APB2_SER3_ADDR_SIZE);
-	if (WARN_ON(!apb2_ser3_base))
+	syscon = ioremap(SYSCON_PHYS_ADDR, SZ_64K);
+	if (WARN_ON(!syscon))
 		return;
+
+	check_fixup_sev(syscon);
+	do_fixup_sev();
 
 	/*
 	 * Initialise the present map, which describes the set of CPUs actually
@@ -178,10 +214,10 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 		if (!is_hyp_mode_available()) {
 			u32 phys_cpu = cpu_logical_map(cpu);
 			if (phys_cpu != 0) {
-				u32 tmp = readl(apb2_ser3_base + 0x1010);
-				writel(0xab, apb2_ser3_base+0x1000);
+				u32 tmp = readl(syscon + 0x1010);
+				writel(0xab, syscon + 0x1000);
 				tmp &= ~(1 << phys_cpu);
-				writel(tmp, apb2_ser3_base+0x1010);
+				writel(tmp, syscon + 0x1010);
 			}
 		}
 
@@ -203,7 +239,7 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 		}
 	}
 
-	iounmap(apb2_ser3_base);
+	iounmap(syscon);
 }
 
 struct smp_operations axxia_smp_ops __initdata = {
