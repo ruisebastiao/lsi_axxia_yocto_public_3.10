@@ -36,7 +36,6 @@
 static void __iomem *nca = NULL;
 static void __iomem *apb = NULL;
 static void __iomem *dickens = NULL;
-static void __iomem *femac = NULL;
 static int ddr_retention_enabled = 0;
 
 enum {
@@ -148,7 +147,7 @@ quiesce_vp_engine(int engineType)
 {
 	unsigned long   *pEngineRegions;
 	unsigned long     *pRegion;
-    unsigned long    ortOff, owtOff;
+	unsigned long    ortOff, owtOff;
 	unsigned ort, owt;
 	unsigned long      buf = 0;
 	unsigned short     node, target;
@@ -156,23 +155,23 @@ quiesce_vp_engine(int engineType)
 
 	printk("quiescing VP engines...\n");
 
-    switch (engineType)
-    {
-        case AXXIA_ENGINE_CNAL:
-	        pEngineRegions = ncp_cnal_regions_acp55xx;
-            ortOff = 0x1c0;
-            owtOff = 0x1c4;
-            break;
+	switch (engineType)
+	{
+		case AXXIA_ENGINE_CNAL:
+			pEngineRegions = ncp_cnal_regions_acp55xx;
+			ortOff = 0x1c0;
+			owtOff = 0x1c4;
+			break;
 
-        case AXXIA_ENGINE_CAAL:
-	        pEngineRegions = ncp_caal_regions_acp55xx;
-            ortOff = 0xf8;
-            owtOff = 0xfc;
-            break;
+		case AXXIA_ENGINE_CAAL:
+			pEngineRegions = ncp_caal_regions_acp55xx;
+			ortOff = 0xf8;
+			owtOff = 0xfc;
+			break;
 
-        default:
-            return;
-    }
+		default:
+			return;
+	}
 
 	pRegion = pEngineRegions;
 
@@ -231,63 +230,34 @@ static inline void cpu_disable_l2_prefetch(void)
 	isb();
 }
 
+
 static inline void
-ncp_ddr_shutdown(unsigned long ctl_244)
+reset_elm_trace(void)
 {
-	unsigned long value;
+	/* reset and disable ELM trace */
+	ncr_register_write(htonl(0x000fff04), (unsigned *) (apb + 0x68000));
+	ncr_register_write(htonl(0x000fff04), (unsigned *) (apb + 0x78000));
 
-    cpu_disable_l2_prefetch();
+	/* reset ELM statistics */
+	ncr_register_write(htonl(0x00001), (unsigned *) (apb + 0x60230));
+	ncr_register_write(htonl(0x00001), (unsigned *) (apb + 0x70230));
 
-    /* 
-     * put SDRAM in self-refresh mode 
-     */
-	ncr_write(NCP_REGION_ID(34,0), 0x3d0, 4, &ctl_244);
-	ncr_write(NCP_REGION_ID(15,0), 0x3d0, 4, &ctl_244);
-
-	/* check interrupt status for completion */
-	/* CDR1 - word offset 0x104 (byte offset 0x410) */
-    do {
-        ncr_read(NCP_REGION_ID(34,0), 0x410, 4, &value);
-    } while ( (value & 0x0200) == 0) ;
-
-    do {
-        ncr_read(NCP_REGION_ID(15,0), 0x410, 4, &value);
-    } while ( (value & 0x0200) == 0) ;
-
-
-	/*
-	  Indicate DDR Retention Reset
-	*/
-
-	/* set bit 0 of persist_scratch */
-	writel_relaxed(0x00000001, apb + 0x300dc);
-
-	/*
-	  Issue Chip Reset
-	*/
-
-	/* Intrnl Boot, 0xffff0000 Target */
-	writel_relaxed(0x00000040, apb + 0x31004);
-	/* Set ResetReadDone */
-	writel_relaxed(0x80000000, apb + 0x3180c);
-	/* Chip Reset */
-	writel_relaxed(0x00080802, apb + 0x31008);
-
-
-    wfi();
-    while (1);
-    __asm__ __volatile__( " nop \n\t" );
-
-
-	return;
+	/* enable ELM trace */
+	ncr_register_write(htonl(0x000fff01), (unsigned *) (apb + 0x68000));
+	ncr_register_write(htonl(0x000fff01), (unsigned *) (apb + 0x78000));
 }
+        
+extern void ncp_ddr_shutdown(void *, void *,  unsigned long );
+
 
 void
 initiate_retention_reset(void)
 {
 	unsigned long ctl_244 = 0;
 	unsigned long value;
-    unsigned cpu_id ;
+	unsigned cpu_id ;
+	volatile long tmp;
+	volatile long *ptmp;
 
 	if (0 == ddr_retention_enabled) {
 		pr_info("DDR Retention Reset is Not Enabled\n");
@@ -297,19 +267,17 @@ initiate_retention_reset(void)
 	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
 
-    /* kill the femac */
-    writel(0x80000000, (femac+0x2000));
-    value = readl(femac + 0x2000);
+	preempt_disable(); 
+	cpu_id = smp_processor_id();
 
-    preempt_disable(); 
-    cpu_id = smp_processor_id();
-    udelay(1000);
 	/* send stop message to other CPUs */
 	local_irq_disable();
+	local_fiq_disable();
 	asm volatile ("dsb" : : : "memory");
 	asm volatile ("dmb" : : : "memory");
 	system_state = SYSTEM_RESTART;
 	smp_send_stop();
+	udelay(1000);
 
 	flush_cache_all();
 	flush_l3();
@@ -317,11 +285,6 @@ initiate_retention_reset(void)
 	/* TODO - quiesce VP engines */
 	quiesce_vp_engine(AXXIA_ENGINE_CAAL);
 	quiesce_vp_engine(AXXIA_ENGINE_CNAL);
-
-	/* disable sysmem interrupts */
-	value = 0;
-	ncr_write(NCP_REGION_ID(34,0), 0x414, 4, &value);
-	ncr_write(NCP_REGION_ID(15,0), 0x414, 4, &value);
 
 	/* unlock reset register for later */
 	writel(0x000000ab, apb + 0x31000); /* Access Key */
@@ -331,21 +294,27 @@ initiate_retention_reset(void)
 	ncr_read(NCP_REGION_ID(34,0), 0x3d0, 4, &ctl_244);
 	ctl_244 |= 0x000a0000;
 
+	/* belts & braces: put secondary CPUs into reset */
+	value = ~(1 << cpu_id);
+	value &= 0xffff;
+	ncr_register_write(htonl(value), (unsigned *) (apb + 0x31030));
 
-    /* put secondary CPUs into reset */
-    value = ~(1 << cpu_id);
-    value &= 0xffff;
-    ncr_register_write(htonl(value), (unsigned *) (apb + 0x31030));
+	/* load entire ddr_shutdown function into L2 cache */
+	ptmp = (long *) ncp_ddr_shutdown;
+	do {
+		tmp += *ptmp++;
+	} while (ptmp < (long*) (ncp_ddr_shutdown + 0x1000));
 
-	/* 
-	 * issue instruction barrier 
-	 * this should cause the next few instructions to be fetched
-	 * into cache 
-	 */
-	asm volatile ("dsb" : : : "memory");
 	asm volatile ("isb" : : : "memory");
 
-	ncp_ddr_shutdown(ctl_244);
+	/* disable L2 prefetching */
+	cpu_disable_l2_prefetch();
+
+	/* reset ELM DDR access trace buffer */
+	reset_elm_trace();
+
+	/* call cache resident ddr shutdown function */
+	ncp_ddr_shutdown(nca, apb, ctl_244);
 
 	return;
 }
@@ -381,7 +350,6 @@ axxia_ddr_retention_init(void)
 			apb = ioremap(0x2010000000, 0x80000);
 			nca = ioremap(0x002020100000ULL, 0x20000);
 			dickens = ioremap(0x2000000000, 0x1000000);
-			femac = ioremap(0x2010120000, 0x10000);
 			ddr_retention_enabled = 1;
 			pr_info("DDR Retention Reset Initialized\n");
 		}
