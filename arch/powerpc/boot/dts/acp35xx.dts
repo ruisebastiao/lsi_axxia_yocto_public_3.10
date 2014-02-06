@@ -401,7 +401,7 @@
                 #size-cells = <2>;
                 compatible = "axxia,rapidio-delta";
                 device_type = "rapidio";
-                reg = <0x0020 0x00560000 0x0 0x1000>; /* SRIO Conf 0 region */
+                reg = <0x0020 0x00560000 0x1000>; /* SRIO Conf 0 region */
                 ranges = <0x0 0x0 0x0021 0x00000000 0x0 0x40000000>;
 		/*
                 linkdown-reset = <0x0200 0x100 0x0020 0x0040A000 0x0 0x000010000>;

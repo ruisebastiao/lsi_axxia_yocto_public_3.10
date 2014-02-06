@@ -50,7 +50,7 @@ scm_version()
 
 	        if [ 0 -eq $? ]
 		then
-		    echo -n "-`git describe`"
+		    echo -n "-`git describe`" | sed -e 's/_axxia_linux_/-/'
 		else
 		    # If we are at a tagged commit (like "v2.6.30-rc6"),
 		    # we ignore it, because this version is defined in the
