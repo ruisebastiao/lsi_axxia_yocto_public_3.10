@@ -380,22 +380,22 @@ int open_ob_data_stream(
  *
  *  Under current implementation, only single descriptor is supported.
  *
- * @mport:		Pointer to the master port
- * @dev_id: 		Device specific pointer to pass on event
- * @dse_id:		DSE ID in the range of [0, 15]
- * @num_header_entries:	Number of header descriptors in the descriptor chain
- * @num_data_entries:	Number of data descriptors in the descriptor chain
+ * @mport:              Pointer to the master port
+ * @dev_id:             Device specific pointer to pass on event
+ * @dse_id:             DSE ID in the range of [0, 15]
+ * @num_header_entries: Number of header descriptors in the descriptor chain
+ * @num_data_entries:   Number of data descriptors in the descriptor chain
  *
  * Returns %0 on success
  ****************************************************************************/
 int axxia_open_ob_data_stream(
-	struct rio_mport    	*mport,
+	struct rio_mport	*mport,
 	void			*dev_id,
 	int			dse_id,
 	int			num_header_entries,
 	int			num_data_entries)
 {
-	int		 	rc = 0;
+	int			rc = 0;
 	struct rio_priv *priv = mport->priv;
 
 	axxia_api_lock(priv);
@@ -861,36 +861,36 @@ int open_ib_data_stream(
 	**	6 - 32K, 7 - 64K
 	*/
 	switch (desc_dbuf_size) {
-		case RIO_IBDS_DATA_BUF_1K:
-			hw_desc_size = 1;
-			break;
+	case RIO_IBDS_DATA_BUF_1K:
+		hw_desc_size = 1;
+		break;
 
-		case RIO_IBDS_DATA_BUF_2K:
-			hw_desc_size = 2;
-			break;
+	case RIO_IBDS_DATA_BUF_2K:
+		hw_desc_size = 2;
+		break;
 
-		case RIO_IBDS_DATA_BUF_4K:
-			hw_desc_size = 3;
-			break;
+	case RIO_IBDS_DATA_BUF_4K:
+		hw_desc_size = 3;
+		break;
 
-		case RIO_IBDS_DATA_BUF_8K:
-			hw_desc_size = 4;
-			break;
+	case RIO_IBDS_DATA_BUF_8K:
+		hw_desc_size = 4;
+		break;
 
-		case RIO_IBDS_DATA_BUF_16K:
-			hw_desc_size = 5;
-			break;
+	case RIO_IBDS_DATA_BUF_16K:
+		hw_desc_size = 5;
+		break;
 
-		case RIO_IBDS_DATA_BUF_32K:
-			hw_desc_size = 6;
-			break;
+	case RIO_IBDS_DATA_BUF_32K:
+		hw_desc_size = 6;
+		break;
 
-		case RIO_IBDS_DATA_BUF_64K:
-			hw_desc_size = 0;
-			break;
+	case RIO_IBDS_DATA_BUF_64K:
+		hw_desc_size = 0;
+		break;
 
-		default:
-			return -EINVAL;
+	default:
+		return -EINVAL;
 	}
 
 	/* TBD ASR_SPINLOCK_INTERRUPT_DISABLE(&priv->ioLock, lflags); */
@@ -1080,19 +1080,19 @@ int open_ib_data_stream(
  *	data error will occur. Thus, an application must program desc_dbuf_size
  *	larger than or equal to the expected PDU.
  *
- * @mport:			Pointer to the master port
- * @source_id:   	Source ID of the data stream
- * @cos:			Class of service of the stream
- * @desc_dbuf_size: Data buffer size the descriptor can handle
- * @num_entries:	Number of descriptors in this descriptor chain
+ * @mport:              Pointer to the master port
+ * @source_id:          Source ID of the data stream
+ * @cos:                Class of service of the stream
+ * @desc_dbuf_size:     Data buffer size the descriptor can handle
+ * @num_entries:        Number of descriptors in this descriptor chain
  *
  * Returns %0 on success
  ****************************************************************************/
 int axxia_open_ib_data_stream(
-	struct rio_mport    	*mport,
+	struct rio_mport	*mport,
 	void			*dev_id,
 	int			source_id,
-	int 		    	cos,
+	int			cos,
 	int			desc_dbuf_size,
 	int			num_entries)
 {
@@ -1348,8 +1348,8 @@ void ib_dse_vsid_m_irq_handler(struct rio_irq_handler *h, u32 state)
 							&dse_stat);
 
 						if (((dse_stat & IB_DSE_STAT_TRANS_PENDING)  ||
-			     				(dse_stat & IB_DSE_STAT_TIMEOUT))	&&
-			     				((dse_stat & IB_DSE_VSID_IN_USED) == virt_vsid)) {
+							(dse_stat & IB_DSE_STAT_TIMEOUT))	&&
+							((dse_stat & IB_DSE_VSID_IN_USED) == virt_vsid)) {
 						/*
 						** BZ43821 - SW workaround for
 						** the IBDS descriptor fetch
@@ -1442,7 +1442,7 @@ void ib_dse_vsid_m_irq_handler(struct rio_irq_handler *h, u32 state)
 						RAB_IBVIRT_M_STAT(virt_vsid),
 						&vsid_m_stats);
 
-    				spin_unlock_irqrestore(&ptr_virt_m_cfg->lock,
+				spin_unlock_irqrestore(&ptr_virt_m_cfg->lock,
 							flags);
 			}
 		}
