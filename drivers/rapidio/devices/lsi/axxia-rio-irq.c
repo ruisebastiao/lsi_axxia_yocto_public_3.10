@@ -2450,6 +2450,9 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 			buf = mb->virt_buffer[mb->next_rx_slot];
 			if (!buf)
 				goto err;
+
+			AXXIA_RIO_SYSMEM_BARRIER();
+
 			memcpy(buf, desc->msg_virt, buf_sz);
 			mb->virt_buffer[mb->next_rx_slot] = NULL;
 			if (!priv->internalDesc) {

@@ -210,53 +210,6 @@ int axxia_data_stream_global_cfg(
 EXPORT_SYMBOL(axxia_data_stream_global_cfg);
 
 /*****************************************************************************
- * axxia_open_ob_data_stream -
- *
- *  This function sets up a descriptor chain to an outbound data streaming
- *  engine (DSE).
- *
- *	There are two types of descriptor usage:
- *	1. Single header descriptors. Each descriptor points to a data buffer
- *	   that is a full PDU length.
- *	2. Header and data descriptor combination. Each header descriptor
- *	   points to a data descriptor, each data descriptor points to a
- *	   4KB data buffer.
- *
- *  Under current implementation, only single descriptor is supported.
- *
- * @mport:		Pointer to the master port
- * @dev_id: 		Device specific pointer to pass on event
- * @dse_id:		DSE ID in the range of [0, 15]
- * @num_header_entries:	Number of header descriptors in the descriptor chain
- * @num_data_entries:	Number of data descriptors in the descriptor chain
- *
- * Returns %0 on success
- ****************************************************************************/
-int axxia_open_ob_data_stream(
-	struct rio_mport    	*mport,
-	void			*dev_id,
-	int			dse_id,
-	int			num_header_entries,
-	int			num_data_entries)
-{
-	int		 	rc = 0;
-	struct rio_priv *priv = mport->priv;
-
-	axxia_api_lock(priv);
-
-	rc = open_ob_data_stream(mport,
-				dev_id,
-				dse_id,
-				num_header_entries,
-				num_data_entries);
-
-	axxia_api_unlock(priv);
-
-	return rc;
-}
-EXPORT_SYMBOL(axxia_open_ob_data_stream);
-
-/*****************************************************************************
  * open_ob_data_stream -
  *
  *  This function sets up a descriptor chain to an outbound data streaming
@@ -270,6 +223,7 @@ EXPORT_SYMBOL(axxia_open_ob_data_stream);
  *
  * Returns %0 on success
  ****************************************************************************/
+static
 int open_ob_data_stream(
 	struct rio_mport    	*mport,
 	void		    	*dev_id,
@@ -410,6 +364,53 @@ int open_ob_data_stream(
 
 	return rc;
 }
+
+/*****************************************************************************
+ * axxia_open_ob_data_stream -
+ *
+ *  This function sets up a descriptor chain to an outbound data streaming
+ *  engine (DSE).
+ *
+ *	There are two types of descriptor usage:
+ *	1. Single header descriptors. Each descriptor points to a data buffer
+ *	   that is a full PDU length.
+ *	2. Header and data descriptor combination. Each header descriptor
+ *	   points to a data descriptor, each data descriptor points to a
+ *	   4KB data buffer.
+ *
+ *  Under current implementation, only single descriptor is supported.
+ *
+ * @mport:		Pointer to the master port
+ * @dev_id: 		Device specific pointer to pass on event
+ * @dse_id:		DSE ID in the range of [0, 15]
+ * @num_header_entries:	Number of header descriptors in the descriptor chain
+ * @num_data_entries:	Number of data descriptors in the descriptor chain
+ *
+ * Returns %0 on success
+ ****************************************************************************/
+int axxia_open_ob_data_stream(
+	struct rio_mport    	*mport,
+	void			*dev_id,
+	int			dse_id,
+	int			num_header_entries,
+	int			num_data_entries)
+{
+	int		 	rc = 0;
+	struct rio_priv *priv = mport->priv;
+
+	axxia_api_lock(priv);
+
+	rc = open_ob_data_stream(mport,
+				dev_id,
+				dse_id,
+				num_header_entries,
+				num_data_entries);
+
+	axxia_api_unlock(priv);
+
+	return rc;
+}
+EXPORT_SYMBOL(axxia_open_ob_data_stream);
 
 /*****************************************************************************
  * axxia_add_ob_data_stream -
@@ -814,56 +815,6 @@ int axxia_close_ob_data_stream(
 EXPORT_SYMBOL(axxia_close_ob_data_stream);
 
 /*****************************************************************************
- * axxia_open_ib_data_stream -
- *
- *  This function sets up a descriptor chain to an internal alias VSID (AVSID).
- *  The internal VSID is calculated through source_id, class of service (cos)
- *  and the RAB_IBDS_VSID_ALIAS register.
- *
- *	Please refer to the data sheet of RAB_IBDS_VSID_ALIAS register for
- *	detail mapping information.
- *
- *	In the IBDS, there are only 7 buffer sizes
- *	(1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB) can be programmed in the
- *	hardware.
- *	If the incoming PDU length is larger than the programmed buffer size,
- *	data error will occur. Thus, an application must program desc_dbuf_size
- *	larger than or equal to the expected PDU.
- *
- * @mport:			Pointer to the master port
- * @source_id:   	Source ID of the data stream
- * @cos:			Class of service of the stream
- * @desc_dbuf_size: Data buffer size the descriptor can handle
- * @num_entries:	Number of descriptors in this descriptor chain
- *
- * Returns %0 on success
- ****************************************************************************/
-int axxia_open_ib_data_stream(
-	struct rio_mport    	*mport,
-	void			*dev_id,
-	int			source_id,
-	int 		    	cos,
-	int			desc_dbuf_size,
-	int			num_entries)
-{
-	int rc = 0;
-	struct rio_priv *priv = mport->priv;
-
-	axxia_api_lock(priv);
-
-	rc = open_ib_data_stream(mport,
-				 dev_id,
-				 source_id,
-				 cos,
-				 desc_dbuf_size,
-				 num_entries);
-	axxia_api_unlock(priv);
-
-	return rc;
-}
-EXPORT_SYMBOL(axxia_open_ib_data_stream);
-
-/*****************************************************************************
  * open_ib_data_stream -
  *
  *  This function sets up a descriptor chain to an internal alias VSID (AVSID).
@@ -877,6 +828,7 @@ EXPORT_SYMBOL(axxia_open_ib_data_stream);
  *
  * Returns %0 on success
  ****************************************************************************/
+static
 int open_ib_data_stream(
 	struct rio_mport    	*mport,
 	void			*dev_id,
@@ -1110,6 +1062,56 @@ int open_ib_data_stream(
 
 	return rc;
 }
+
+/*****************************************************************************
+ * axxia_open_ib_data_stream -
+ *
+ *  This function sets up a descriptor chain to an internal alias VSID (AVSID).
+ *  The internal VSID is calculated through source_id, class of service (cos)
+ *  and the RAB_IBDS_VSID_ALIAS register.
+ *
+ *	Please refer to the data sheet of RAB_IBDS_VSID_ALIAS register for
+ *	detail mapping information.
+ *
+ *	In the IBDS, there are only 7 buffer sizes
+ *	(1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB) can be programmed in the
+ *	hardware.
+ *	If the incoming PDU length is larger than the programmed buffer size,
+ *	data error will occur. Thus, an application must program desc_dbuf_size
+ *	larger than or equal to the expected PDU.
+ *
+ * @mport:			Pointer to the master port
+ * @source_id:   	Source ID of the data stream
+ * @cos:			Class of service of the stream
+ * @desc_dbuf_size: Data buffer size the descriptor can handle
+ * @num_entries:	Number of descriptors in this descriptor chain
+ *
+ * Returns %0 on success
+ ****************************************************************************/
+int axxia_open_ib_data_stream(
+	struct rio_mport    	*mport,
+	void			*dev_id,
+	int			source_id,
+	int 		    	cos,
+	int			desc_dbuf_size,
+	int			num_entries)
+{
+	int rc = 0;
+	struct rio_priv *priv = mport->priv;
+
+	axxia_api_lock(priv);
+
+	rc = open_ib_data_stream(mport,
+				 dev_id,
+				 source_id,
+				 cos,
+				 desc_dbuf_size,
+				 num_entries);
+	axxia_api_unlock(priv);
+
+	return rc;
+}
+EXPORT_SYMBOL(axxia_open_ib_data_stream);
 
 /*****************************************************************************
  * axxia_add_ibds_buffer -

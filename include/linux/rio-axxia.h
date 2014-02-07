@@ -1,6 +1,8 @@
 #ifndef __RIO_AXXIA_H__
 #define __RIO_AXXIA_H__
 
+#ifdef __KERNEL__
+
 #include <linux/device.h>
 #include <linux/of_platform.h>
 #include <linux/rio.h>
@@ -8,6 +10,8 @@
 #include <linux/rio_dio.h>
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
+
+#endif /* __KERNEL__ */
 
 /******************************************************************************
 **  Buffer sizes, Device limits, and other limits
@@ -21,6 +25,8 @@
 #define RIO_IBDS_DATA_BUF_32K               (1<<15)
 #define RIO_IBDS_DATA_BUF_64K               (1<<16)
 
+#define RIO_OBDS_DATA_BUF_64K               (1<<16)
+
 #define RIO_DS_DATA_BUF_64K                 (0) /* HW uses 0 for 64K */
 
 #define RIO_MAX_NUM_OBDS_DSE                (16)
@@ -32,7 +38,6 @@
 #define RIO_DS_TRUE                         (1)
 #define RIO_DS_FALSE                        (0)
 
-#define IOCTL_BUF_SIZE                      (4096)
 #define MAX_NUM_PROC_IBDS_DESC              (10)
 
 #define DS_DBUF_FREED                       (0)
@@ -108,6 +113,8 @@
 /******************************************************************************
 **  Type Definitions for registers & APIs
 ******************************************************************************/
+
+#ifdef __KERNEL__
 
 /* outbound data descriptor */
 struct axxia_rio_ods_data_desc {
@@ -245,13 +252,6 @@ extern int axxia_open_ob_data_stream(
 	int                  num_header_entries,
 	int                  num_data_entries);
 
-extern int open_ob_data_stream(
-	struct rio_mport    *mport,
-	void                *dev_id,
-	int                  dse_id,
-	int                  num_header_entries,
-	int                  num_data_entries);
-
 /* add user's data */
 extern int axxia_add_ob_data_stream(
 	struct rio_mport    *mport,
@@ -271,14 +271,6 @@ extern int axxia_data_stream_global_cfg(
 
 /* open IBDS data stream */
 extern int axxia_open_ib_data_stream(
-	struct rio_mport    *mport,
-	void                *dev_id,
-	int                  source_id,
-	int 		     cos,
-	int                  desc_dbuf_size,
-	int                  num_entries);
-
-int open_ib_data_stream(
 	struct rio_mport    *mport,
 	void                *dev_id,
 	int                  source_id,
@@ -318,5 +310,7 @@ extern int axxia_close_ib_data_stream(
 extern int axxia_close_ob_data_stream(
 	struct rio_mport    *mport,
 	int                  dse_id);
+
+#endif /* __KERNEL__ */
 
 #endif /* __RIO_AXXIA_H__ */
