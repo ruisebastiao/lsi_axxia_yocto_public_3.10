@@ -64,9 +64,9 @@
 #define RAB_IBVIRT_M_STAT(n)         (RAB_REG_BASE + (0x2ef0 + (0x4*(n))))
 
 #define RAB_IBDSE_CTRL(n) \
-	(RAB_REG_BASE + (0x2a20 + (0x8 * (n))))
+        (RAB_REG_BASE + (0x2a20 + (0x8 * (n))))
 #define RAB_IBDSE_STAT(n) \
-	(RAB_REG_BASE + (0x2a20 + (0x8 * (n))) + 0x4)
+        (RAB_REG_BASE + (0x2a20 + (0x8 * (n))) + 0x4)
 
 #define RAB_IBDS_VSID_ADDR_LOW(n)    (RAB_REG_BASE + (0x2b28 + (0x8*(n))))
 #define RAB_IBDS_VSID_ADDR_HI(n)     (RAB_REG_BASE + (0x2b28 + (0x8*(n)))+0x4)
@@ -75,20 +75,20 @@
 #define GRIO_DSI_CAR                 (0x3c)
 #define GRIO_DSLL_CCSR               (0x48)
 
-#define RIO_DS_DESC_ALIGNMENT        (1 << 5)
+#define RIO_DS_DESC_ALIGNMENT           (1 << 5)
 
 /* stats */
-#define IB_VIRT_M_STAT_ERROR_MASK           0x3FC
-#define IB_VIRT_M_STAT_SLEEPING             (1<<11)
-#define IB_VIRT_M_STAT_TRAN_PENDING         (1<<10)
-#define IB_VIRT_M_STAT_PDU_DROPPED	    (1 << 9)
-#define IB_VIRT_M_STAT_SEG_LOSS		    (1 << 8)
-#define IB_VIRT_M_STAT_MTU_LEN_MIS_ERR	    (1 << 7)
-#define IB_VIRT_M_STAT_PDU_LEN_MIS_ERR      (1 << 6)
-#define IB_VIRT_M_STAT_TRANS_ERR	    (1 << 5)
-#define IB_VIRT_M_STAT_UPDATE_ERR	    (1 << 4)
-#define IB_VIRT_M_STAT_TIMEOUT_ERR	    (1 << 3)
-#define IB_VIRT_M_STAT_FETCH_ERR            (1 << 2)
+#define IB_VIRT_M_STAT_ERROR_MASK       0x3FC
+#define IB_VIRT_M_STAT_SLEEPING         (1<<11)
+#define IB_VIRT_M_STAT_TRAN_PENDING     (1<<10)
+#define IB_VIRT_M_STAT_PDU_DROPPED      (1 << 9)
+#define IB_VIRT_M_STAT_SEG_LOSS         (1 << 8)
+#define IB_VIRT_M_STAT_MTU_LEN_MIS_ERR  (1 << 7)
+#define IB_VIRT_M_STAT_PDU_LEN_MIS_ERR  (1 << 6)
+#define IB_VIRT_M_STAT_TRANS_ERR        (1 << 5)
+#define IB_VIRT_M_STAT_UPDATE_ERR       (1 << 4)
+#define IB_VIRT_M_STAT_TIMEOUT_ERR      (1 << 3)
+#define IB_VIRT_M_STAT_FETCH_ERR        (1 << 2)
 
 #define IB_DSE_DESC_ERROR_MASK          0xC00
 #define IB_DSE_DESC_AXI_ERR             (1 << 11)
@@ -99,9 +99,9 @@
 #define IB_DSE_STAT_TRANS_PENDING       (1 << 6)
 #define IB_DSE_STAT_TIMEOUT             (1 << 7)
 
-#define OB_DSE_STAT_ERROR_MASK		0x3C
-#define OB_DSE_STAT_TRANS_ERR	  	(1 << 5)
-#define OB_DSE_STAT_UPDATE_ERR		(1 << 4)
+#define OB_DSE_STAT_ERROR_MASK          0x3C
+#define OB_DSE_STAT_TRANS_ERR           (1 << 5)
+#define OB_DSE_STAT_UPDATE_ERR          (1 << 4)
 #define OB_DSE_STAT_DESC_ERR            (1 << 3)
 #define OB_DSE_STAT_FETCH_ERR           (1 << 2)
 #define OB_DSE_STAT_SLEEPING            (1<<8)
@@ -116,32 +116,32 @@
 
 #ifdef __KERNEL__
 
-/* outbound data descriptor */
+/* Outbound data descriptor */
 struct axxia_rio_ods_data_desc {
-	u32     dw0;
-	u32     dw1;
-	u32     dw2;
-	u32     dw3;
+        u32     dw0;
+        u32     dw1;
+        u32     dw2;
+        u32     dw3;
 
-	/* SW usage */
-	u32     virt_data_buf;
-	u32     sw1;
-	u32     sw2;
-	u32     sw3;
+        /* SW usage */
+        void    *virt_data_buf;
+        u32     sw1;
+        u32     sw2;
+        u32     sw3;
 };
 
-/* inbound data descriptor */
+/* Inbound data descriptor */
 struct axxia_rio_ids_data_desc {
-	u32     dw0;
-	u32     dw1;
-	u32     dw2;
-	u32     dw3;
-	u32     dw4;
+        u32     dw0;
+        u32     dw1;
+        u32     dw2;
+        u32     dw3;
+        u32     dw4;
 
-	/* SW usage */
-	u32     virt_data_buf;
-	u32     buf_status;
-	u32     sw2;
+        /* SW usage */
+        void    *virt_data_buf;
+        u32     buf_status;
+        u32     sw2;
 };
 
 /*
@@ -149,74 +149,74 @@ struct axxia_rio_ids_data_desc {
 **  only used in outbound
 */
 struct axxia_rio_ds_hdr_desc {
-	u32     dw0;
-	u32     dw1;
-	u32     dw2;
-	u32     dw3;
-	u32     dw4;
+        u32     dw0;
+        u32     dw1;
+        u32     dw2;
+        u32     dw3;
+        u32     dw4;
 
-	/* SW usage */
-	u32     virt_data_buf;
-	u32     buf_status;
-	u32	sw2;
+        /* SW usage */
+        void    *virt_data_buf;
+        u32     buf_status;
+        u32     sw2;
 };
 
 /*
 ** OBDS DSE configuration
 */
 struct axxia_rio_obds_dse_cfg {
-	u8         in_use;     /* if the DSE is in_use */
-	u8         cos;
-	u16        dest_id;
-	u16        stream_id;
-	spinlock_t lock;
-	u8         irqEnabled;
-	char       name[16];
+        u8         in_use;     /* if the DSE is in_use */
+        u8         cos;
+        u16        dest_id;
+        u16        stream_id;
+        spinlock_t lock;
+        u8         irqEnabled;
+        char       name[16];
 
-	/* header descriptor */
-	u16        num_hdr_desc_free;
-	u16        max_num_hdr_desc;
+        /* header descriptor */
+        u16        num_hdr_desc_free;
+        u16        max_num_hdr_desc;
 
-	/* data descriptor */
-	u16        num_data_desc_free;
-	u16        max_num_data_desc;
-	u16        hdr_read_ptr;
-	u16        hdr_write_ptr;
-	u8         first_hdr_desc;
+        /* data descriptor */
+        u16        num_data_desc_free;
+        u16        max_num_data_desc;
+        u16        hdr_read_ptr;
+        u16        hdr_write_ptr;
+        u8         first_hdr_desc;
 
-	u16        data_read_ptr;
-	u16        data_write_ptr;
-	u8         first_data_desc;
+        u16        data_read_ptr;
+        u16        data_write_ptr;
+        u8         first_data_desc;
 
-	struct axxia_rio_ds_hdr_desc    *ptr_obds_hdr_desc;
-	struct axxia_rio_ods_data_desc  *ptr_obds_data_desc;
+        struct axxia_rio_ds_hdr_desc    *ptr_obds_hdr_desc;
+        struct axxia_rio_ods_data_desc  *ptr_obds_data_desc;
 };
 
 /*
 ** IBDS configuration
 */
 struct axxia_ibds_virt_m_cfg {
-	spinlock_t lock;
-	u32        in_use;     /* if the DSE is in_use */
-	u8         cos;
-	u16        dest_id;
-	u16        stream_id;
-	u16        source_id;
-	char       name[16];
+        spinlock_t lock;
+        u32        in_use;     /* if the DSE is in_use */
+        u8         cos;
+        u16        dest_id;
+        u16        stream_id;
+        u16        source_id;
+        char       name[16];
 
-	u16        num_desc_free;
-	u16        max_num_data_desc;
-	u16        data_read_ptr;
-	u16        data_write_ptr;
+        u16        num_desc_free;
+        u16        max_num_data_desc;
+        u16        data_read_ptr;
+        u16        data_write_ptr;
 
-	struct axxia_rio_ids_data_desc    *ptr_ibds_data_desc;
-	u32        desc_dbuf_size;
-	u32        buf_add_ptr;
-	u32        num_hw_written_bufs;
+        struct axxia_rio_ids_data_desc    *ptr_ibds_data_desc;
+        u32        desc_dbuf_size;
+        u32        buf_add_ptr;
+        u32        num_hw_written_bufs;
 
-	u32        alias_reg_value;
-	u16        virt_vsid;
-	u16        num_data_streams;
+        u32        alias_reg_value;
+        u16        virt_vsid;
+        u16        num_data_streams;
 };
 
 /*
@@ -225,16 +225,16 @@ struct axxia_ibds_virt_m_cfg {
 ** current mport.
 */
 struct axxia_rio_ds_cfg {
-	/* IBDS */
-	u16			mtu;
-	u32			ibds_avsid_mapping;
-	u16                     num_ibds_dses;/* TBR */
-	u16                     num_ibds_virtual_m;/* TBR */
-	struct axxia_ibds_virt_m_cfg	ibds_vsid_m_cfg[RIO_MAX_NUM_IBDS_VSID_M];
+        /* IBDS */
+        u16             mtu;
+        u32             ibds_avsid_mapping;
+        u16             num_ibds_dses;
+        u16             num_ibds_virtual_m;
+        struct axxia_ibds_virt_m_cfg ibds_vsid_m_cfg[RIO_MAX_NUM_IBDS_VSID_M];
 
-	/* OBDS */
-	u16                     num_obds_dses; /* TBR */
-	struct axxia_rio_obds_dse_cfg obds_dse_cfg[RIO_MAX_NUM_OBDS_DSE];
+        /* OBDS */
+        u16             num_obds_dses;
+        struct axxia_rio_obds_dse_cfg obds_dse_cfg[RIO_MAX_NUM_OBDS_DSE];
 };
 
 /******************************************************************************
@@ -242,9 +242,9 @@ struct axxia_rio_ds_cfg {
 ******************************************************************************/
 
 extern struct axxia_rio_ds_cfg*
-	axxia_mport_to_ds_cfg(struct rio_mport *mport);
+        axxia_mport_to_ds_cfg(struct rio_mport *mport);
 
-/* open an OBDS data stream */
+/* Open an OBDS data stream */
 extern int axxia_open_ob_data_stream(
 	struct rio_mport    *mport,
 	void                *dev_id,
@@ -252,64 +252,64 @@ extern int axxia_open_ob_data_stream(
 	int                  num_header_entries,
 	int                  num_data_entries);
 
-/* add user's data */
+/* Add user's data */
 extern int axxia_add_ob_data_stream(
-	struct rio_mport    *mport,
-	int		     dest_id,
-	int		     stream_id,
-	int		     cos,
-	int                  priority,
-	int                  is_hdr_desc,
-	void		    *buffer,
-	int		     data_len);
+        struct rio_mport    *mport,
+        int                  dest_id,
+        int                  stream_id,
+        int                  cos,
+        int                  priority,
+        int                  is_hdr_desc,
+        void                *buffer,
+        int                  data_len);
 
-/* data streaming global configuration */
+/* Data streaming global configuration */
 extern int axxia_data_stream_global_cfg(
-	struct rio_mport    *mport,
-	int                  mtu,
-	int                  ibds_avsid_mapping);
+        struct rio_mport    *mport,
+        int                  mtu,
+        int                  ibds_avsid_mapping);
 
-/* open IBDS data stream */
+/* Open IBDS data stream */
 extern int axxia_open_ib_data_stream(
-	struct rio_mport    *mport,
-	void                *dev_id,
-	int                  source_id,
-	int 		     cos,
-	int                  desc_dbuf_size,
-	int                  num_entries);
+        struct rio_mport    *mport,
+        void                *dev_id,
+        int                  source_id,
+        int                  cos,
+        int                  desc_dbuf_size,
+        int                  num_entries);
 
-/* add IBDS data buffer */
+/* Add IBDS data buffer */
 extern int axxia_add_ibds_buffer(
-	struct rio_mport    *mport,
-	int                  source_id,
-	int                  cos,
-	void                *buf,
-	int                  buf_size);
+        struct rio_mport    *mport,
+        int                  source_id,
+        int                  cos,
+        void                *buf,
+        int                  buf_size);
 
-/* get IBDS data */
+/* Get IBDS data */
 extern void *axxia_get_ibds_data(
-	struct rio_mport    *mport,
-	int                  source_id,
-	int                  cos,
-	int                 *ptr_pdu_length,
-	int                 *ptr_stream_id);
+        struct rio_mport    *mport,
+        int                  source_id,
+        int                  cos,
+        int                 *ptr_pdu_length,
+        int                 *ptr_stream_id);
 
-/* convert VSID to internal VSID */
+/* Convert VSID to internal VSID */
 int axxio_virt_vsid_convert(
-	u32                  vsid,
-	u32                  alias_reg,
-	u16                 *ptr_virt_vsid);
+        u32                  vsid,
+        u32                  alias_reg,
+        u16                 *ptr_virt_vsid);
 
-/* close IBDS data streaming */
+/* Close IBDS data streaming */
 extern int axxia_close_ib_data_stream(
-	struct rio_mport    *mport,
-	int                 source_id,
-	int                 cos);
+        struct rio_mport    *mport,
+        int                 source_id,
+        int                 cos);
 
-/* close OBDS data streaming */
+/* Close OBDS data streaming */
 extern int axxia_close_ob_data_stream(
-	struct rio_mport    *mport,
-	int                  dse_id);
+        struct rio_mport    *mport,
+        int                  dse_id);
 
 #endif /* __KERNEL__ */
 

@@ -17,8 +17,6 @@
 #ifndef _AXXIA_RIO_H_
 #define _AXXIA_RIO_H_
 
-/* #define DEBUG */
-
 #include <linux/device.h>
 #include <linux/of_platform.h>
 #include <linux/rio.h>

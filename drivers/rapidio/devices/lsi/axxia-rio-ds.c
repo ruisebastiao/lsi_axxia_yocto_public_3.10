@@ -14,7 +14,8 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-/* #define DEBUG */
+/* #define DS_DEBUG 1 */
+/* #define ALLOC_BUF_BY_KERNEL 1 */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -39,9 +40,7 @@
 #include "axxia-rio-irq.h"
 #include "axxia-rio-ds.h"
 
-/* #define DS_DEBUG 1 */
-
-/* #define ALLOC_BUF_BY_KERNEL 1 */
+/****************************************************************************/
 
 static inline void __ib_virt_m_dbg(
 	struct axxia_rio_ds_ibds_vsid_m_stats *ptr_ib_stats,
@@ -575,7 +574,7 @@ int axxia_add_ob_data_stream(
 		ptr_hdr_desc->dw0 |= 0x1;
 		ptr_hdr_desc->dw0 |= ((1 << 5) & 0x20);
 
-		ptr_hdr_desc->virt_data_buf = (u32)buffer;
+		ptr_hdr_desc->virt_data_buf = buffer;
 
 		ptr_hdr_desc->buf_status = DS_DBUF_ALLOC;
 
@@ -706,7 +705,7 @@ void ob_dse_irq_handler(struct rio_irq_handler *h, u32 state)
 
 			/* free the buffer */
 			if (ptr_hdr_desc->buf_status != DS_DBUF_FREED) {
-				kfree((void *)ptr_hdr_desc->virt_data_buf);
+				kfree(ptr_hdr_desc->virt_data_buf);
 				ptr_hdr_desc->buf_status = DS_DBUF_FREED;
 			}
 
@@ -789,7 +788,7 @@ int axxia_close_ob_data_stream(
 		/* if an application has not yet retrieve the data */
 		if (((ptr_hdr_desc->buf_status == DS_DBUF_ALLOC)) &&
 			(ptr_hdr_desc->virt_data_buf)) {
-			kfree((void *)ptr_hdr_desc->virt_data_buf);
+			kfree(ptr_hdr_desc->virt_data_buf);
 		}
 	}
 
@@ -1209,10 +1208,10 @@ int axxia_add_ibds_buffer(
 	ptr_data_desc =
 	&(ptr_virt_m_cfg->ptr_ibds_data_desc[ptr_virt_m_cfg->buf_add_ptr]);
 
-	ptr_data_desc->virt_data_buf = (u32)buf;
+	ptr_data_desc->virt_data_buf = buf;
 
 	data_addr_phy =
-		virt_to_phys((void *)ptr_data_desc->virt_data_buf);
+		virt_to_phys(ptr_data_desc->virt_data_buf);
 
 	ptr_data_desc->dw3 = ((u64)data_addr_phy & 0xFFFFFFFF);
 	data_addr_hi = ((u64)data_addr_phy >> 32) & 0x3F;
@@ -1529,7 +1528,7 @@ void *axxia_get_ibds_data(
 		return NULL;
 	}
 
-	user_buf = (void *)ptr_data_desc->virt_data_buf;
+	user_buf = ptr_data_desc->virt_data_buf;
 
 	if (user_buf == NULL) {
 		*ptr_pdu_length = 0;
@@ -1626,7 +1625,7 @@ int axxia_close_ib_data_stream(
 		/* if an application has not yet retrieved the data */
 		if (((ptr_data_desc->buf_status == DS_DBUF_ALLOC)) &&
 			(ptr_data_desc->virt_data_buf)) {
-			kfree((void *)ptr_data_desc->virt_data_buf);
+			kfree(ptr_data_desc->virt_data_buf);
 		}
 	}
 
