@@ -14,8 +14,8 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-/* #define DEBUG */
-/* #define SRIO_IODEBUG */
+/* #define IODEBUG */
+/* #define EXTRA1DEBUG */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -41,10 +41,16 @@
 
 static DEFINE_SPINLOCK(rio_io_lock);
 
-#ifdef SRIO_IODEBUG
+#ifdef IODEBUG
 #define	IODP(...)	printk(__VA_ARGS__)
 #else
 #define	IODP(...)
+#endif
+
+#ifdef EXTRA1DEBUG
+#define	EXT1P(...)	printk(__VA_ARGS__)
+#else
+#define	EXT1P(...)
 #endif
 
 /**
@@ -57,21 +63,30 @@ static DEFINE_SPINLOCK(rio_io_lock);
  *
  * - Big and Little Endian mode registers
  *   Big Endian:
- *   0x0000-0xFFFC   - RapidIO Standard Registers
- *   0x10000-0x1FFFC - Endpoint Controller Specific Registers
+ *       0x0000-0xFFFC   - RapidIO Standard Registers
+ *       0x10000-0x1FFFC - Endpoint Controller Specific Registers
  *   Little Endian
- *   0x20000-0x3FFFC - Peripheral Bus Bridge Specific Registers
+ *       0x20000-0x3FFFC - Peripheral Bus Bridge Specific Registers
  *
- *   "SRIO_CONF" registers in AXXIA (e.g. page selection register)
- *   are also Little Endian.
+ * "SRIO_CONF" registers in AXXIA (e.g. page selection register)
+ * are also Little Endian.  SRIO_CONF is organized as follows:
+ *
+ * - 0x000 .. 0x7ff    Fixed mapping to SRIO/RAB endpoint controller specific
+ *                     registers equivalent to 0x20000 .. 0x207ff.  The
+ *                     RAB_APB_CSR register within this block is used to
+ *                     control the page selection of the 'paged mapping'
+ *                     block.
+ * - 0x800 .. 0xfff    Paged mapping to SRIO generic+endpoint controller
+ *                     specific registers equivalent to 0x00000 .. 0x3ffff
  *
  * To avoid an extra spin-lock layer in __axxia_local_config_read
  * and __axxia_local_config_write, perform all internal driver accesses
  * to local config registers through the generic rio driver API.
  *
- * Accesses through the generic driver: __rio_local_write_config_32(),
+ * Accesses through the generic driver:__rio_local_write_config_32(),
  * __rio_local_read_config_32(), rio_mport_write_config_32() and
- * rio_mport_read_config_32() all uses spin_lock_irqsave().
+ * rio_mport_read_config_32() all use spin_lock_irqsave() /
+ * spin_unlock_irqrestore(), to ensure local access restrictions.
  *
  */
 
@@ -764,9 +779,9 @@ void axxia_rio_set_mport_disc_mode(struct rio_mport *mport)
 					    RIO_ANY_DESTID(mport->sys_size)));
 	}
 
-#ifdef SRIO_IODEBUG
+#ifdef EXTRA1DEBUG
 	__rio_local_read_config_32(mport, RIO_GCCSR, &result);
-	IODP("rio[%d]: RIO_GEN_CTL_CSR set to 0x%X for main port\n",
+	EXT1P("rio[%d]: RIO_GEN_CTL_CSR set to 0x%X for main port\n",
 		mport->id, result);
 #endif
 
@@ -847,20 +862,22 @@ static void axxia_init_port_data(struct rio_mport *mport)
 	dev_dbg(priv->dev, "RapidIO Common Transport System size: %d\n",
 		mport->sys_size ? 65536 : 256);
 
+	__rio_local_read_config_32(mport, RIO_DEV_ID_CAR, &priv->devid);
+	__rio_local_read_config_32(mport, RIO_DEV_INFO_CAR, &priv->devrev);
 	{
-		int i, devid;
+		int i;
 		static const u32 legacyids[] = {
-			0x5101000a, 0x5108000a,
+			AXXIA_DEVID_ACP34XX,
+			AXXIA_DEVID_ACP25XX,
 		};
-		__rio_local_read_config_32(mport, RIO_DEV_ID_CAR, &devid);
 		__rio_local_read_config_32(mport, RAB_CTRL, &data);
 		priv->internalDesc = (data & 0x00001000) ? 1 : 0;
 		for (i = 0; i < 2; i++) {
-			if (devid == legacyids[i])
+			if (priv->devid == legacyids[i])
 				priv->internalDesc = 1;
 		}
-		IODP("rio[%d]: RapidIO internal descriptors: %d (%x %x)\n",
-			mport->id, priv->internalDesc, devid, data);
+		EXT1P("rio[%d]: RapidIO internal descriptors: %d (%x %x)\n",
+			mport->id, priv->internalDesc, priv->devid, data);
 	}
 }
 
@@ -934,6 +951,7 @@ static int rio_start_port(struct rio_mport *mport)
 		dev_err(priv->dev,
 			"Port is not ready/restart ordered. Try to restart "
 			"connection...\n");
+
 		/* Disable ports */
 		ccsr |= RIO_CCSR_PD;
 		__rio_local_write_config_32(mport, RIO_CCSR(priv->portNdx),
@@ -949,6 +967,7 @@ static int rio_start_port(struct rio_mport *mport)
 		case RIO_PHY_PARALLEL:
 			break;
 		}
+
 		/* Enable ports */
 		ccsr &= ~RIO_CCSR_PD;
 		__rio_local_write_config_32(mport, RIO_CCSR(priv->portNdx),
@@ -966,20 +985,19 @@ static int rio_start_port(struct rio_mport *mport)
 		}
 	}
 
-#ifdef SRIO_IODEBUG
+#ifdef EXTRA1DEBUG
 	{
-		u32 hdlcsr, didcar, rabver;
+		u32 hdlcsr, rabver;
 
 		__rio_local_read_config_32(mport, RIO_HOST_DID_LOCK_CSR,
 					&hdlcsr);
-		__rio_local_read_config_32(mport, RIO_DEV_ID_CAR, &didcar);
 		__rio_local_read_config_32(mport, RAB_VER, &rabver);
 
 		printk(KERN_INFO
 			"rio[%d]: AR[%d] DIDCAR[%x]=%08x RAB_VER[%x]=%08x\n",
 			mport->id,
 			__LINE__,
-			RIO_DEV_ID_CAR, didcar,
+			RIO_DEV_ID_CAR, priv->devid,
 			RAB_VER, rabver);
 		printk("rio[%d]: AR[%d] CCSR[%x]=%08x ESCSR[%x]=%08x "
 		      "HBDIDLCSR[%x]=%08x\n",
@@ -989,7 +1007,7 @@ static int rio_start_port(struct rio_mport *mport)
 			RIO_ESCSR(priv->portNdx), escsr,
 			RIO_HOST_DID_LOCK_CSR, hdlcsr);
 	}
-#endif /* defined(SRIO_IODEBUG) */
+#endif /* defined(EXTRA1DEBUG) */
 
 	dev_dbg(priv->dev, "Port is Ready\n");
 	return 0;
@@ -1138,10 +1156,10 @@ static int rio_parse_dtb(
 	}
 
 	if (!of_device_is_available(dev->dev.of_node)) {
-		IODP("rio[%d]: AR[%d] status = not available\n", 99, __LINE__);
+		EXT1P("rio[%d]: AR[%d] status = not available\n", 99, __LINE__);
 		return -ENODEV;
 	} else {
-		IODP("rio[%d]: AR[%d] status = available\n", 99, __LINE__);
+		EXT1P("rio[%d]: AR[%d] status = available\n", 99, __LINE__);
 	}
 
 	if (of_property_read_u32(dev->dev.of_node, "index", &rlen))
@@ -1265,7 +1283,7 @@ static int rio_parse_dtb(
 			linkdown_reset->reg_mask =
 				of_read_number(dt_range + 1, 1);
 			linkdown_reset->in_use = 1;
-			IODP("rio[%d]: LDR"
+			EXT1P("rio[%d]: LDR"
 			     "st=%llx sz=%llx RA=%x MSK=%x iu=%d\n",
 				99,
 				linkdown_reset->phy_reset_start,
@@ -1493,6 +1511,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 		rc = -ENOMEM;
 		goto err_fixed;
 	}
+
 	priv->regs_win_paged = ioremap(regs->start + SRIO_CONF_SPACE_SIZE,
 					SRIO_CONF_SPACE_SIZE);
 	if (!priv->regs_win_paged) {
@@ -1509,7 +1528,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 			rc = -ENOMEM;
 			goto err_linkdown;
 		}
-		IODP("rio[%d]: LDR win=%p\n", mport->id,
+		EXT1P("rio[%d]: LDR win=%p\n", mport->id,
 			priv->linkdown_reset.win);
 	}
 
@@ -1656,7 +1675,7 @@ static int axxia_rio_setup(struct platform_device *dev)
 
 	/* !!! HW access to local config space starts here !!! */
 
-	/* Get and set master port data:
+	/* Get and set master port data
 	 */
 	axxia_init_port_data(mport);
 
@@ -1697,7 +1716,7 @@ static int axxia_rio_setup(struct platform_device *dev)
 	 */
 	{
 		u16 id = rio_local_get_device_id(mport);
-		IODP("rio[%d]: AR[%d] devid=%d hdid=%d\n",
+		EXT1P("rio[%d]: AR[%d] devid=%d hdid=%d\n",
 			mport->id, __LINE__,
 			mport->host_deviceid, rio_local_get_device_id(mport));
 		if (mport->host_deviceid < 0) {
@@ -1706,6 +1725,25 @@ static int axxia_rio_setup(struct platform_device *dev)
 			else if ((id != 0xFFFF) && (mport->sys_size != 0))
 				mport->host_deviceid = id;
 		}
+	}
+
+	/* Any changes needed based on device id / revision ?
+	*/
+	switch (priv->devid) {
+	case AXXIA_DEVID_ACP25XX:
+		priv->outbDmes[1] = 0x00000000;
+		break;
+	case AXXIA_DEVID_AXM55XX:
+		switch (priv->devrev) {
+		case AXXIA_DEVREV_AXM55XX_V1_0:
+			priv->outbDmes[1] = 0x00000000;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
 	}
 
 	/* And set the discovery mode for this port before we go
@@ -1717,7 +1755,7 @@ static int axxia_rio_setup(struct platform_device *dev)
 
 	axxia_rio_set_mport_disc_mode(mport);
 
-	IODP("rio[%p:%d]: priv=%p enum_host=%d\n", mport, mport->id,
+	EXT1P("rio[%p:%d]: priv=%p enum_host=%d\n", mport, mport->id,
 		priv, mport->enum_host);
 	return 0;
 
@@ -1748,7 +1786,7 @@ err_ops:
 */
 static int axxia_of_rio_rpn_probe(struct platform_device *dev)
 {
-	IODP(KERN_INFO "Setting up RapidIO peer-to-peer network %s\n",
+	EXT1P(KERN_INFO "Setting up RapidIO peer-to-peer network %s\n",
 	       dev->dev.of_node->full_name);
 
 	return axxia_rio_setup(dev);
@@ -1771,7 +1809,7 @@ static struct platform_driver axxia_of_rio_rpn_driver = {
 
 static __init int axxia_of_rio_rpn_init(void)
 {
-	IODP(KERN_INFO "Register RapidIO platform driver\n");
+	EXT1P(KERN_INFO "Register RapidIO platform driver\n");
 	return platform_driver_register(&axxia_of_rio_rpn_driver);
 }
 

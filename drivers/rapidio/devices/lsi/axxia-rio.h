@@ -52,6 +52,14 @@
 
 #define SRIO_SPACE_SIZE         0x40000      /* Total size GRIO + RAB Spaces */
 
+/* End point models & revisions */
+#define AXXIA_DEVID_ACP34XX		0x5101000a
+#define AXXIA_DEVID_ACP25XX		0x5108000a
+#define AXXIA_DEVID_AXM55XX		0x5120000a
+#define   AXXIA_DEVREV_AXM55XX_V1_0	  0x00000000
+#define   AXXIA_DEVREV_AXM55XX_V1_1	  0x00000001
+#define AXXIA_DEVID_AXM35XX		0x5102000a
+
 /* End Point Controller Specific Registers (0x1_0000-0x1_FFFC) */
 #define EPC_REG_BASE            0x10000
 #define EPC_PNADIDCSR(x)        (EPC_REG_BASE + (0x100+((x)*0x80)))
@@ -496,6 +504,8 @@ struct rio_priv {
 	struct device *dev;
 	int  ndx;	/* From FDT description */
 	int  portNdx;
+	u32  devid;     /* From GRIO register */
+	u32  devrev;    /* From GRIO register */
 
 	void __iomem *regs_win_fixed;
 	void __iomem *regs_win_paged;
