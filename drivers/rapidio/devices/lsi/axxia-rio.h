@@ -369,6 +369,7 @@
 #define DME_DESC_DW0_DONE               (1 << 8)
 #define DME_DESC_DW0_SZ_MASK            (3 << 4)
 #define DME_DESC_DW0_EN_INT             (1 << 3)
+#define DME_DESC_DW0_END_OF_CHAIN       (1 << 2)
 #define DME_DESC_DW0_NXT_DESC_VALID     (1 << 1)
 #define DME_DESC_DW0_VALID              (1)
 

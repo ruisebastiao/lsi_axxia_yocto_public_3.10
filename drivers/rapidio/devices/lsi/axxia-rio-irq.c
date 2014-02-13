@@ -139,9 +139,11 @@ static inline void __misc_fatal_dbg(struct rio_priv *priv, u32 misc_state,
 static inline void __misc_info_dbg(struct rio_priv *priv, u32 misc_state)
 {
 	/* Log only - no enable bit or state to clear */
-	if (misc_state & (UNEXP_MSG_LOG | UNEXP_MSG_INT |
-			  LL_TL_INT | GRIO_INT |
-			  UNSP_RIO_REQ_INT | LINK_REQ_INT)) {
+	if (misc_state & (UNEXP_MSG_INT |
+			  LL_TL_INT |
+			  GRIO_INT |
+			  UNSP_RIO_REQ_INT |
+			  LINK_REQ_INT)) {
 		if (misc_state & UNEXP_MSG_INT)
 			__irq_dbg(priv, RIO_MISC_UNEXP);
 		if (misc_state & LL_TL_INT)
@@ -1245,12 +1247,14 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 
 	spin_lock_irqsave(&mbox->lock, flags);
 
+#ifdef OBSOLETE_47417
 	/**
 	 * Try to kick back some life in the HW if it is un-responsive
 	 */
 	__rio_local_read_config_32(mport, RAB_OB_DME_CTRL(dme_no), &dme_ctrl);
 	dme_ctrl |= DME_WAKEUP | DME_ENABLE;
 	__rio_local_write_config_32(mport, RAB_OB_DME_CTRL(dme_no), dme_ctrl);
+#endif /* OBSOLETE_47417 */
 
 	/**
 	 * Process all completed transactions
@@ -2569,7 +2573,7 @@ void axxia_rio_port_irq_init(struct rio_mport *mport)
 					LINK_REQ_INT;
 #if defined(CONFIG_AXXIA_RIO_STAT)
 	priv->misc_irq.irq_state_mask |=
-		GRIO_INT | LL_TL_INT | UNEXP_MSG_LOG |
+		GRIO_INT | LL_TL_INT |
 		UNSP_RIO_REQ_INT | UNEXP_MSG_INT;
 #endif
 	priv->misc_irq.irq_state = 0;
