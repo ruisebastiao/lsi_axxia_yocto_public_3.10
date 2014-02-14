@@ -18,7 +18,7 @@
 
 / {
 	model = "Emulation Platform AXM55xx";
-	compatible = "lsi,axm5516-emulation", "lsi,axm5516";
+	compatible = "lsi,axm5516-emu", "lsi,axm5516";
 
 	memory {
 		device_type = "memory";

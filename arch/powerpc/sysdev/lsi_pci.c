@@ -154,9 +154,8 @@ static int __init acp_parse_dma_ranges(struct pci_controller *hose,
 		return -ENXIO;
 	}
 
-	/* Check we are a power of 2 size and that base is a multiple of size*/
-	if ((size & (size - 1)) != 0  ||
-	    (res->start & (size - 1)) != 0) {
+	/* Check that base is a multiple of size*/
+	if ((res->start & (size - 1)) != 0) {
 		printk(KERN_ERR "%s: dma-ranges unaligned\n",
 		       hose->dn->full_name);
 		return -ENXIO;
