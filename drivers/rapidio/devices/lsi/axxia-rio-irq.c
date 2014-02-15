@@ -1027,42 +1027,58 @@ static inline int select_dme(int dme_no,
 
 static inline int choose_ob_dme(
 	struct rio_priv	*priv,
+	int mbox_dest,
 	int len,
 	struct rio_msg_dme **ob_dme,
 	unsigned long *iflags,
 	int *buf_sz)
 {
-	int i, j, dme_no = 0;
+	int i, ndx, dme_no = 0;
+	int sz = RIO_OUTB_DME_TO_BUF_SIZE(priv, dme_no);
+	struct rio_irq_handler *h = NULL;
+	struct rio_msg_dme *dme = NULL;
+
+	if (len > sz)
+		return -EINVAL;
 
 	/* Find an OB DME that is enabled and which has empty slots */
-	/* If we can find one, then lock it as well */
-	for (j = 0; j < 2; j++) {
-		struct rio_irq_handler *h = NULL;
-		struct rio_msg_dme *dme = NULL;
-
-		for (i = 0; i < priv->numOutbDmes[j]; i++, dme_no++) {
-			int sz = RIO_OUTB_DME_TO_BUF_SIZE(priv, dme_no);
-			h = &priv->ob_dme_irq[dme_no];
-			dme = h->data;
-
-			if (dme == NULL)
-				continue;
-
-			spin_lock_irqsave(&dme->lock, *iflags);
-
-			if (test_bit(RIO_IRQ_ENABLED, &h->state) &&
-			    (len <= sz) &&
-			    (dme->entries > (dme->entries_in_use+1))) {
-				(*ob_dme) = dme;
-				(*buf_sz) = sz;
-				return dme_no;
-			}
-
-			spin_unlock_irqrestore(&dme->lock, *iflags);
-		}
+	ndx = RIO_MBOX_TO_IDX(mbox_dest);
+	switch (ndx) {
+	case 0:
+		if ((priv->numOutbDmes[0] == 0) || (priv->outbDmes[0] == 0))
+			return -ENXIO;
+		break;
+	case 1:
+		if ((priv->numOutbDmes[1] == 0) || (priv->outbDmes[1] == 0))
+			return -ENXIO;
+		dme_no += priv->numOutbDmes[0];
+		break;
+	default:
+		dev_err(priv->dev, "Attempt to select unknown OB DME type!\n");
+		return -ENXIO;
 	}
 
-	return -EBUSY;
+	/* If we can find one, then lock it as well */
+	for (i = 0; i < priv->numOutbDmes[ndx]; i++, dme_no++) {
+		h = &priv->ob_dme_irq[dme_no];
+		dme = h->data;
+
+		if (dme == NULL)
+			continue;
+
+		spin_lock_irqsave(&dme->lock, *iflags);
+
+		if (test_bit(RIO_IRQ_ENABLED, &h->state) &&
+		    (dme->entries > (dme->entries_in_use+1))) {
+			(*ob_dme) = dme;
+			(*buf_sz) = sz;
+			return dme_no;
+		}
+
+		spin_unlock_irqrestore(&dme->lock, *iflags);
+	}
+
+	return -ENODEV;
 }
 
 static void release_mbox(struct kref *kref)
@@ -2210,7 +2226,18 @@ static struct rio_msg_desc *get_ob_desc(struct rio_mport *mport,
  * @len: Length of message
  *
  * Adds the @buffer message to the AXXIA outbound message queue.
- * Returns %0 on success or %-EINVAL on failure.
+ * Returns %0 on success
+ *         %-EBUSY  on temporarily unavailable resource failure e.g. such
+ *                     as waiting for an open entry in the outbound DME
+ *                     descriptor chain
+ *         %-EAGAIN on another kind of temporarily unavailable resource
+ *                     failure
+ *         %-EINVAL on invalid argument failure.
+ *         %-ENODEV on unavailable resource failure e.g. no outbound DME
+ *                     open that matches the kind of destination mailbox
+ *         %-ENXIO  on incompatible argument failure e.g. trying to open
+ *                     a single-segment mbox when none are available on
+ *                     the platform
  */
 int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 			     int mbox_dest, int letter, int flags,
@@ -2231,7 +2258,7 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 	    (letter    >= RIO_MSG_MAX_LETTER))
 		return -EINVAL;
 
-	dme = choose_ob_dme(priv, len, &mb, &iflags, &buf_sz);
+	dme = choose_ob_dme(priv, mbox_dest, len, &mb, &iflags, &buf_sz);
 	if (dme < 0)
 		return dme;
 
@@ -2358,7 +2385,12 @@ void axxia_close_inb_mbox(struct rio_mport *mport, int mbox)
  * @buf: Buffer to add to inbound queue
  *
  * Adds the @buf buffer to the AXXIA inbound message queue.
- * Returns %0 on success or %-EINVAL on failure.
+ *
+ * Returns %0 on success
+ *         %-EINVAL on invalid argument failure.
+ *         %-EBUSY  on temporarily unavailable resource failure e.g. such
+ *                     as waiting for a filled entry in the inbound DME
+ *                     descriptor chain
  */
 int axxia_add_inb_buffer(struct rio_mport *mport, int mbox, void *buf)
 {
@@ -2398,7 +2430,10 @@ busy:
  * @sz: size of returned buffer
  *
  * Gets the next available inbound message from the inbound message queue.
- * A pointer to the message is returned on success or NULL on failure.
+ *
+ * Returns pointer to the message on success
+ *         NULL on nothing available
+ *         IS_ERR(ptr) on failure with extra information
  */
 void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 			    int *sz, int *slot, u16 *destid)

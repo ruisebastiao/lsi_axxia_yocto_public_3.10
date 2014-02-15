@@ -163,6 +163,8 @@ enum rio_ob_dme_dbg {
 #define RIO_MSG_MAX_ENTRIES                1024   /* Default Max descriptor
 						     table entries for internal
 						     descriptor builds */
+#define	RIO_MBOX_TO_IDX(mid)		\
+	((mid <= RIO_MAX_RX_MBOX_4KB) ? 0 : 1)
 #define	RIO_MBOX_TO_BUF_SIZE(mid)		\
 	((mid <= RIO_MAX_RX_MBOX_4KB) ? RIO_MSG_MULTI_SIZE : RIO_MSG_SEG_SIZE)
 #define	RIO_OUTB_DME_TO_BUF_SIZE(p,did)		\
