@@ -276,7 +276,7 @@ static void acp_rio_hotswap_work(struct work_struct *work)
 	u32 flags = hotswap_work->flags;
 
 
-	axxia_api_lock();
+	axxia_api_lock(priv);
 
 	if (RIO_EXTRACT_LP(flags)) {
 		if (rio_port_started(mport)) {
@@ -333,7 +333,7 @@ out:
 		 "Port work done\n");
 	complete(cmp);
 	kfree(hotswap_work);
-	axxia_api_unlock();
+	axxia_api_unlock(priv);
 }
 
 int axxia_rio_hotswap(struct rio_mport *mport, u8 flags)

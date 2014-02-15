@@ -3,7 +3,6 @@
 
 /* forward declaration */
 struct rio_priv;
-struct mutex;
 
 #if !defined(CONFIG_AXXIA_RIO_STAT)
 

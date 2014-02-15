@@ -436,10 +436,9 @@ int alloc_irq_handler(struct rio_irq_handler *h,
 	if (h->irq_enab_reg_addr) {
 		__rio_local_read_config_32(mport, h->irq_enab_reg_addr, &mask);
 		mask |= h->irq_state_mask;
+		__rio_local_write_config_32(mport, h->irq_state_reg_addr, mask);
 		__rio_local_write_config_32(mport, h->irq_enab_reg_addr, mask);
 	}
-	if (h->irq_enab_reg_addr)
-		__rio_local_write_config_32(mport, h->irq_state_reg_addr, mask);
 
 	return rc;
 }
@@ -1030,30 +1029,37 @@ static inline int choose_ob_dme(
 	struct rio_priv	*priv,
 	int len,
 	struct rio_msg_dme **ob_dme,
+	unsigned long *iflags,
 	int *buf_sz)
 {
-	int i, j, ret = 0;
+	int i, j, dme_no = 0;
 
 	/* Find an OB DME that is enabled and which has empty slots */
+	/* If we can find one, then lock it as well */
 	for (j = 0; j < 2; j++) {
-		for (i = 0; i < priv->numOutbDmes[j]; i++) {
-			int sz = RIO_OUTB_DME_TO_BUF_SIZE(priv, i);
-			struct rio_irq_handler *h = &priv->ob_dme_irq[i];
-			struct rio_msg_dme *dme = h->data;
+		struct rio_irq_handler *h = NULL;
+		struct rio_msg_dme *dme = NULL;
 
-			if (!test_bit(RIO_IRQ_ENABLED, &h->state))
+		for (i = 0; i < priv->numOutbDmes[j]; i++, dme_no++) {
+			int sz = RIO_OUTB_DME_TO_BUF_SIZE(priv, dme_no);
+			h = &priv->ob_dme_irq[dme_no];
+			dme = h->data;
+
+			if (dme == NULL)
 				continue;
 
-			if (len > sz)
-				continue;
+			spin_lock_irqsave(&dme->lock, *iflags);
 
-			if (dme->entries > (dme->entries_in_use+1)) {
+			if (test_bit(RIO_IRQ_ENABLED, &h->state) &&
+			    (len <= sz) &&
+			    (dme->entries > (dme->entries_in_use+1))) {
 				(*ob_dme) = dme;
 				(*buf_sz) = sz;
-				return ret + i;
+				return dme_no;
 			}
+
+			spin_unlock_irqrestore(&dme->lock, *iflags);
 		}
-		ret += priv->numOutbDmes[j];
 	}
 
 	return -EBUSY;
@@ -1183,7 +1189,7 @@ err:
  * if available, on each successfully sent message.
  *
  * @note:
- * HW descriptor fetch and update may be out of order
+ * HW descriptor fetch and update may be out of order.
  * Check state of all used descriptors and take care to not fall into
  * any of the traps that come with this design:
  *
@@ -1234,9 +1240,10 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 	struct rio_priv *priv = mport->priv;
 	struct rio_msg_dme *mbox = h->data;
 	u32 dme_stat, dw0, dme_no = 31 - CNTLZW(state);
-	u32 dme_ctrl;
 	unsigned long flags;
 	int i;
+
+	spin_lock_irqsave(&mbox->lock, flags);
 
 	/**
 	 * Clear latched state
@@ -1245,15 +1252,13 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 	__rio_local_write_config_32(mport, RAB_OB_DME_STAT(dme_no), dme_stat);
 	__ob_dme_dbg(priv, dme_stat);
 
-	spin_lock_irqsave(&mbox->lock, flags);
-
 #ifdef OBSOLETE_47417
 	/**
 	 * Try to kick back some life in the HW if it is un-responsive
 	 */
-	__rio_local_read_config_32(mport, RAB_OB_DME_CTRL(dme_no), &dme_ctrl);
-	dme_ctrl |= DME_WAKEUP | DME_ENABLE;
-	__rio_local_write_config_32(mport, RAB_OB_DME_CTRL(dme_no), dme_ctrl);
+	__rio_local_read_config_32(mport, RAB_OB_DME_CTRL(dme_no), &dme_stat);
+	dme_stat |= DME_WAKEUP | DME_ENABLE;
+	__rio_local_write_config_32(mport, RAB_OB_DME_CTRL(dme_no), dme_stat);
 #endif /* OBSOLETE_47417 */
 
 	/**
@@ -1302,6 +1307,7 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 			}
 		}
 	}
+
 	spin_unlock_irqrestore(&mbox->lock, flags);
 }
 
@@ -1418,14 +1424,6 @@ static int open_outb_mbox(struct rio_mport *mport, void *dev_id, int dme_no,
 	}
 
 	/**
-	 * Set TID mask to restrict RAB to only send
-	 * one letter to each destination at a time.
-	 * NB! masking only effective per group - multi/single segment.
-	 */
-	__rio_local_write_config_32(mport, RAB_OB_DME_TID_MASK,
-				    OB_DME_TID_MASK);
-
-	/**
 	 * And setup the DME chain control and chain start address
 	 */
 	dme_ctrl  = (prio & 0x3) << 4;
@@ -1505,6 +1503,9 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 	int mbox_no = mb->mbox_no;
 	int letter = RIO_MSG_MAX_LETTER - 1;
 	u32 dme_mask = state;
+	unsigned long iflags;
+
+	spin_lock_irqsave(&mb->lock, iflags);
 
 	/**
 	 * Inbound mbox has 4 engines, 1 per letter.
@@ -1523,8 +1524,10 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 		while (mb->me[letter]->dme_no != dme_no)
 			letter--;
 
-		if (letter < 0)
+		if (letter < 0) {
+			spin_unlock_irqrestore(&mb->lock, iflags);
 			return;
+		}
 
 		me = mb->me[letter];
 
@@ -1660,6 +1663,8 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 		}
 #endif /* OBSOLETE_BZ47185 */
 	}
+
+	spin_unlock_irqrestore(&mb->lock, iflags);
 }
 
 /**
@@ -1683,10 +1688,10 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 	struct rio_priv *priv = mport->priv;
 	struct rio_irq_handler *h = NULL;
 	int i, letter;
-	int irq_state_mask = 0;
+	int rc, buf_sz;
+	u32 irq_state_mask = 0;
 	u32 dme_ctrl;
 	struct rio_rx_mbox *mb;
-	int rc, buf_sz;
 
 	if ((mbox < 0) || (mbox >= RIO_MAX_RX_MBOX))
 		return -EINVAL;
@@ -1729,7 +1734,7 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 	 * mailbox.
 	 */
 	for (letter = 0; letter < RIO_MSG_MAX_LETTER; ++letter) {
-		int dme_no = (mbox * RIO_MSG_MAX_LETTER) + letter;
+		int dme_no = 0;
 		struct rio_msg_dme *me = NULL;
 		struct rio_msg_desc *desc;
 		u32 dw0, dw1, dw2, dw3;
@@ -1737,8 +1742,18 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 		u32 dme_stat, wait = 0;
 		u32 buffer_size = (buf_sz > 256 ? 3 : 0);
 
-		rc = check_dme(dme_no, &priv->numInbDmes[0],
+		/* Search for a free DME, so we can more efficiently map
+		 * them to the all of the mbox||letter combinations. */
+		for (i = 0, rc = -1;
+		     i < (priv->numInbDmes[0]+priv->numInbDmes[1]);
+		     i++) {
+			rc = check_dme(i, &priv->numInbDmes[0],
 				&priv->inbDmesInUse[0], &priv->inbDmes[0]);
+			if (rc == 0) {
+				dme_no = i;
+				break;
+			}
+		}
 		if (rc < 0)
 			return rc;
 
@@ -1769,8 +1784,9 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 		dw0 = ((buffer_size & 0x3) << 4) |
 		      DME_DESC_DW0_EN_INT |
 		      DME_DESC_DW0_VALID;
-		dw1 = ((mbox & 0x3f) << 2) |
-		      (letter & 0x3);
+		dw1 = DME_DESC_DW1_XMBOX(mbox) |
+		      DME_DESC_DW1_MBOX(mbox)  |
+		      DME_DESC_DW1_LETTER(letter);
 		dw3 = 0;		/* 0 means, next contiguous addr
 					 * Also next desc valid bit in dw0
 					 * must be zero. */
@@ -1845,10 +1861,11 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 		/**
 		 * Setup the DME including descriptor chain start address
 		 */
-		dme_ctrl = (mbox & 0x3f) << 6;
-		dme_ctrl |= letter << 4;
-		dme_ctrl |= DME_WAKEUP;
-		dme_ctrl |= DME_ENABLE;
+		dme_ctrl = RAB_IB_DME_CTRL_XMBOX(mbox)    |
+			   RAB_IB_DME_CTRL_MBOX(mbox)     |
+			   RAB_IB_DME_CTRL_LETTER(letter) |
+		           DME_WAKEUP                     |
+		           DME_ENABLE;
 		dme_ctrl |= (u32)((descChainStart >> 6) & 0xc0000000);
 		descAddr  = (u32)descChainStart >> 4;
 		__rio_local_write_config_32(mport,
@@ -2200,39 +2217,44 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 			     void *buffer, size_t len, void *cookie)
 {
 	int rc = 0, dme;
+	int buf_sz = 0;
 	u32 dw0, dw1, dme_ctrl;
 	u16 destid = (rdev ? rdev->destid : mport->host_deviceid);
 	struct rio_priv *priv = mport->priv;
 	struct rio_msg_dme *mb = NULL;
-	int buf_sz = 0;
 	struct rio_msg_desc *desc;
 	unsigned long iflags;
 
-	if ((mbox_dest < 0)          ||
-	    (mbox_dest >= RIO_MAX_TX_MBOX))
+	if ((mbox_dest < 0)                ||
+	    (mbox_dest >= RIO_MAX_TX_MBOX) ||
+	    (letter    <  0)               ||
+	    (letter    >= RIO_MSG_MAX_LETTER))
 		return -EINVAL;
 
-	dme = choose_ob_dme(priv, len, &mb, &buf_sz);
-	if (dme < 0) {
-		rc = dme;
-		return rc;
+	dme = choose_ob_dme(priv, len, &mb, &iflags, &buf_sz);
+	if (dme < 0)
+		return dme;
+
+	/* Since the choice was successful, we have also locked the 'mb' */
+
+	if ((len < 8) || (len > buf_sz)) {
+		rc = -EINVAL;
+		goto done2;
 	}
 
-	if ((len < 8) || (len > buf_sz))
-		return -EINVAL;
-
 	mb = dme_get(mb);
-	if (!mb)
-		return -EINVAL;
+	if (!mb) {
+		rc = -EINVAL;
+		goto done2;
+	}
 
-	spin_lock_irqsave(&mb->lock, iflags);
 	desc = get_ob_desc(mport, mb);
 	if (!desc) {
 		dev_dbg(priv->dev,
 			"RIO: TX DMA descriptor ring exhausted\n");
 		__ob_dme_event_dbg(priv, mb->dme_no,
 				   1 << RIO_OB_DME_TX_PUSH_RING_FULL);
-		rc = -EAGAIN;
+		rc = -EBUSY;
 		goto done;
 	}
 	__ob_dme_event_dbg(priv, mb->dme_no, 1 << RIO_OB_DME_TX_PUSH);
@@ -2253,7 +2275,7 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 	dw1 = DME_DESC_DW1_PRIO(flags) |
 		DME_DESC_DW1_CRF(flags) |
 		DME_DESC_DW1_SEG_SIZE_256 |
-		DME_DESC_DW1_SIZE(len) |
+		DME_DESC_DW1_MSGLEN(len) |
 		DME_DESC_DW1_XMBOX(mbox_dest) |
 		DME_DESC_DW1_MBOX(mbox_dest) |
 		DME_DESC_DW1_LETTER(letter);
@@ -2277,8 +2299,9 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 				    dme_ctrl);
 
 done:
-	spin_unlock_irqrestore(&mb->lock, iflags);
 	dme_put(mb);
+done2:
+	spin_unlock_irqrestore(&mb->lock, iflags);
 	return rc;
 }
 
@@ -2389,7 +2412,7 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 
 	if ((mbox < 0) || (mbox >= RIO_MAX_RX_MBOX))
 		return ERR_PTR(-EINVAL);
-	if (letter >= RIO_MSG_MAX_LETTER)
+	if ((letter < 0) || (letter >= RIO_MSG_MAX_LETTER))
 		return ERR_PTR(-EINVAL);
 
 	mb = mbox_get(priv->ib_dme_irq[mbox].data);
@@ -2449,8 +2472,8 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 			numProc++;
 		} else if ((dw0 & DME_DESC_DW0_DONE) &&
 			   (dw0 & DME_DESC_DW0_VALID)) {
-			int seg = DME_DESC_DW1_SIZE_F(dw1);
-			int buf_sz = DME_DESC_DW1_SIZE_SENT(seg);
+			int seg = DME_DESC_DW1_MSGLEN_F(dw1);
+			int buf_sz = DME_DESC_DW1_MSGLEN_B(seg);
 			buf = mb->virt_buffer[mb->next_rx_slot];
 			if (!buf)
 				goto err;

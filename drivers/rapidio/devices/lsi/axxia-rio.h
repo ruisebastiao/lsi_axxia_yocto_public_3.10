@@ -48,7 +48,9 @@
 /*****************************************/
 /* *********** ACP/AXXIA REG *********** */
 /*****************************************/
-#define SRIO_CONF_SPACE_SIZE    0x800
+#define SRIO_CONF_SPACE_SIZE          0x1000
+#define SRIO_CONF_SPACE_SIZE_FIXED    0x0800
+#define SRIO_CONF_SPACE_SIZE_PAGED    0x0800
 
 #define SRIO_SPACE_SIZE         0x40000      /* Total size GRIO + RAB Spaces */
 
@@ -147,7 +149,7 @@
 					 >> 32) << 22)
 #define AXI_BASE(addr)                  (((u32)(addr) & 0xfffffc00) >> 10)
 
-/* register for RIO base address */
+/* Register for RIO base address */
 #define RAB_APIO_AMAP_RBAR(n)   (RAB_REG_BASE + (0x20C + (n * 0x10)))
 #define RIO_ADDR_BASE(taddr)            (((u32)(taddr) & 0xfffffc00) >> 10)
 #define RIO_ADDR_OFFSET(taddr)          ((u32)(taddr) & 0x3ff)
@@ -191,7 +193,7 @@
 
 #define RAB_INTR_STAT_APIO      (RAB_REG_BASE + 0x64)
 
-/* data_streaming */
+/* Data_streaming */
 #define RAB_INTR_ENAB_ODSE      (RAB_REG_BASE + 0x2a0c)
 #define RAB_INTR_ENAB_IBDS      (RAB_REG_BASE + 0x2a04)
 #define RAB_INTR_STAT_ODSE      (RAB_REG_BASE + 0x2a18)
@@ -322,9 +324,12 @@
 #define OB_DME_STAT_DESC_CHAIN_XFER_CPLT (1)
 
 #define OB_DME_STAT_ERROR_MASK           0x000000FC
-#define OB_DME_TID_MASK                  0xffff
+#define OB_DME_TID_MASK                  0xFFFFFFFF
 
 #define RAB_IB_DME_CTRL(e)      (RAB_REG_BASE + (0x600 + (0x10 * (e))))
+#define   RAB_IB_DME_CTRL_XMBOX(m)           (((m) & 0x3c) << 6)
+#define   RAB_IB_DME_CTRL_MBOX(m)            (((m) & 0x03) << 6)
+#define   RAB_IB_DME_CTRL_LETTER(l)          (((l) & 0x03) << 4)
 #define RAB_IB_DME_DESC_ADDR(e) (RAB_REG_BASE + (0x604 + (0x10 * (e))))
 #define RAB_IB_DME_STAT(e)      (RAB_REG_BASE + (0x608 + (0x10 * (e))))
 #define RAB_IB_DME_DESC(e)      (RAB_REG_BASE + (0x60C + (0x10 * (e))))
@@ -386,14 +391,14 @@
 
 #define DME_DESC_DW1_PRIO(flags)        ((flags & 0x3) << 30)
 #define DME_DESC_DW1_CRF(flags)         ((flags & 0x4) << 27)
-#define DME_DESC_DW1_SEG_SIZE_256       (0x6 << 18)
-#define DME_DESC_DW1_XMBOX(m)           ((m & 0x30) << 2)
-#define DME_DESC_DW1_MBOX(m)            ((m & 0x3) << 2)
-#define DME_DESC_DW1_SIZE(s)            ((((s + 7) & ~7) >> 3) << 8) /* Round
+#define DME_DESC_DW1_SEG_SIZE_256       (0x06 << 18)
+#define DME_DESC_DW1_XMBOX(m)           (((m) & 0x3c) << 2)
+#define DME_DESC_DW1_MBOX(m)            (((m) & 0x03) << 2)
+#define DME_DESC_DW1_LETTER(l)          ((l) & 0x03)
+#define DME_DESC_DW1_MSGLEN(s)          ((((s + 7) & ~7) >> 3) << 8) /* Round
 					 up and shift to make double word */
-#define DME_DESC_DW1_SIZE_F(d)          (((d) >> 8) & 0x3ff)
-#define DME_DESC_DW1_SIZE_SENT(sf)      ((sf) << 3) /* double words to bytes */
-#define DME_DESC_DW1_LETTER(l)          ((l) & 0x3)
+#define DME_DESC_DW1_MSGLEN_F(d)        (((d) >> 8) & 0x3ff)
+#define DME_DESC_DW1_MSGLEN_B(ml)       ((ml) << 3) /* double words to bytes */
 
 /***********************************/
 /* *********** RIO REG *********** */
@@ -498,7 +503,8 @@ struct rio_desc {
 struct rio_priv {
 	u32     cookie;
 
-	struct mutex api_mutex;
+	spinlock_t api_lock;
+	unsigned long api_lock_flags;
 	spinlock_t port_lock;
 
 	struct rio_mport *mport;
@@ -552,7 +558,7 @@ struct rio_priv {
 	/* Fatal err */
 	void (*port_notify_cb)(struct rio_mport *mport);
 
-	/* data_streaming */
+	/* Data_streaming */
 	struct axxia_rio_ds_priv     ds_priv_data;
 	struct axxia_rio_ds_cfg      ds_cfg_data;
 };
@@ -564,11 +570,12 @@ struct rio_priv {
 
 static inline void axxia_api_lock(struct rio_priv *priv)
 {
-	mutex_lock(&priv->api_mutex);
+	spin_lock_irqsave(&priv->api_lock, priv->api_lock_flags);
 }
+
 static inline void axxia_api_unlock(struct rio_priv *priv)
 {
-	mutex_unlock(&priv->api_mutex);
+	spin_unlock_irqrestore(&priv->api_lock, priv->api_lock_flags);
 }
 
 extern int axxia_rio_start_port(struct rio_mport *mport);

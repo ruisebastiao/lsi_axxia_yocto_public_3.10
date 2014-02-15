@@ -111,34 +111,47 @@ static int __axxia_local_config_read_actual(struct rio_priv *priv,
 
 	AXXIA_RIO_SYSMEM_BARRIER();
 
-	/* Set correct page to operate on */
-	page_sel = (offset & 0x00fff800) << 5;
-	outl(page_sel, (long unsigned int)priv->regs_win_fixed +
-					  RAB_APB_CSR_BASE);
-
-	AXXIA_RIO_SYSMEM_BARRIER();
-
-	if (offset < RAB_REG_BASE) {
-		/*
-		 * RapidIO Standard Registers (0x0000-0xFFFC)
-		 * Endpoint Controller Specific Registers (0x1_0000-0x1_FFFC)
-		 */
-		*data = CORRECT_GRIO(inl((long unsigned int)
-						priv->regs_win_paged +
-						(offset & 0x7ff)));
-	} else if ((offset >= RAB_REG_BASE) && (offset < SRIO_SPACE_SIZE)) {
+	if ((offset >= RAB_REG_BASE) &&
+	    (offset < (RAB_REG_BASE+SRIO_CONF_SPACE_SIZE_FIXED))) {
 		/*
 		 * Peripheral Bus Bridge Specific Registers
-		 * (0x2_0000-0x3_FFFC)
+		 * (0x2_0000-0x2_0FFC)
 		 */
 		*data = CORRECT_RAB(inl((long unsigned int)
-						priv->regs_win_paged +
+						priv->regs_win_fixed +
 						(offset & 0x7ff)));
 	} else {
-		dev_err(priv->dev,
-			"RIO: Reading config register not specified for "
-			"AXXIA (0x%8.8x)\n",
-			offset);
+		/* Set correct page to operate on */
+		page_sel = (offset & 0x00fff800) << 5;
+		outl(page_sel, (long unsigned int)priv->regs_win_fixed +
+					  	RAB_APB_CSR_BASE);
+
+		AXXIA_RIO_SYSMEM_BARRIER();
+
+		if (offset < RAB_REG_BASE) {
+			/*
+			* Registers:
+		 	*   RapidIO Standard (0x0000-0xFFFC)
+		 	*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
+		 	*/
+			*data = CORRECT_GRIO(inl((long unsigned int)
+							priv->regs_win_paged +
+							(offset & 0x7ff)));
+		} else if ((offset >= RAB_REG_BASE) &&
+			   (offset < SRIO_SPACE_SIZE)) {
+			/*
+		 	* Peripheral Bus Bridge Specific Registers
+		 	* (0x2_0000-0x3_FFFC)
+		 	*/
+			*data = CORRECT_RAB(inl((long unsigned int)
+							priv->regs_win_paged +
+							(offset & 0x7ff)));
+		} else {
+			dev_err(priv->dev,
+				"RIO: Reading config register not specified "
+				"for AXXIA (0x%8.8x)\n",
+				offset);
+		}
 	}
 
 	if (suppress) {
@@ -185,32 +198,47 @@ static int __axxia_local_config_write_actual(struct rio_priv *priv,
 
 	AXXIA_RIO_SYSMEM_BARRIER();
 
-	/* Set correct page to operate on */
-	page_sel = (offset & 0x00fff800) << 5;
-	outl(page_sel, (long unsigned int)priv->regs_win_fixed +
-					  RAB_APB_CSR_BASE);
-
-	AXXIA_RIO_SYSMEM_BARRIER();
-
-	if (offset < RAB_REG_BASE) {
+	if ((offset >= RAB_REG_BASE) &&
+	    (offset < (RAB_REG_BASE+SRIO_CONF_SPACE_SIZE_FIXED))) {
 		/*
-		 * RapidIO Standard Registers (0x0000-0xFFFC)
-		 * Endpoint Controller Specific Registers (0x1_0000-0x1_FFFC)
-		 */
-		outl_p(CORRECT_GRIO(data),
-			(long unsigned int)priv->regs_win_paged +
-					   (offset & 0x7ff));
-	} else if ((offset >= RAB_REG_BASE) && (offset < SRIO_SPACE_SIZE)) {
-		/*
-		 * Peripheral Bus Bridge Specific Registers (0x2_0000-0x3_FFFC)
+		 * Peripheral Bus Bridge Specific Registers
+		 * (0x2_0000-0x2_0FFC)
 		 */
 		outl(data, CORRECT_RAB((long unsigned int)
-						priv->regs_win_paged +
+						priv->regs_win_fixed +
 						(offset & 0x7ff)));
 	} else {
-		dev_err(priv->dev, "RIO: Trying to write to config register "
-				   "not specified for AXIA (0x%8.8x)\n",
-			offset);
+		/* Set correct page to operate on */
+		page_sel = (offset & 0x00fff800) << 5;
+		outl(page_sel, (long unsigned int)priv->regs_win_fixed +
+					  	RAB_APB_CSR_BASE);
+
+		AXXIA_RIO_SYSMEM_BARRIER();
+
+		if (offset < RAB_REG_BASE) {
+			/*
+			* Registers:
+		 	*   RapidIO Standard (0x0000-0xFFFC)
+		 	*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
+		 	*/
+			outl_p(CORRECT_GRIO(data),
+				(long unsigned int)priv->regs_win_paged +
+						(offset & 0x7ff));
+		} else if ((offset >= RAB_REG_BASE) &&
+			   (offset < SRIO_SPACE_SIZE)) {
+			/*
+		 	* Peripheral Bus Bridge Specific Registers
+			* (0x2_0000-0x3_FFFC)
+		 	*/
+			outl(data, CORRECT_RAB((long unsigned int)
+							priv->regs_win_paged +
+							(offset & 0x7ff)));
+		} else {
+			dev_err(priv->dev,
+				"RIO: Trying to write to config register "
+			   	"not specified for AXIA (0x%8.8x)\n",
+				offset);
+		}
 	}
 
 	if (suppress) {
@@ -1449,7 +1477,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 	priv->mport = mport;
 	priv->ndx = ndx;
 	priv->portNdx = portNdx;
-	mutex_init(&priv->api_mutex);
+	spin_lock_init(&priv->api_lock);
 
 	/* Max descriptors */
 	priv->desc_max_entries = RIO_MSG_MAX_ENTRIES;
@@ -1506,14 +1534,13 @@ static struct rio_priv *rio_priv_dtb_setup(
 	}
 
 	/* Setup local access */
-	priv->regs_win_fixed = ioremap(regs->start, SRIO_CONF_SPACE_SIZE);
+	priv->regs_win_fixed = ioremap(regs->start, SRIO_CONF_SPACE_SIZE_FIXED);
 	if (!priv->regs_win_fixed) {
 		rc = -ENOMEM;
 		goto err_fixed;
 	}
-
-	priv->regs_win_paged = ioremap(regs->start + SRIO_CONF_SPACE_SIZE,
-					SRIO_CONF_SPACE_SIZE);
+	priv->regs_win_paged = ioremap(regs->start + SRIO_CONF_SPACE_SIZE_FIXED,
+					SRIO_CONF_SPACE_SIZE_PAGED);
 	if (!priv->regs_win_paged) {
 		rc = -ENOMEM;
 		goto err_paged;
@@ -1556,7 +1583,7 @@ err_fixed:
  * elsewise we give up if the port is not up.
  *
  * Setup HW for basic memap access support:
- * enable AXI bridge, maintenance window and doorbells.
+ * enable AXI bridge, maintenance window, doorbells, etc..
  */
 int axxia_rio_start_port(struct rio_mport *mport)
 {
@@ -1564,7 +1591,7 @@ int axxia_rio_start_port(struct rio_mport *mport)
 	struct rio_priv *priv = mport->priv;
 
 	/*
-	 * Set port lin request ack timout 1.5 - 3 s
+	 * Set port line request ack timout 1.5 - 3 s
 	 * Set port response timeout 1.5 - 3 s
 	 */
 	__rio_local_write_config_32(mport, RIO_PLTOCCSR, 0x7fffff);
@@ -1588,6 +1615,12 @@ int axxia_rio_start_port(struct rio_mport *mport)
 	rio_rab_ctrl_setup(mport);
 
 	rio_rab_pio_enable(mport);
+
+	/* Miscellaneous
+	 */
+        __rio_local_write_config_32(mport, RAB_OB_DME_TID_MASK,
+				    OB_DME_TID_MASK);
+
 
 	/* Setup maintenance window
 	 * Enable doorbells
