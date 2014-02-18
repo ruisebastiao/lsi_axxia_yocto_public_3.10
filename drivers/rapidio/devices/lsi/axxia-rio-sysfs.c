@@ -608,7 +608,7 @@ static ssize_t ib_dme_show(struct device *dev,
 					"DME_SLEEP" : "OK"));
 		}
 	}
-	if (!priv->internalDesc) {
+	if (!priv->intern_msg_desc) {
 		int j, k;
 		int ne = 0;
 		struct rio_irq_handler *ob = NULL;

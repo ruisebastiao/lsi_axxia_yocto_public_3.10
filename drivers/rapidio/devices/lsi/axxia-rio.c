@@ -124,25 +124,25 @@ static int __axxia_local_config_read_actual(struct rio_priv *priv,
 		/* Set correct page to operate on */
 		page_sel = (offset & 0x00fff800) << 5;
 		outl(page_sel, (long unsigned int)priv->regs_win_fixed +
-					  	RAB_APB_CSR_BASE);
+						RAB_APB_CSR_BASE);
 
 		AXXIA_RIO_SYSMEM_BARRIER();
 
 		if (offset < RAB_REG_BASE) {
 			/*
 			* Registers:
-		 	*   RapidIO Standard (0x0000-0xFFFC)
-		 	*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
-		 	*/
+			*   RapidIO Standard (0x0000-0xFFFC)
+			*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
+			*/
 			*data = CORRECT_GRIO(inl((long unsigned int)
 							priv->regs_win_paged +
 							(offset & 0x7ff)));
 		} else if ((offset >= RAB_REG_BASE) &&
 			   (offset < SRIO_SPACE_SIZE)) {
 			/*
-		 	* Peripheral Bus Bridge Specific Registers
-		 	* (0x2_0000-0x3_FFFC)
-		 	*/
+			* Peripheral Bus Bridge Specific Registers
+			* (0x2_0000-0x3_FFFC)
+			*/
 			*data = CORRECT_RAB(inl((long unsigned int)
 							priv->regs_win_paged +
 							(offset & 0x7ff)));
@@ -211,32 +211,32 @@ static int __axxia_local_config_write_actual(struct rio_priv *priv,
 		/* Set correct page to operate on */
 		page_sel = (offset & 0x00fff800) << 5;
 		outl(page_sel, (long unsigned int)priv->regs_win_fixed +
-					  	RAB_APB_CSR_BASE);
+						RAB_APB_CSR_BASE);
 
 		AXXIA_RIO_SYSMEM_BARRIER();
 
 		if (offset < RAB_REG_BASE) {
 			/*
 			* Registers:
-		 	*   RapidIO Standard (0x0000-0xFFFC)
-		 	*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
-		 	*/
+			*   RapidIO Standard (0x0000-0xFFFC)
+			*   Endpoint Controller Specific (0x1_0000-0x1_FFFC)
+			*/
 			outl_p(CORRECT_GRIO(data),
 				(long unsigned int)priv->regs_win_paged +
 						(offset & 0x7ff));
 		} else if ((offset >= RAB_REG_BASE) &&
 			   (offset < SRIO_SPACE_SIZE)) {
 			/*
-		 	* Peripheral Bus Bridge Specific Registers
+			* Peripheral Bus Bridge Specific Registers
 			* (0x2_0000-0x3_FFFC)
-		 	*/
+			*/
 			outl(data, CORRECT_RAB((long unsigned int)
 							priv->regs_win_paged +
 							(offset & 0x7ff)));
 		} else {
 			dev_err(priv->dev,
 				"RIO: Trying to write to config register "
-			   	"not specified for AXIA (0x%8.8x)\n",
+				"not specified for AXIA (0x%8.8x)\n",
 				offset);
 		}
 	}
@@ -899,13 +899,13 @@ static void axxia_init_port_data(struct rio_mport *mport)
 			AXXIA_DEVID_ACP25XX,
 		};
 		__rio_local_read_config_32(mport, RAB_CTRL, &data);
-		priv->internalDesc = (data & 0x00001000) ? 1 : 0;
+		priv->intern_msg_desc = (data & 0x00001000) ? 1 : 0;
 		for (i = 0; i < 2; i++) {
 			if (priv->devid == legacyids[i])
-				priv->internalDesc = 1;
+				priv->intern_msg_desc = 1;
 		}
 		EXT1P("rio[%d]: RapidIO internal descriptors: %d (%x %x)\n",
-			mport->id, priv->internalDesc, priv->devid, data);
+			mport->id, priv->intern_msg_desc, priv->devid, data);
 	}
 }
 
@@ -1151,10 +1151,10 @@ void axxia_rio_static_win_release(struct rio_mport *mport)
  * @law_size: Local Access Window size from DTB
  * @regs: RapidIO registers from DTB
  * @obNumDmes: Number of outbound DMEs available
- * @outbDmes: RapidIO outbound DMEs array available;
+ * @outb_dmes: RapidIO outbound DMEs array available;
  *                [0] for MSeg, [1] for SSeg
  * @ibNumDmes: Number of inbound DMEs available
- * @inbDmes: RapidIO inbound DMEs array available; 2 elements
+ * @inb_dmes: RapidIO inbound DMEs array available; 2 elements
  * @irq: RapidIO IRQ mapping from DTB
  *
  * Returns:
@@ -1168,9 +1168,9 @@ static int rio_parse_dtb(
 	u64 *law_size,
 	struct resource *regs,
 	int *obNumDmes,
-	int *outbDmes,
+	int *outb_dmes,
 	int *ibNumDmes,
-	int *inbDmes,
+	int *inb_dmes,
 	int *irq,
 	struct event_regs *linkdown_reset)
 {
@@ -1238,13 +1238,13 @@ static int rio_parse_dtb(
 	dev_dbg(&dev->dev, "LAW: [mem 0x%016llx -- 0x%016llx]\n",
 		*law_start, *law_start + *law_size - 1);
 
-	outbDmes[0] = outbDmes[1] = 0;
+	outb_dmes[0] = outb_dmes[1] = 0;
 	cell = of_get_property(dev->dev.of_node, "outb-dmes", &rlen);
 	if (!cell) {
 		obNumDmes[0] = 2;
 		obNumDmes[1] = 1;
-		outbDmes[0] = 0x00000003;
-		outbDmes[1] = 0x00000001;
+		outb_dmes[0] = 0x00000003;
+		outb_dmes[1] = 0x00000001;
 	} else {
 		if (rlen < (4 * sizeof(int))) {
 			dev_err(&dev->dev, "Invalid %s property 'outb-dmes'\n",
@@ -1252,9 +1252,9 @@ static int rio_parse_dtb(
 			return -EFAULT;
 		}
 		obNumDmes[0] = of_read_number(cell, 1);
-		outbDmes[0] = of_read_number(cell + 1, 1);
+		outb_dmes[0] = of_read_number(cell + 1, 1);
 		obNumDmes[1] = of_read_number(cell + 2, 1);
-		outbDmes[1] = of_read_number(cell + 3, 1);
+		outb_dmes[1] = of_read_number(cell + 3, 1);
 		if (((obNumDmes[0])+(obNumDmes[1])) > DME_MAX_OB_ENGINES) {
 			dev_err(&dev->dev, "Invalid %s property 'outb-dmes'\n",
 				dev->dev.of_node->full_name);
@@ -1262,15 +1262,15 @@ static int rio_parse_dtb(
 		}
 	}
 	dev_dbg(&dev->dev, "outb-dmes: MSeg[%d]=%08x SSeg[%d]=%08x\n",
-		obNumDmes[0], outbDmes[0], obNumDmes[1], outbDmes[1]);
+		obNumDmes[0], outb_dmes[0], obNumDmes[1], outb_dmes[1]);
 
-	inbDmes[0] = inbDmes[1] = 0;
+	inb_dmes[0] = inb_dmes[1] = 0;
 	cell = of_get_property(dev->dev.of_node, "inb-dmes", &rlen);
 	if (!cell) {
 		ibNumDmes[0] = DME_MAX_IB_ENGINES;
 		ibNumDmes[1] = 0;
-		inbDmes[0] = 0xffffffff;
-		inbDmes[1] = 0x00000000;
+		inb_dmes[0] = 0xffffffff;
+		inb_dmes[1] = 0x00000000;
 	} else {
 		if (rlen < (4 * sizeof(int))) {
 			dev_err(&dev->dev, "Invalid %s property 'inb-dmes'\n",
@@ -1278,9 +1278,9 @@ static int rio_parse_dtb(
 			return -EFAULT;
 		}
 		ibNumDmes[0] = of_read_number(cell, 1);
-		inbDmes[0] = of_read_number(cell + 1, 1);
+		inb_dmes[0] = of_read_number(cell + 1, 1);
 		ibNumDmes[1] = of_read_number(cell + 2, 1);
-		inbDmes[1] = of_read_number(cell + 3, 1);
+		inb_dmes[1] = of_read_number(cell + 3, 1);
 		if (((ibNumDmes[0])+(ibNumDmes[1])) > DME_MAX_IB_ENGINES) {
 			dev_err(&dev->dev, "Invalid %s property 'inb-dmes'\n",
 				dev->dev.of_node->full_name);
@@ -1288,7 +1288,7 @@ static int rio_parse_dtb(
 		}
 	}
 	dev_dbg(&dev->dev, "inb-dmes: MSeg[%d]=%08x SSeg[%d]=%08x\n",
-		ibNumDmes[0], inbDmes[0], ibNumDmes[1], inbDmes[1]);
+		ibNumDmes[0], inb_dmes[0], ibNumDmes[1], inb_dmes[1]);
 
 	*irq = irq_of_parse_and_map(dev->dev.of_node, 0);
 	dev_dbg(&dev->dev, "irq: %d\n", *irq);
@@ -1440,9 +1440,9 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
  * @ndx: Instance Id of the controller description
  * @portNdx: Port Id of the controller
  * @numObNumDmes: override num outbound DMEs available
- * @outbDmes: RapidIO outbound DMEs array available; [0] for MSeg, [1] for SSeg
+ * @outb_dmes: RapidIO outbound DMEs array available; [0] for MSeg, [1] for SSeg
  * @numIbNumDmes: override num inbound DMEs available
- * @inbDmes: RapidIO inbound DMEs array available; 2 elements
+ * @inb_dmes: RapidIO inbound DMEs array available; 2 elements
  * @irq: IRQ number
  *
  * Init master port private data structure
@@ -1458,10 +1458,10 @@ static struct rio_priv *rio_priv_dtb_setup(
 	struct rio_mport *mport,
 	int ndx,
 	int portNdx,
-	int *numOutbDmes,
-	int *outbDmes,
-	int *numInbDmes,
-	int *inbDmes,
+	int *num_outb_dmes,
+	int *outb_dmes,
+	int *num_inb_dmes,
+	int *inb_dmes,
 	int irq,
 	struct event_regs *linkdown_reset)
 {
@@ -1482,7 +1482,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 	/* Max descriptors */
 	priv->desc_max_entries = RIO_MSG_MAX_ENTRIES;
 
-	if (priv->internalDesc) {
+	if (priv->intern_msg_desc) {
 		/* Support for alloc_message_engine() */
 		struct resource *dres = &priv->acpres[ACP_HW_DESC_RESOURCE];
 
@@ -1507,17 +1507,17 @@ static struct rio_priv *rio_priv_dtb_setup(
 	}
 
 	/* Defined DMEs */
-	if (outbDmes) {
-		priv->numOutbDmes[0] = numOutbDmes[0];
-		priv->numOutbDmes[1] = numOutbDmes[1];
-		priv->outbDmes[0] = outbDmes[0];
-		priv->outbDmes[1] = outbDmes[1];
+	if (outb_dmes) {
+		priv->num_outb_dmes[0] = num_outb_dmes[0];
+		priv->num_outb_dmes[1] = num_outb_dmes[1];
+		priv->outb_dmes[0] = outb_dmes[0];
+		priv->outb_dmes[1] = outb_dmes[1];
 	}
-	if (inbDmes) {
-		priv->numInbDmes[0] = numInbDmes[0];
-		priv->numInbDmes[1] = numInbDmes[1];
-		priv->inbDmes[0] = inbDmes[0];
-		priv->inbDmes[1] = inbDmes[1];
+	if (inb_dmes) {
+		priv->num_inb_dmes[0] = num_inb_dmes[0];
+		priv->num_inb_dmes[1] = num_inb_dmes[1];
+		priv->inb_dmes[0] = inb_dmes[0];
+		priv->inb_dmes[1] = inb_dmes[1];
 	}
 
 	/* Interrupt handling */
@@ -1618,7 +1618,7 @@ int axxia_rio_start_port(struct rio_mport *mport)
 
 	/* Miscellaneous
 	 */
-        __rio_local_write_config_32(mport, RAB_OB_DME_TID_MASK,
+	__rio_local_write_config_32(mport, RAB_OB_DME_TID_MASK,
 				    OB_DME_TID_MASK);
 
 
@@ -1667,15 +1667,15 @@ static int axxia_rio_setup(struct platform_device *dev)
 	struct resource regs;
 	u64 law_start = 0, law_size = 0;
 	int ndx = 0, irq = 0, portNdx = 0;
-	int numObDmes[2] = { 0, }, outbDmes[2] = { 0, };
-	int numIbDmes[2] = { 0, }, inbDmes[2] = { 0, };
+	int numObDmes[2] = { 0, }, outb_dmes[2] = { 0, };
+	int numIbDmes[2] = { 0, }, inb_dmes[2] = { 0, };
 	struct event_regs linkdown_reset = { 0, };
 	struct axxia_rio_ds_dtb_info ds_dtb_info; /* data_streaming */
 
 	/* Get address boundaries, etc. from DTB */
 	if (rio_parse_dtb(dev, &ndx, &law_start, &law_size, &regs,
-			  &numObDmes[0], &outbDmes[0],
-			  &numIbDmes[0], &inbDmes[0],
+			  &numObDmes[0], &outb_dmes[0],
+			  &numIbDmes[0], &inb_dmes[0],
 			  &irq, &linkdown_reset))
 		return -EFAULT;
 
@@ -1698,8 +1698,8 @@ static int axxia_rio_setup(struct platform_device *dev)
 	if (rc != 0)
 		goto err_port;
 	priv = rio_priv_dtb_setup(dev, &regs, mport, ndx, portNdx,
-				  &numObDmes[0], &outbDmes[0],
-				  &numIbDmes[0], &inbDmes[0],
+				  &numObDmes[0], &outb_dmes[0],
+				  &numIbDmes[0], &inb_dmes[0],
 				  irq, &linkdown_reset);
 	if (IS_ERR(priv)) {
 		rc = PTR_ERR(priv);
@@ -1764,12 +1764,12 @@ static int axxia_rio_setup(struct platform_device *dev)
 	*/
 	switch (priv->devid) {
 	case AXXIA_DEVID_ACP25XX:
-		priv->outbDmes[1] = 0x00000000;
+		priv->outb_dmes[1] = 0x00000000;
 		break;
 	case AXXIA_DEVID_AXM55XX:
 		switch (priv->devrev) {
 		case AXXIA_DEVREV_AXM55XX_V1_0:
-			priv->outbDmes[1] = 0x00000000;
+			priv->outb_dmes[1] = 0x00000000;
 			break;
 		default:
 			break;

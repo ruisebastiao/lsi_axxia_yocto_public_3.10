@@ -145,7 +145,7 @@ static inline void __ib_dse_dw_dbg(
  * @mport:	pointer to the master port
  * @mtu:	Maximum Transmission Unit - controls the data payload size for
  *			segments of an encapsulated PDU.
- * @ibds_avsid_mapping:	this field definesmapping from incoming VSID
+ * @ibds_avsid_mapping:	this field defines mapping from incoming VSID
  *			(Combination of Source ID and COS) to internal
  *			(aliased) VSID.
  *
@@ -214,9 +214,9 @@ EXPORT_SYMBOL(axxia_data_stream_global_cfg);
  *  This function sets up a descriptor chain to an outbound data streaming
  *  engine (DSE). It is called by axxia_open_ob_data_stream( ).
  *
- * @mport:		Pointer to the master port
- * @dev_id: 		Device specific pointer to pass on event
- * @dse_id:		DSE ID in the range of [0, 15]
+ * @mport:              Pointer to the master port
+ * @dev_id:             Device specific pointer to pass on event
+ * @dse_id:             DSE ID in the range of [0, 15]
  * @num_header_entries:	Number of header descriptors in the descriptor chain
  * @num_data_entries:	Number of data descriptors in the descriptor chain
  *
@@ -224,8 +224,8 @@ EXPORT_SYMBOL(axxia_data_stream_global_cfg);
  ****************************************************************************/
 static
 int open_ob_data_stream(
-	struct rio_mport    	*mport,
-	void		    	*dev_id,
+	struct rio_mport	*mport,
+	void			*dev_id,
 	int			dse_id,
 	int			num_header_entries,
 	int			num_data_entries)
@@ -426,27 +426,27 @@ EXPORT_SYMBOL(axxia_open_ob_data_stream);
  *  The buffer will be freed when the associated descriptor is processed
  *  in the ob_dse_irq_handler( ) routine.
  *
- * @mport:	  	Pointer to the master port
- * @dest_id:	 	Destination ID of the data stream
- * @stream_id:		Data stream ID
- * @cos:	    	Class of service of the stream
- * @priority:		Priority of the data stream
- * @is_hdr_desc:	Indicate if the descriptor a header descriptor
+ * @mport:              Pointer to the master port
+ * @dest_id:            Destination ID of the data stream
+ * @stream_id:          Data stream ID
+ * @cos:                Class of service of the stream
+ * @priority:           Priority of the data stream
+ * @is_hdr_desc:        Indicate if the descriptor a header descriptor
  *			or data descriptor
- * @buffer:	 	Pointer to where the data is stored
- * @data_len:     	Data buffer length associated with the descriptor
+ * @buffer:             Pointer to where the data is stored
+ * @data_len:           Data buffer length associated with the descriptor
  *
  * Returns %0 on success
  ****************************************************************************/
 int axxia_add_ob_data_stream(
 	struct rio_mport	*mport,
-	int		     	dest_id,
-	int		     	stream_id,
-	int		     	cos,
+	int			dest_id,
+	int			stream_id,
+	int			cos,
 	int			priority,
 	int			is_hdr_desc,
-	void		    	*buffer,
-	int		     	data_len)
+	void			*buffer,
+	int			data_len)
 {
 	struct rio_priv *priv = mport->priv;
 	struct axxia_rio_ds_priv      *ptr_ds_priv;
@@ -753,8 +753,8 @@ void ob_dse_irq_handler(struct rio_irq_handler *h, u32 state)
  * Returns %0 on success
  ****************************************************************************/
 int axxia_close_ob_data_stream(
-	struct rio_mport    	*mport,
-	int		 	dse_id)
+	struct rio_mport	*mport,
+	int			dse_id)
 {
 	struct rio_priv               *priv = mport->priv;
 	struct axxia_rio_ds_priv      *ptr_ds_priv = &(priv->ds_priv_data);
@@ -820,7 +820,7 @@ EXPORT_SYMBOL(axxia_close_ob_data_stream);
  *  It is called by axxia_open_ib_data_stream( ).
  *
  * @mport:		Pointer to the master port
- * @source_id:   	Source ID of the data stream
+ * @source_id:          Source ID of the data stream
  * @cos:		Class of service of the stream
  * @desc_dbuf_size: Data buffer size the descriptor can handle
  * @num_entries:	Number of descriptors in this descriptor chain
@@ -829,10 +829,10 @@ EXPORT_SYMBOL(axxia_close_ob_data_stream);
  ****************************************************************************/
 static
 int open_ib_data_stream(
-	struct rio_mport    	*mport,
+	struct rio_mport	*mport,
 	void			*dev_id,
 	int			source_id,
-	int 		    	cos,
+	int			cos,
 	int			desc_dbuf_size,
 	int			num_entries)
 {
@@ -923,8 +923,8 @@ int open_ib_data_stream(
 	ptr_virt_m_cfg->alias_reg_value = alias_reg;
 
 	/*
-	** If the end of chain bit is not set, it is required that there is
-	** 	one invalid entry left in the system.
+	** If the end of chain bit is not set, it is required that there
+	** is one invalid entry left in the system.
 	*/
 	num_int_entries = num_entries + 1;
 
@@ -1125,7 +1125,7 @@ EXPORT_SYMBOL(axxia_open_ib_data_stream);
  * @source_id:	Source ID of the data stream
  * @cos:	Class of service of the stream
  * @buf:	Pointer to where the data is stored
- * @buf_size: 	Size of the buffer
+ * @buf_size:   Size of the buffer
  *
  * Returns %0 on success
  ****************************************************************************/
@@ -1223,8 +1223,8 @@ int axxia_add_ibds_buffer(
 	ptr_data_desc->dw0 &= ~(IB_DSE_DESC_DS_ERR);
 
 	/*
-	**	set the valid bit to be 1
-	** 	The valid bit has to be set prior to setting VSID_ADDR_HI reg
+	** Set the valid bit to be 1
+	** The valid bit has to be set prior to setting VSID_ADDR_HI reg
 	*/
 	ptr_data_desc->dw0 |= 0x1;
 
@@ -1568,9 +1568,9 @@ EXPORT_SYMBOL(axxia_get_ibds_data);
  *
  *  This function closes an inbound data streaming.
  *
- * @mport:	  	Pointer to the master port
- * @source_id:     	Source ID of the data stream
- * @cos:	  	Class of service of the stream
+ * @mport:              Pointer to the master port
+ * @source_id:          Source ID of the data stream
+ * @cos:                Class of service of the stream
  *
  * Returns %0 on success
  ****************************************************************************/
@@ -1586,7 +1586,7 @@ int axxia_close_ib_data_stream(
 	struct axxia_rio_ids_data_desc *ptr_data_desc;
 	u8      find_ava_virt_m = RIO_DS_FALSE;
 	u8      i;
-	u8 	virt_vsid;
+	u8      virt_vsid;
 
 	axxia_api_lock(priv);
 
@@ -1646,8 +1646,8 @@ EXPORT_SYMBOL(axxia_close_ib_data_stream);
  *  virtual VSID.  Please refer to Table 133 of rio_axi_datasheet.pdf
  *  for detail information.
  *
- * @vsid:	  	Incoming VSID
- * @alias_reg:  	RAB_IBDS_VSID_ALIAS register value
+ * @vsid:               Incoming VSID
+ * @alias_reg:          RAB_IBDS_VSID_ALIAS register value
  *
  * @ptr_virt_vsid:	Pointer to where the alias VSID is stored
  *

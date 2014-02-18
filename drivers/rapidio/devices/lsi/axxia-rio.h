@@ -521,17 +521,17 @@ struct rio_priv {
 	struct atmu_outb outb_atmu[RIO_OUTB_ATMU_WINDOWS];
 	struct resource acpres[ACP_MAX_RESOURCES];
 
-	int internalDesc;
+	int intern_msg_desc;
 	int desc_max_entries;
 
 	/* Chip-specific DME availability */
-	int numOutbDmes[2];	/* [0]=MSeg, [1]=Sseg */
-	int outbDmesInUse[2];
-	int outbDmes[2];	/* set of defined outbound DMEs:
+	int num_outb_dmes[2];	/* [0]=MSeg, [1]=Sseg */
+	int outb_dmes_in_use[2];
+	int outb_dmes[2];	/* set of defined outbound DMEs:
 				 *   [0]=MSeg, [1]=SSeg */
-	int numInbDmes[2];	/* [0]=MSeg, [1]=Sseg */
-	int inbDmesInUse[2];
-	int inbDmes[2];		/* set of defined inbound DMEs */
+	int num_inb_dmes[2];	/* [0]=MSeg, [1]=Sseg */
+	int inb_dmes_in_use[2];
+	int inb_dmes[2];	/* set of defined inbound DMEs */
 
 	/* Linkdown Reset; Trigger via SRDS STAT1 */
 	struct event_regs linkdown_reset;
