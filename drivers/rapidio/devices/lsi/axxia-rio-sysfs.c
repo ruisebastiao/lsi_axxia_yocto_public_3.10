@@ -29,7 +29,7 @@
 
 #ifdef CONFIG_AXXIA_RIO_STAT
 
-static const char *event_str[] = {
+static const char * const event_str[] = {
 	"TX Port Packet dropped                 ",
 	"TX Port Error threshold exceeded       ",
 	"Tx Port Degraded threshold exceeded    ",
@@ -41,7 +41,7 @@ static const char *event_str[] = {
 	"RIO_EVENT_NUM"
 };
 
-static const char *state_str[] = {
+static const char * const state_str[] = {
 	"TX Port stopped due to retry condition",
 	"TX Port stopped due to transmission err",
 	"RX Port stopped due to retry condition",
@@ -51,7 +51,7 @@ static const char *state_str[] = {
 	"RIO_STATE_NUM"
 };
 
-static const char *irq_str[] = {
+static const char * const irq_str[] = {
 	/* Axxia Error Events - really bad! */
 	"Axxia Master Write timouts                           ",
 	"Axxia Master Read timouts                            ",
@@ -131,7 +131,7 @@ static const char *irq_str[] = {
 	"RIO_IRQ_NUM"
 };
 
-static const char *ib_dme_str[] = {
+static const char * const ib_dme_str[] = {
 	"Inbound Message descriptors push to net stack        ",
 	"Inbound Message descriptors ok pop by net stack      ",
 	"Inbound Message descriptors err pop by net stack     ",
@@ -143,7 +143,7 @@ static const char *ib_dme_str[] = {
 	"RIO_IB_DME_NUM"
 };
 
-static const char *ob_dme_str[] = {
+static const char * const ob_dme_str[] = {
 	"Outbound Message descriptors push by net stack       ",
 	"Outbound Message descriptors net push when ring full ",
 	"Outbound Message descriptors ack to net stack        ",
@@ -423,9 +423,9 @@ static ssize_t axxia_rio_tmo_show(struct device *dev,
 	__rio_local_read_config_32(mport, RAB_APIO_STAT, &stat);
 	str += sprintf(str, "RAB_APIO_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_APIO_STAT, stat);
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &stat);
+	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &stat);
 	str += sprintf(str, "PNESCSR (%p)\t%8.8x\n",
-		       (void *)RIO_ESCSR(priv->portNdx), stat);
+		       (void *)RIO_ESCSR(priv->port_ndx), stat);
 
 	return str - buf;
 }
@@ -711,8 +711,8 @@ retry:
 		stat->desc_done++;
 		for (i = 0; i < sz; i++) {
 			if (buf[i] != (i & 0xff)) {
-				pr_err("--- %s --- unexpected data %hhx "
-					"returned in byte %d\n",
+				pr_err("--- %s --- unexpected data %hhx \
+returned in byte %d\n",
 					__func__, buf[i], i);
 				break;
 			}

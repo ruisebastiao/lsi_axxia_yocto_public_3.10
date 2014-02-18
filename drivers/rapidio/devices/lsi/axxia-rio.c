@@ -42,13 +42,13 @@
 static DEFINE_SPINLOCK(rio_io_lock);
 
 #ifdef IODEBUG
-#define	IODP(...)	printk(__VA_ARGS__)
+#define	IODP(...)	pr_info(__VA_ARGS__)
 #else
 #define	IODP(...)
 #endif
 
 #ifdef EXTRA1DEBUG
-#define	EXT1P(...)	printk(__VA_ARGS__)
+#define	EXT1P(...)	pr_info(__VA_ARGS__)
 #else
 #define	EXT1P(...)
 #endif
@@ -353,8 +353,9 @@ static int axxia_rio_config_read(struct rio_mport *mport, int index,
 				       0);
 
 	if (TTYPE_VAL(ctrl)) { /* Not maintenance */
-		dev_err(priv->dev, "(%s): Window is not setup for Maintenance "
-				   "operations. 0x%8.8x\n",
+		dev_err(priv->dev,
+			"(%s): Window is not setup for Maintenance "
+			"operations. 0x%8.8x\n",
 			__func__, ctrl);
 		AXXIA_RIO_ENABLE_MACHINE_CHECK();
 		return -EINVAL;
@@ -823,7 +824,7 @@ void axxia_rio_set_mport_disc_mode(struct rio_mport *mport)
 	/* Set to receive any dist ID for serial RapidIO controller. */
 	if (mport->phy_type == RIO_PHY_SERIAL)
 		__rio_local_write_config_32(mport,
-					    EPC_PNPTAACR(mport->portNdx),
+					    EPC_PNPTAACR(mport->port_ndx),
 					    0x00000000);
 #endif
 
@@ -835,10 +836,10 @@ void axxia_rio_set_mport_disc_mode(struct rio_mport *mport)
 		result |= EPC_PNADIDCSR_ADID_SMALL(
 				CONFIG_RAPIDIO_SECOND_DEST_ID);
 		__rio_local_write_config_32(mport,
-					    EPC_PNADIDCSR(priv->portNdx),
+					    EPC_PNADIDCSR(priv->port_ndx),
 					    result);
 		dev_dbg(priv->dev, "Port%dAltDevIdmCSR set to 0x%X\n",
-			priv->portNdx, CONFIG_RAPIDIO_SECOND_DEST_ID);
+			priv->port_ndx, CONFIG_RAPIDIO_SECOND_DEST_ID);
 	}
 #else
 	/* Set the Alternate Destination ID to prevent "Machine Checks"
@@ -853,10 +854,10 @@ void axxia_rio_set_mport_disc_mode(struct rio_mport *mport)
 		else
 			result |= EPC_PNADIDCSR_ADID_SMALL(~0);
 		__rio_local_write_config_32(mport,
-					    EPC_PNADIDCSR(priv->portNdx),
+					    EPC_PNADIDCSR(priv->port_ndx),
 					    result);
 		dev_dbg(priv->dev, "Port%dAltDevIdmCSR set to 0x%X\n",
-			priv->portNdx, result);
+			priv->port_ndx, result);
 	}
 #endif
 }
@@ -878,7 +879,7 @@ static void axxia_init_port_data(struct rio_mport *mport)
 				    data | RAB_SRDS_CTRL0_16B_ID);
 #endif
 	/* Probe the master port phy type */
-	__rio_local_read_config_32(mport, RIO_CCSR(priv->portNdx), &ccsr);
+	__rio_local_read_config_32(mport, RIO_CCSR(priv->port_ndx), &ccsr);
 	mport->phy_type = (ccsr & 1) ? RIO_PHY_SERIAL : RIO_PHY_PARALLEL;
 	dev_dbg(priv->dev, "RapidIO PHY type: %s\n",
 		 (mport->phy_type == RIO_PHY_PARALLEL) ? "parallel" :
@@ -971,8 +972,8 @@ static int rio_start_port(struct rio_mport *mport)
 	u32 ccsr, escsr;
 
 	/* Probe the master port phy type */
-	__rio_local_read_config_32(mport, RIO_CCSR(priv->portNdx), &ccsr);
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &escsr);
+	__rio_local_read_config_32(mport, RIO_CCSR(priv->port_ndx), &ccsr);
+	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &escsr);
 
 	if (escsr & RIO_ESCSR_PU) {
 
@@ -982,7 +983,7 @@ static int rio_start_port(struct rio_mport *mport)
 
 		/* Disable ports */
 		ccsr |= RIO_CCSR_PD;
-		__rio_local_write_config_32(mport, RIO_CCSR(priv->portNdx),
+		__rio_local_write_config_32(mport, RIO_CCSR(priv->port_ndx),
 						ccsr);
 		switch (mport->phy_type) {
 		case RIO_PHY_SERIAL:
@@ -990,7 +991,7 @@ static int rio_start_port(struct rio_mport *mport)
 			ccsr &= ~RIO_CCSR_PWO;
 			ccsr |= RIO_CCSR_FORCE_LANE0;
 			__rio_local_write_config_32(mport,
-						RIO_CCSR(priv->portNdx), ccsr);
+						RIO_CCSR(priv->port_ndx), ccsr);
 			break;
 		case RIO_PHY_PARALLEL:
 			break;
@@ -998,10 +999,10 @@ static int rio_start_port(struct rio_mport *mport)
 
 		/* Enable ports */
 		ccsr &= ~RIO_CCSR_PD;
-		__rio_local_write_config_32(mport, RIO_CCSR(priv->portNdx),
+		__rio_local_write_config_32(mport, RIO_CCSR(priv->port_ndx),
 					ccsr);
 		msleep(100);
-		__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx),
+		__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx),
 					&escsr);
 		axxia_rio_info(priv->dev, ccsr);
 		if (escsr & RIO_ESCSR_PU) {
@@ -1021,18 +1022,17 @@ static int rio_start_port(struct rio_mport *mport)
 					&hdlcsr);
 		__rio_local_read_config_32(mport, RAB_VER, &rabver);
 
-		printk(KERN_INFO
-			"rio[%d]: AR[%d] DIDCAR[%x]=%08x RAB_VER[%x]=%08x\n",
+		pr_info("rio[%d]: AR[%d] DIDCAR[%x]=%08x RAB_VER[%x]=%08x\n",
 			mport->id,
 			__LINE__,
 			RIO_DEV_ID_CAR, priv->devid,
 			RAB_VER, rabver);
-		printk("rio[%d]: AR[%d] CCSR[%x]=%08x ESCSR[%x]=%08x "
-		      "HBDIDLCSR[%x]=%08x\n",
+		pr_info("rio[%d]: AR[%d] CCSR[%x]=%08x ESCSR[%x]=%08x "
+			"HBDIDLCSR[%x]=%08x\n",
 			mport->id,
 			__LINE__,
-			RIO_CCSR(priv->portNdx), ccsr,
-			RIO_ESCSR(priv->portNdx), escsr,
+			RIO_CCSR(priv->port_ndx), ccsr,
+			RIO_ESCSR(priv->port_ndx), escsr,
 			RIO_HOST_DID_LOCK_CSR, hdlcsr);
 	}
 #endif /* defined(EXTRA1DEBUG) */
@@ -1150,10 +1150,10 @@ void axxia_rio_static_win_release(struct rio_mport *mport)
  * @law_start: Local Access Window start address from DTB
  * @law_size: Local Access Window size from DTB
  * @regs: RapidIO registers from DTB
- * @obNumDmes: Number of outbound DMEs available
+ * @ob_num_dmes: Number of outbound DMEs available
  * @outb_dmes: RapidIO outbound DMEs array available;
  *                [0] for MSeg, [1] for SSeg
- * @ibNumDmes: Number of inbound DMEs available
+ * @ib_num_dmes: Number of inbound DMEs available
  * @inb_dmes: RapidIO inbound DMEs array available; 2 elements
  * @irq: RapidIO IRQ mapping from DTB
  *
@@ -1167,9 +1167,9 @@ static int rio_parse_dtb(
 	u64 *law_start,
 	u64 *law_size,
 	struct resource *regs,
-	int *obNumDmes,
+	int *ob_num_dmes,
 	int *outb_dmes,
-	int *ibNumDmes,
+	int *ib_num_dmes,
 	int *inb_dmes,
 	int *irq,
 	struct event_regs *linkdown_reset)
@@ -1241,8 +1241,8 @@ static int rio_parse_dtb(
 	outb_dmes[0] = outb_dmes[1] = 0;
 	cell = of_get_property(dev->dev.of_node, "outb-dmes", &rlen);
 	if (!cell) {
-		obNumDmes[0] = 2;
-		obNumDmes[1] = 1;
+		ob_num_dmes[0] = 2;
+		ob_num_dmes[1] = 1;
 		outb_dmes[0] = 0x00000003;
 		outb_dmes[1] = 0x00000001;
 	} else {
@@ -1251,24 +1251,24 @@ static int rio_parse_dtb(
 				dev->dev.of_node->full_name);
 			return -EFAULT;
 		}
-		obNumDmes[0] = of_read_number(cell, 1);
+		ob_num_dmes[0] = of_read_number(cell, 1);
 		outb_dmes[0] = of_read_number(cell + 1, 1);
-		obNumDmes[1] = of_read_number(cell + 2, 1);
+		ob_num_dmes[1] = of_read_number(cell + 2, 1);
 		outb_dmes[1] = of_read_number(cell + 3, 1);
-		if (((obNumDmes[0])+(obNumDmes[1])) > DME_MAX_OB_ENGINES) {
+		if (((ob_num_dmes[0])+(ob_num_dmes[1])) > DME_MAX_OB_ENGINES) {
 			dev_err(&dev->dev, "Invalid %s property 'outb-dmes'\n",
 				dev->dev.of_node->full_name);
 			return -EFAULT;
 		}
 	}
 	dev_dbg(&dev->dev, "outb-dmes: MSeg[%d]=%08x SSeg[%d]=%08x\n",
-		obNumDmes[0], outb_dmes[0], obNumDmes[1], outb_dmes[1]);
+		ob_num_dmes[0], outb_dmes[0], ob_num_dmes[1], outb_dmes[1]);
 
 	inb_dmes[0] = inb_dmes[1] = 0;
 	cell = of_get_property(dev->dev.of_node, "inb-dmes", &rlen);
 	if (!cell) {
-		ibNumDmes[0] = DME_MAX_IB_ENGINES;
-		ibNumDmes[1] = 0;
+		ib_num_dmes[0] = DME_MAX_IB_ENGINES;
+		ib_num_dmes[1] = 0;
 		inb_dmes[0] = 0xffffffff;
 		inb_dmes[1] = 0x00000000;
 	} else {
@@ -1277,18 +1277,18 @@ static int rio_parse_dtb(
 				dev->dev.of_node->full_name);
 			return -EFAULT;
 		}
-		ibNumDmes[0] = of_read_number(cell, 1);
+		ib_num_dmes[0] = of_read_number(cell, 1);
 		inb_dmes[0] = of_read_number(cell + 1, 1);
-		ibNumDmes[1] = of_read_number(cell + 2, 1);
+		ib_num_dmes[1] = of_read_number(cell + 2, 1);
 		inb_dmes[1] = of_read_number(cell + 3, 1);
-		if (((ibNumDmes[0])+(ibNumDmes[1])) > DME_MAX_IB_ENGINES) {
+		if (((ib_num_dmes[0])+(ib_num_dmes[1])) > DME_MAX_IB_ENGINES) {
 			dev_err(&dev->dev, "Invalid %s property 'inb-dmes'\n",
 				dev->dev.of_node->full_name);
 			return -EFAULT;
 		}
 	}
 	dev_dbg(&dev->dev, "inb-dmes: MSeg[%d]=%08x SSeg[%d]=%08x\n",
-		ibNumDmes[0], inb_dmes[0], ibNumDmes[1], inb_dmes[1]);
+		ib_num_dmes[0], inb_dmes[0], ib_num_dmes[1], inb_dmes[1]);
 
 	*irq = irq_of_parse_and_map(dev->dev.of_node, 0);
 	dev_dbg(&dev->dev, "irq: %d\n", *irq);
@@ -1311,9 +1311,7 @@ static int rio_parse_dtb(
 			linkdown_reset->reg_mask =
 				of_read_number(dt_range + 1, 1);
 			linkdown_reset->in_use = 1;
-			EXT1P("rio[%d]: LDR"
-			     "st=%llx sz=%llx RA=%x MSK=%x iu=%d\n",
-				99,
+			EXT1P("rio: LDR st=%llx sz=%llx RA=%x MSK=%x iu=%d\n",
 				linkdown_reset->phy_reset_start,
 				linkdown_reset->phy_reset_size,
 				linkdown_reset->reg_addr,
@@ -1384,7 +1382,7 @@ static struct rio_mem_ops axxia_mem_ops = {
 };
 
 static int rio_mport_dtb_setup(struct platform_device *dev,
-			       int portNdx,
+			       int port_ndx,
 			       u64 law_start,
 			       u64 law_size,
 			       struct rio_ops *ops,
@@ -1398,7 +1396,7 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
 	if (!mport)
 		return -ENOMEM;
 
-	mport->index = portNdx;
+	mport->index = port_ndx;
 
 	INIT_LIST_HEAD(&mport->dbells);
 	mport->iores.start = law_start;
@@ -1438,7 +1436,7 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
  * @regs: RapidIO registers from DTB
  * @mport: master port
  * @ndx: Instance Id of the controller description
- * @portNdx: Port Id of the controller
+ * @port_ndx: Port Id of the controller
  * @numObNumDmes: override num outbound DMEs available
  * @outb_dmes: RapidIO outbound DMEs array available; [0] for MSeg, [1] for SSeg
  * @numIbNumDmes: override num inbound DMEs available
@@ -1457,7 +1455,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 	struct resource *regs,
 	struct rio_mport *mport,
 	int ndx,
-	int portNdx,
+	int port_ndx,
 	int *num_outb_dmes,
 	int *outb_dmes,
 	int *num_inb_dmes,
@@ -1476,7 +1474,7 @@ static struct rio_priv *rio_priv_dtb_setup(
 	priv->cookie = LSI_AXXIA_RIO_COOKIE;
 	priv->mport = mport;
 	priv->ndx = ndx;
-	priv->portNdx = portNdx;
+	priv->port_ndx = port_ndx;
 	spin_lock_init(&priv->api_lock);
 
 	/* Max descriptors */
@@ -1666,7 +1664,7 @@ static int axxia_rio_setup(struct platform_device *dev)
 	struct rio_priv *priv;
 	struct resource regs;
 	u64 law_start = 0, law_size = 0;
-	int ndx = 0, irq = 0, portNdx = 0;
+	int ndx = 0, irq = 0, port_ndx = 0;
 	int numObDmes[2] = { 0, }, outb_dmes[2] = { 0, };
 	int numIbDmes[2] = { 0, }, inb_dmes[2] = { 0, };
 	struct event_regs linkdown_reset = { 0, };
@@ -1679,7 +1677,7 @@ static int axxia_rio_setup(struct platform_device *dev)
 			  &irq, &linkdown_reset))
 		return -EFAULT;
 
-	rc = axxia_rapidio_board_init(dev, ndx, &portNdx);
+	rc = axxia_rapidio_board_init(dev, ndx, &port_ndx);
 	if (rc != 0)
 		return rc;
 
@@ -1693,11 +1691,11 @@ static int axxia_rio_setup(struct platform_device *dev)
 		rc = PTR_ERR(ops);
 		goto err_ops;
 	}
-	rc = rio_mport_dtb_setup(dev, portNdx, law_start, law_size,
+	rc = rio_mport_dtb_setup(dev, port_ndx, law_start, law_size,
 				 ops, &mport);
 	if (rc != 0)
 		goto err_port;
-	priv = rio_priv_dtb_setup(dev, &regs, mport, ndx, portNdx,
+	priv = rio_priv_dtb_setup(dev, &regs, mport, ndx, port_ndx,
 				  &numObDmes[0], &outb_dmes[0],
 				  &numIbDmes[0], &inb_dmes[0],
 				  irq, &linkdown_reset);

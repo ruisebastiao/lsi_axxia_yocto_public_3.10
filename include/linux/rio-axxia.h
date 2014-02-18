@@ -95,7 +95,7 @@
 #define IB_DSE_DESC_DS_ERR		(1 << 10)
 #define IB_DSE_DESC_DONE		(1 << 9)
 
-#define IB_DSE_VSID_IN_USED		0x3F
+#define IB_DSE_VSID_IN_USE		0x3F
 #define IB_DSE_STAT_TRANS_PENDING	(1 << 6)
 #define IB_DSE_STAT_TIMEOUT		(1 << 7)
 

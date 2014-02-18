@@ -36,7 +36,6 @@
 /*
 ** Debug Build Flags
 **/
-/* #define STRICT_INB_ORDERING	0 */
 /* #define AXM55XX_OUTB_DME_BBS 1 */
 
 
@@ -303,8 +302,8 @@ static inline void __ib_dme_event_dbg(struct rio_priv *priv,
 		__ib_dme_debug(priv, dme, RIO_IB_DME_RX_VBUF_EMPTY);
 	if (ib_event & (1 << RIO_IB_DME_RX_RING_FULL))
 		__ib_dme_debug(priv, dme, RIO_IB_DME_RX_RING_FULL);
-	if (ib_event & (1 << RIO_IB_DME_RX_PENDING_AT_SLEEP))
-		__ib_dme_debug(priv, dme, RIO_IB_DME_RX_PENDING_AT_SLEEP);
+	if (ib_event & (1 << RIO_IB_DME_RX_PEND_SLEEP))
+		__ib_dme_debug(priv, dme, RIO_IB_DME_RX_PEND_SLEEP);
 	if (ib_event & (1 << RIO_IB_DME_RX_SLEEP))
 		__ib_dme_debug(priv, dme, RIO_IB_DME_RX_SLEEP);
 	if (ib_event & (1 << RIO_IB_DME_RX_WAKEUP))
@@ -503,13 +502,13 @@ static inline void __misc_fatal(struct rio_mport *mport,
 	u32 aslv_state = 0;
 	u32 escsr, iecsr;
 
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &escsr);
-	__rio_local_read_config_32(mport, EPC_IECSR(priv->portNdx), &iecsr);
+	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &escsr);
+	__rio_local_read_config_32(mport, EPC_IECSR(priv->port_ndx), &iecsr);
 
 	/* clear latched state indications */
-	__rio_local_write_config_32(mport, RIO_ESCSR(priv->portNdx),
+	__rio_local_write_config_32(mport, RIO_ESCSR(priv->port_ndx),
 					(escsr & RIO_EXCSR_WOLR));
-	__rio_local_write_config_32(mport, EPC_IECSR(priv->portNdx),
+	__rio_local_write_config_32(mport, EPC_IECSR(priv->port_ndx),
 					(iecsr & EPC_IECSR_RETE));
 
 #if defined(CONFIG_AXXIA_RIO_STAT)
@@ -953,15 +952,12 @@ static void release_dme(struct kref *kref)
 	int i;
 
 	if (me->desc) {
-		for (i = 0, desc = me->desc; i < me->entries; i++, desc++) {
-			if (desc->msg_virt)
-				kfree(desc->msg_virt);
-		}
+		for (i = 0, desc = me->desc; i < me->entries; i++, desc++)
+			kfree(desc->msg_virt);
 		kfree(me->desc);
 	}
 
-	if (me->descriptors)
-		kfree(me->descriptors);
+	kfree(me->descriptors);
 
 	if (!priv->intern_msg_desc) {
 		if (me->dres.parent)
@@ -985,20 +981,20 @@ static inline void dme_put(struct rio_msg_dme *me)
 }
 
 static inline int check_dme(int dme_no,
-			    int *numDmes,
-			    int *dmesInUse,
+			    int *num_dmes,
+			    int *dmes_in_use,
 			    int *dmes)
 {
 	int i;
 	for (i = 0; i < 2; i++) {
-		if (dme_no < numDmes[i]) {
+		if (dme_no < num_dmes[i]) {
 			if (dmes[i] & (1 << dme_no)) {
-				if (dmesInUse[i] & (1 << dme_no))
+				if (dmes_in_use[i] & (1 << dme_no))
 					return -EBUSY;	/* Already allocated */
 				return 0;
 			}
 		} else {
-			dme_no -= numDmes[i];
+			dme_no -= num_dmes[i];
 		}
 	}
 
@@ -1006,19 +1002,19 @@ static inline int check_dme(int dme_no,
 }
 
 static inline int select_dme(int dme_no,
-			     int *numDmes,
-			     int *dmesInUse,
+			     int *num_dmes,
+			     int *dmes_in_use,
 			     int *dmes,
 			     int value)
 {
 	int i;
 	for (i = 0; i < 2; i++) {
-		if (dme_no < numDmes[i]) {
-			dmesInUse[i] &= ~(1 << dme_no);
-			dmesInUse[i] |= (value << dme_no);
+		if (dme_no < num_dmes[i]) {
+			dmes_in_use[i] &= ~(1 << dme_no);
+			dmes_in_use[i] |= (value << dme_no);
 			return 0;
 		} else {
-			dme_no -= numDmes[i];
+			dme_no -= num_dmes[i];
 		}
 	}
 
@@ -1107,8 +1103,7 @@ static void release_mbox(struct kref *kref)
 
 	priv->ib_dme_irq[mb->mbox_no].irq_state_mask = 0;
 
-	if (mb->virt_buffer)
-		kfree(mb->virt_buffer);
+	kfree(mb->virt_buffer);
 
 	kfree(mb);
 }
@@ -1557,20 +1552,22 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 		__ib_dme_dbg(priv, dme_stat);
 #ifdef CONFIG_SRIO_IRQ_TIME
 		{
-			struct rio_irq_handler *hN;
-			hN = &priv->ib_dme_irq[mbox_no];
+			struct rio_irq_handler *h_n;
+			h_n = &priv->ib_dme_irq[mbox_no];
 
-			if (atomic_read(&hN->start_time)) {
+			if (atomic_read(&h_n->start_time)) {
 				if (me->pkt == 0) {
-					me->start_irq_tb = hN->irq_tb;
-					me->start_thrd_tb = hN->thrd_tb;
+					me->start_irq_tb = h_n->irq_tb;
+					me->start_thrd_tb = h_n->thrd_tb;
 				}
-				me->stop_irq_tb = hN->irq_tb;
-				me->stop_thrd_tb = hN->thrd_tb;
-				if ((hN->thrd_tb - hN->irq_tb) > me->max_lat)
-					me->max_lat = hN->thrd_tb - hN->irq_tb;
-				if ((hN->thrd_tb - hN->irq_tb) < me->min_lat)
-					me->min_lat = hN->thrd_tb - hN->irq_tb;
+				me->stop_irq_tb = h_n->irq_tb;
+				me->stop_thrd_tb = h_n->thrd_tb;
+				if ((h_n->thrd_tb - h_n->irq_tb) > me->max_lat)
+					me->max_lat = h_n->thrd_tb -
+							h_n->irq_tb;
+				if ((h_n->thrd_tb - h_n->irq_tb) < me->min_lat)
+					me->min_lat = h_n->thrd_tb -
+							h_n->irq_tb;
 			}
 		}
 #endif
@@ -1639,7 +1636,6 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 			struct rio_msg_desc *desc;
 			u32 dme_ctrl;
 			int i;
-			int inval = 0;  /* see #ifdef STRICT_INB_ORDERING */
 
 			__ib_dme_event_dbg(priv, dme_no,
 					   1 << RIO_IB_DME_RX_SLEEP);
@@ -1656,17 +1652,10 @@ static void ib_dme_irq_handler(struct rio_irq_handler *h, u32 state)
 				}
 				if (!(dw0 & DME_DESC_DW0_VALID)) {
 					__ib_dme_event_dbg(priv, dme_no,
-						1 << RIO_IB_DME_RX_PENDING_AT_SLEEP);
-#ifdef STRICT_INB_ORDERING
-					inval++;
-					pr_warn("RIO: Inbound Message engine "
-						"%d disabled\n RIO: Receive "
-						"buffer ring is corrupt\n",
-						dme_no);
-#endif
+						1 << RIO_IB_DME_RX_PEND_SLEEP);
 				}
 			}
-			if (inval == 0) {
+			{
 				__ib_dme_event_dbg(priv, dme_no,
 						   1 << RIO_IB_DME_RX_WAKEUP);
 				dme_ctrl = (mbox_no & 0x3f) << 6;
@@ -1964,10 +1953,10 @@ void axxia_rio_port_get_state(struct rio_mport *mport, int cleanup)
 	}
 
 	/* Master Port state */
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &escsr);
-	__rio_local_read_config_32(mport, EPC_IECSR(priv->portNdx), &iecsr);
+	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &escsr);
+	__rio_local_read_config_32(mport, EPC_IECSR(priv->port_ndx), &iecsr);
 
-	__rio_local_write_config_32(mport, RIO_ESCSR(priv->portNdx),
+	__rio_local_write_config_32(mport, RIO_ESCSR(priv->port_ndx),
 				(escsr & RIO_EXCSR_WOLR));
 #if defined(CONFIG_AXXIA_RIO_STAT)
 	__add_state_dbg(priv, escsr);
@@ -2127,7 +2116,7 @@ int axxia_rio_doorbell_send(struct rio_mport *mport,
  * axxia_open_outb_mbox - Initialize AXXIA outbound mailbox
  * @mport: Master port implementing the outbound message unit
  * @dev_id: Device specific pointer to pass on event
- * @mboxDme: Mailbox to open
+ * @mbox_dme: Mailbox to open
  * @entries: Number of entries in the outbound DME/mailbox ring for
  *           each letter
  *
@@ -2149,7 +2138,7 @@ int axxia_rio_doorbell_send(struct rio_mport *mport,
 int axxia_open_outb_mbox(
 	struct rio_mport *mport,
 	void *dev_id,
-	int mboxDme,
+	int mbox_dme,
 	int entries,
 	int prio)
 {
@@ -2157,7 +2146,7 @@ int axxia_open_outb_mbox(
 	int rc = 0;
 
 	axxia_api_lock(priv);
-	rc = open_outb_mbox(mport, dev_id, mboxDme, entries, prio);
+	rc = open_outb_mbox(mport, dev_id, mbox_dme, entries, prio);
 	axxia_api_unlock(priv);
 
 	return rc;
@@ -2166,21 +2155,21 @@ int axxia_open_outb_mbox(
 /**
  * axxia_close_outb_mbox - Shut down AXXIA outbound mailbox
  * @mport: Master port implementing the outbound message unit
- * @mboxDme: Mailbox to close
+ * @mbox_dme: Mailbox to close
  *
  * Disables the outbound message unit, frees all buffers, and
  * frees any other resources.
  */
-void axxia_close_outb_mbox(struct rio_mport *mport, int mboxDme)
+void axxia_close_outb_mbox(struct rio_mport *mport, int mbox_dme)
 {
 	struct rio_priv *priv = mport->priv;
 
-	if ((mboxDme < 0) ||
-	    (mboxDme > (priv->num_outb_dmes[0]+priv->num_outb_dmes[0])))
+	if ((mbox_dme < 0) ||
+	    (mbox_dme > (priv->num_outb_dmes[0]+priv->num_outb_dmes[0])))
 		return;
 
 	axxia_api_lock(priv);
-	release_irq_handler(&priv->ob_dme_irq[mboxDme]);
+	release_irq_handler(&priv->ob_dme_irq[mbox_dme]);
 	axxia_api_unlock(priv);
 
 	return;
@@ -2443,7 +2432,7 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 	struct rio_rx_mbox *mb;
 	struct rio_msg_dme *me;
 	unsigned long iflags;
-	int numProc = 0;
+	int num_proc = 0;
 	void *buf = NULL;
 
 	if ((mbox < 0) || (mbox >= RIO_MAX_RX_MBOX))
@@ -2505,7 +2494,7 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 			me->read_idx = (me->read_idx + 1) % me->entries;
 			__ib_dme_event_dbg(priv, me->dme_no,
 					   1 << RIO_IB_DME_DESC_ERR);
-			numProc++;
+			num_proc++;
 		} else if ((dw0 & DME_DESC_DW0_DONE) &&
 			   (dw0 & DME_DESC_DW0_VALID)) {
 			int seg = DME_DESC_DW1_MSGLEN_F(dw1);
@@ -2557,7 +2546,7 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 			mb->next_rx_slot = (mb->next_rx_slot + 1) %
 					    mb->ring_size;
 			me->read_idx = (me->read_idx + 1) % me->entries;
-			numProc++;
+			num_proc++;
 			goto done;
 		} else {
 			goto done;
@@ -2566,9 +2555,9 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 
 done:
 	/* Advance VALID bit to next entry */
-	if (numProc > 0) {
+	if (num_proc > 0) {
 		u32 dw0;
-		int nxt_inval_desc = (me->last_invalid_desc + numProc) %
+		int nxt_inval_desc = (me->last_invalid_desc + num_proc) %
 				     me->entries;
 		if (!priv->intern_msg_desc) {
 			dw0 = *((u32 *)DESC_TABLE_W0_MEM(me, nxt_inval_desc));
@@ -2775,7 +2764,7 @@ int axxia_rio_port_op_state(struct rio_mport *mport)
 {
 	u32 escsr;
 
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &escsr);
+	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &escsr);
 
 	if (escsr & RIO_ESCSR_PO)
 		return MPORT_STATE_OPERATIONAL;

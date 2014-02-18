@@ -1202,7 +1202,7 @@ int axxia_add_ibds_buffer(
 	if (ptr_virt_m_cfg->num_desc_free == 1)
 		return -ENOMEM;
 
-     spin_lock_irqsave(&ptr_virt_m_cfg->lock, iflags);
+	spin_lock_irqsave(&ptr_virt_m_cfg->lock, iflags);
 
 	/* put user's buffer into the corresponding descriptors */
 	ptr_data_desc =
@@ -1265,7 +1265,7 @@ int axxia_add_ibds_buffer(
 
 	ptr_virt_m_cfg->num_desc_free--;
 
-    spin_unlock_irqrestore(&ptr_virt_m_cfg->lock, iflags);
+	spin_unlock_irqrestore(&ptr_virt_m_cfg->lock, iflags);
 
 	return 0;
 }
@@ -1287,164 +1287,162 @@ void ib_dse_vsid_m_irq_handler(struct rio_irq_handler *h, u32 state)
 	struct axxia_rio_ds_cfg   *ptr_ds_cfg  = &(priv->ds_cfg_data);
 	struct axxia_ibds_virt_m_cfg   *ptr_virt_m_cfg;
 	struct axxia_rio_ids_data_desc *ptr_data_desc;
-	u32  dse_stat, vsid_m_stats;
-	u8   virt_vsid, dse_id;
-	u16  data_write_ptr;
+	u32  dse_st, vsid_m_stats;
+	u8   vvsid, dse_id;
+	u16  dwp;
 	unsigned long flags;
 	u32  is_desc_done = 1;
 	u8   i;
 
 	for (i = 0; i < 32; i++) {
-		/* if the corresponding interrupt bit is set */
-		if ((state >> i) & 0x1) {
-			virt_vsid = i;
+		/* If the corresponding interrupt bit is set */
+		if (((state >> i) & 0x1) == 0)
+			continue;
 
-			__rio_local_read_config_32(mport,
-					RAB_IBVIRT_M_STAT(virt_vsid),
-					&vsid_m_stats);
+		vvsid = i;
 
+		__rio_local_read_config_32(mport,
+				RAB_IBVIRT_M_STAT(vvsid),
+				&vsid_m_stats);
+
+		/*
+		** The ARM could also be interrupted with
+		** vsid_m_stats sticky status bits not being set.
+		** TBD should be 3FF?
+		*/
+		if ((vsid_m_stats & 0x1FF) == 0)
+			continue;
+
+		/* Check if the chain transfer complete */
+		ptr_virt_m_cfg =
+			&(ptr_ds_cfg->ibds_vsid_m_cfg[vvsid]);
+
+		spin_lock_irqsave(&ptr_virt_m_cfg->lock, flags);
+
+		/* Check errors */
+		__ib_virt_m_dbg(
+			&(ptr_ds_priv->ib_vsid_m_stats[vvsid]),
+			vsid_m_stats);
+
+		if (vsid_m_stats & IB_VIRT_M_STAT_FETCH_ERR) {
 			/*
-			** The ARM could also got interrupted with
-			** vsid_m_stats sticky status
-			**	bits not being set. TBD should be 3FF?
+			** If transaction pending bit is not
+			** set and timeout is also not set,
+			** that means that PDU was successfully
+			** written into AXI memory and nothing
+			** needs to be done.
+			** If transaction pending bit is set
+			** or timeout is set, engine needs to
+			** be reset.  After disabling engine,
+			** when transaction pending gets reset,
+			** engine is ready to be enabled again.
 			*/
-			if ((vsid_m_stats & 0x1FF)) {
 
-				/* Check if the chain transfer complete */
-				ptr_virt_m_cfg =
-				&(ptr_ds_cfg->ibds_vsid_m_cfg[virt_vsid]);
+			/* Check if there is a corresponding
+			** DSE that handles this vsid */
+			for (dse_id = 0;
+				dse_id < RIO_MAX_NUM_IBDS_DSE;
+				dse_id++) {
+				__rio_local_read_config_32(
+					mport,
+					RAB_IBDSE_STAT(dse_id),
+					&dse_st);
 
-				spin_lock_irqsave(&ptr_virt_m_cfg->lock, flags);
-
-				/* check errors */
-				__ib_virt_m_dbg(
-					&(ptr_ds_priv->ib_vsid_m_stats[virt_vsid]),
-					vsid_m_stats);
-
-
-				if (vsid_m_stats & IB_VIRT_M_STAT_FETCH_ERR) {
+				if (((dse_st & IB_DSE_STAT_TRANS_PENDING)  ||
+				     (dse_st & IB_DSE_STAT_TIMEOUT))	&&
+				     ((dse_st & IB_DSE_VSID_IN_USE) == vvsid)) {
 					/*
-					** If transaction pending bit is not
-					** set and timeout is also not set,
-					** that means that PDU was successfully
-					** written into AXI memory and nothing
-					** needs to be done.
-					** If transaction pending bit is set
-					** or timeout is set, engine needs to
-					** be reset.  After disabling engine,
-					** when transaction pending gets reset,
-					** engine is ready to be enabled again.
+					** BZ43821 - SW workaround for the
+					** IBDS descriptor fetch error
+					** When S/W sees the descriptor
+					** fetch error being indicated
+					** in status bits, introduce a
+					** delay and then disable the
+					** engine and enable the engine
+					** again.
+					** With this the next incoming
+					** packet for that engine would
+					** not get corrupted.
 					*/
+					ndelay(5);
 
-					/* Check if there is a corresponding
-					** DSE that handles this vsid */
-					for (dse_id = 0;
-						dse_id < RIO_MAX_NUM_IBDS_DSE;
-						dse_id++) {
-						__rio_local_read_config_32(
-							mport,
-							RAB_IBDSE_STAT(dse_id),
-							&dse_stat);
+					/* Disable the engine */
+					__rio_local_write_config_32(
+						mport,
+						RAB_IBDSE_CTRL(dse_id),
+						0);
 
-						if (((dse_stat & IB_DSE_STAT_TRANS_PENDING)  ||
-							(dse_stat & IB_DSE_STAT_TIMEOUT))	&&
-							((dse_stat & IB_DSE_VSID_IN_USED) == virt_vsid)) {
-						/*
-						** BZ43821 - SW workaround for
-						** the IBDS descriptor fetch
-						** error
-						** When S/W sees the descriptor
-						** fetch error being indicated
-						** in status bits, introduce a
-						** delay and then disable the
-						** engine and enable the engine
-						** again.
-						** With this the next incoming
-						** packet for that engine would
-						** not get corrupted.
-						*/
-						ndelay(5);
+					/* Should wait till the pending
+					** bit is reset?*/
 
-						/* Disable the engine */
-						__rio_local_write_config_32(
-							mport,
-							RAB_IBDSE_CTRL(dse_id),
-							0);
-
-						/* Should wait till the pending
-						** bit is reset?*/
-
-						/* Enable the engine again */
-						__rio_local_write_config_32(
-							mport,
-							RAB_IBDSE_CTRL(dse_id),
-							1);
-						break;
-						}
-					}
+					/* Enable the engine again */
+					__rio_local_write_config_32(
+						mport,
+						RAB_IBDSE_CTRL(dse_id),
+						1);
+					break;
 				}
-
-				/* In case of timeout error, if not alreaday
-				** disabled, descriptor prefetch logic should
-				** be disabled and associated descriptor start
-				** address needs to be set for VSID PDUs to be
-				** assembled again.  Engine should be disabled,
-				** once transaction pending gets reset, engine
-				** can be enabled again.
-				** TBD
-				*/
-
-				/* Process maximum number MAX_NUM_PROC_IBDS_DESC
-				** transactions */
-				data_write_ptr = ptr_virt_m_cfg->data_write_ptr;
-
-				ptr_data_desc =
-					&(ptr_virt_m_cfg->ptr_ibds_data_desc[data_write_ptr]);
-
-				/* Get the done bit of the data descriptor */
-				is_desc_done =
-					(ptr_data_desc->dw0 & IB_DSE_DESC_DONE);
-
-				while (is_desc_done) {
-					ptr_virt_m_cfg->num_hw_written_bufs++;
-					__ib_dse_dw_dbg(
-						&(ptr_ds_priv->ib_vsid_m_stats[virt_vsid]),
-						ptr_data_desc->dw0);
-
-					if (data_write_ptr ==
-						(ptr_virt_m_cfg->max_num_data_desc-1))
-						data_write_ptr = 0;
-					else
-						data_write_ptr++;
-
-					/* set the valid bit to be invalid */
-					ptr_data_desc->dw0 &= 0xFFFFFFFE;
-
-					ptr_data_desc =
-						&(ptr_virt_m_cfg->ptr_ibds_data_desc[data_write_ptr]);
-
-					is_desc_done = (ptr_data_desc->dw0 & IB_DSE_DESC_DONE);
-				}
-
-				ptr_virt_m_cfg->data_write_ptr = data_write_ptr;
-
-				/* Call back - TBD */
-
-				/* Clear the interrupt bit? - TBD */
-				/* Clear the virt_m stats bit */
-				if (vsid_m_stats & 0x2) {
-					__rio_local_write_config_32(mport,
-						RAB_IBVIRT_M_STAT(virt_vsid),
-						vsid_m_stats);
-				}
-				__rio_local_read_config_32(mport,
-						RAB_IBVIRT_M_STAT(virt_vsid),
-						&vsid_m_stats);
-
-				spin_unlock_irqrestore(&ptr_virt_m_cfg->lock,
-							flags);
 			}
 		}
+
+		/* In case of timeout error, if not already
+		** disabled, descriptor prefetch logic should
+		** be disabled and associated descriptor start
+		** address needs to be set for VSID PDUs to be
+		** assembled again.  Engine should be disabled,
+		** once transaction pending gets reset, engine
+		** can be enabled again.
+		** TBD
+		*/
+
+		/* Process maximum number MAX_NUM_PROC_IBDS_DESC
+		** transactions */
+		dwp = ptr_virt_m_cfg->data_write_ptr;
+
+		ptr_data_desc =
+			&(ptr_virt_m_cfg->ptr_ibds_data_desc[dwp]);
+
+		/* Get the done bit of the data descriptor */
+		is_desc_done =
+			(ptr_data_desc->dw0 & IB_DSE_DESC_DONE);
+
+		while (is_desc_done) {
+			ptr_virt_m_cfg->num_hw_written_bufs++;
+			__ib_dse_dw_dbg(
+				&(ptr_ds_priv->ib_vsid_m_stats[vvsid]),
+				ptr_data_desc->dw0);
+
+			if (dwp == (ptr_virt_m_cfg->max_num_data_desc-1))
+				dwp = 0;
+			else
+				dwp++;
+
+			/* Set the valid bit to be invalid */
+			ptr_data_desc->dw0 &= 0xFFFFFFFE;
+
+			ptr_data_desc =
+				&(ptr_virt_m_cfg->ptr_ibds_data_desc[dwp]);
+
+			is_desc_done = (ptr_data_desc->dw0 & IB_DSE_DESC_DONE);
+		}
+
+		ptr_virt_m_cfg->data_write_ptr = dwp;
+
+		/* Call back - TBD */
+
+		/* Clear the interrupt bit? - TBD */
+
+		/* Clear the virt_m stats bit */
+		if (vsid_m_stats & 0x2) {
+			__rio_local_write_config_32(mport,
+				RAB_IBVIRT_M_STAT(vvsid),
+				vsid_m_stats);
+		}
+		__rio_local_read_config_32(mport,
+				RAB_IBVIRT_M_STAT(vvsid),
+				&vsid_m_stats);
+
+		spin_unlock_irqrestore(&ptr_virt_m_cfg->lock, flags);
 	}
 
 	return;

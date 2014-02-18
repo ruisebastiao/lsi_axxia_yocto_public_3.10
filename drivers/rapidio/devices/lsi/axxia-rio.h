@@ -510,7 +510,7 @@ struct rio_priv {
 	struct rio_mport *mport;
 	struct device *dev;
 	int  ndx;	/* From FDT description */
-	int  portNdx;
+	int  port_ndx;
 	u32  devid;     /* From GRIO register */
 	u32  devrev;    /* From GRIO register */
 
