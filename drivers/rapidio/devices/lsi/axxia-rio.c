@@ -99,15 +99,11 @@ static DEFINE_SPINLOCK(rio_io_lock);
  * Generates a AXXIA local configuration space read.
  * Returns %0 on success or %-EINVAL on failure.
  */
-static int __axxia_local_config_read_actual(struct rio_priv *priv,
-					    u32 offset,
-					    u32 *data,
-					    int suppress)
+int axxia_local_config_read(struct rio_priv *priv,
+			    u32 offset,
+			    u32 *data)
 {
 	u32 page_sel;
-
-	if (suppress)
-		AXXIA_RIO_DISABLE_MACHINE_CHECK();
 
 	AXXIA_RIO_SYSMEM_BARRIER();
 
@@ -154,27 +150,10 @@ static int __axxia_local_config_read_actual(struct rio_priv *priv,
 		}
 	}
 
-	if (suppress) {
-		int mcsr;
-		AXXIA_RIO_IF_MACHINE_CHECK(mcsr);
-		if (mcsr) {
-			dev_err(priv->dev,
-				"RIO: Machine check trying to read SRIO "
-				"register 0x%0x8 for AXXIA\n",
-				offset);
-			*data = 0;
-		}
-
-		AXXIA_RIO_ENABLE_MACHINE_CHECK();
-	}
-
 	IODP("rio[%d]: ACR(%08x, <%08x)\n", priv->mport->id, offset, *data);
 
 	return 0;
 }
-
-#define __axxia_local_config_read(priv, offset, data)			\
-	__axxia_local_config_read_actual(priv, offset, data, 1)
 
 /**
  * axxia_local_config_write - Generate a AXXIA local config space write
@@ -186,15 +165,11 @@ static int __axxia_local_config_read_actual(struct rio_priv *priv,
  * Generates a AXXIA local configuration space write.
  * Returns %0 on success or %-EINVAL on failure.
  */
-static int __axxia_local_config_write_actual(struct rio_priv *priv,
-					     u32 offset,
-					     u32 data,
-					     int suppress)
+int axxia_local_config_write(struct rio_priv *priv,
+				      u32 offset,
+				      u32 data)
 {
 	u32 page_sel;
-
-	if (suppress)
-		AXXIA_RIO_DISABLE_MACHINE_CHECK();
 
 	AXXIA_RIO_SYSMEM_BARRIER();
 
@@ -241,29 +216,13 @@ static int __axxia_local_config_write_actual(struct rio_priv *priv,
 		}
 	}
 
-	if (suppress) {
-		int mcsr;
-		AXXIA_RIO_IF_MACHINE_CHECK(mcsr);
-		if (mcsr) {
-			dev_err(priv->dev,
-				"RIO: Machine check trying to write SRIO "
-				"register 0x%0x8 for AXXIA\n",
-				offset);
-		}
-
-		AXXIA_RIO_ENABLE_MACHINE_CHECK();
-	}
-
 	IODP("rio[%d]: ACW(%08x, >%08x)\n", priv->mport->id, offset, data);
 
 	return 0;
 }
 
-#define __axxia_local_config_write(priv, offset, data)			\
-	__axxia_local_config_write_actual(priv, offset, data, 1)
-
 /**
- * axxia_local_config_read - Generate a AXXIA local config space read
+ * axxia_rio_local_config_read - Generate a AXXIA local config space read
  * @mport: RapidIO master port info
  * @index: ID of RapdiIO interface
  * @offset: Offset into configuration space
@@ -273,19 +232,35 @@ static int __axxia_local_config_write_actual(struct rio_priv *priv,
  * Generates a AXXIA local configuration space read.
  * Returns %0 on success or %-EINVAL on failure.
  */
-static int axxia_local_config_read(struct rio_mport *mport,
-				 int index, u32 offset, int len, u32 *data)
+static
+int axxia_rio_local_config_read(struct rio_mport *mport,
+				int index, u32 offset, int len, u32 *data)
 {
 	struct rio_priv *priv = mport->priv;
+	int rc;
+	int mcsr;
 
 	if ((priv == NULL) || (priv->cookie != LSI_AXXIA_RIO_COOKIE))
 		return -ENODEV;
 
-	return __axxia_local_config_read(priv, offset, data);
+	AXXIA_RIO_DISABLE_MACHINE_CHECK();
+
+	rc = axxia_local_config_read(priv, offset, data);
+
+	AXXIA_RIO_IF_MACHINE_CHECK(mcsr);
+	if (mcsr) {
+		dev_err(priv->dev,
+			"RIO: Machine check trying to write SRIO "
+			"register 0x%0x8 for AXXIA\n",
+			offset);
+	}
+	AXXIA_RIO_ENABLE_MACHINE_CHECK();
+
+	return rc;
 }
 
 /**
- * axxia_local_config_write - Generate a AXXIA local config space write
+ * axxia_rio_local_config_write - Generate a AXXIA local config space write
  * @mport: RapidIO master port info
  * @index: ID of RapdiIO interface
  * @offset: Offset into configuration space
@@ -295,15 +270,32 @@ static int axxia_local_config_read(struct rio_mport *mport,
  * Generates a AXXIA local configuration space write.
  * Returns %0 on success or %-EINVAL on failure.
  */
-static int axxia_local_config_write(struct rio_mport *mport,
-				  int index, u32 offset, int len, u32 data)
+static
+int axxia_rio_local_config_write(struct rio_mport *mport,
+				 int index, u32 offset, int len, u32 data)
 {
 	struct rio_priv *priv = mport->priv;
+	int rc;
+	int mcsr;
 
 	if ((priv == NULL) || (priv->cookie != LSI_AXXIA_RIO_COOKIE))
 		return -ENODEV;
 
-	return __axxia_local_config_write(priv, offset, data);
+	AXXIA_RIO_DISABLE_MACHINE_CHECK();
+
+	rc = axxia_local_config_write(priv, offset, data);
+
+	AXXIA_RIO_IF_MACHINE_CHECK(mcsr);
+	if (mcsr) {
+		dev_err(priv->dev,
+			"RIO: Machine check trying to write SRIO "
+			"register 0x%0x8 for AXXIA\n",
+			offset);
+	}
+
+	AXXIA_RIO_ENABLE_MACHINE_CHECK();
+
+	return rc;
 }
 
 /**
@@ -320,9 +312,10 @@ static int axxia_local_config_write(struct rio_mport *mport,
  * Returns %0 on success or %-EINVAL on failure.
  */
 
-static int axxia_rio_config_read(struct rio_mport *mport, int index,
-				 u16 destid, u8 hopcount, u32 offset,
-				 int len, u32 *val)
+static
+int axxia_rio_config_read(struct rio_mport *mport, int index,
+			  u16 destid, u8 hopcount, u32 offset,
+			  int len, u32 *val)
 {
 	struct rio_priv *priv = mport->priv;
 	struct atmu_outb *aoutb = NULL;
@@ -347,10 +340,9 @@ static int axxia_rio_config_read(struct rio_mport *mport, int index,
 
 	AXXIA_RIO_DISABLE_MACHINE_CHECK();
 
-	__axxia_local_config_read_actual(priv,
+	axxia_local_config_read(priv,
 				       RAB_APIO_AMAP_CTRL(priv->maint_win_id),
-				       &ctrl,
-				       0);
+				       &ctrl);
 
 	if (TTYPE_VAL(ctrl)) { /* Not maintenance */
 		dev_err(priv->dev,
@@ -363,17 +355,15 @@ static int axxia_rio_config_read(struct rio_mport *mport, int index,
 
 	rbar &= ~HOP_COUNT(0xff);     /* Hop Count clear */
 	rbar |= HOP_COUNT(hopcount);  /* Hop Count set */
-	__axxia_local_config_write_actual(priv,
+	axxia_local_config_write(priv,
 				 RAB_APIO_AMAP_RBAR(priv->maint_win_id),
-				 rbar,
-				 0);
+				 rbar);
 
 	ctrl &= ~TARGID(0xffff); /* Target id clear */
 	ctrl |= TARGID(destid);  /* Target id set */
-	__axxia_local_config_write_actual(priv,
+	axxia_local_config_write(priv,
 				 RAB_APIO_AMAP_CTRL(priv->maint_win_id),
-				 ctrl,
-				 0);
+				 ctrl);
 
 	addr = (u8 *) aoutb->win +
 		(offset & (CONFIG_RIO_MAINT_WIN_SIZE - 1));
@@ -436,9 +426,10 @@ static int axxia_rio_config_read(struct rio_mport *mport, int index,
  * Generates an AXXIA write maintenance transaction.
  * Returns %0 on success or %-EINVAL on failure.
  */
-static int axxia_rio_config_write(struct rio_mport *mport, int index,
-				  u16 destid, u8 hopcount, u32 offset,
-				  int len, u32 val)
+static
+int axxia_rio_config_write(struct rio_mport *mport, int index,
+			   u16 destid, u8 hopcount, u32 offset,
+			   int len, u32 val)
 {
 	struct rio_priv *priv = mport->priv;
 	struct atmu_outb *aoutb = NULL;
@@ -468,10 +459,9 @@ static int axxia_rio_config_write(struct rio_mport *mport, int index,
 
 	AXXIA_RIO_DISABLE_MACHINE_CHECK();
 
-	__axxia_local_config_read_actual(priv,
+	axxia_local_config_read(priv,
 				RAB_APIO_AMAP_CTRL(priv->maint_win_id),
-				&ctrl,
-				0);
+				&ctrl);
 
 	if (TTYPE_VAL(ctrl)) { /* Not maintenance */
 		dev_err(priv->dev,
@@ -484,17 +474,15 @@ static int axxia_rio_config_write(struct rio_mport *mport, int index,
 
 	rbar &= ~HOP_COUNT(0xff);     /* Hop Count clear */
 	rbar |= HOP_COUNT(hopcount);  /* Hop Count set */
-	__axxia_local_config_write_actual(priv,
+	axxia_local_config_write(priv,
 				 RAB_APIO_AMAP_RBAR(priv->maint_win_id),
-				 rbar,
-				 0);
+				 rbar);
 
 	ctrl &= ~TARGID(0xffff); /* Target id clear */
 	ctrl |= TARGID(destid);  /* Target id set */
-	__axxia_local_config_write_actual(priv,
+	axxia_local_config_write(priv,
 				 RAB_APIO_AMAP_CTRL(priv->maint_win_id),
-				 ctrl,
-				 0);
+				 ctrl);
 
 	if (offset < RAB_REG_BASE)
 		rval = CORRECT_GRIO(val);
@@ -1027,8 +1015,7 @@ static int rio_start_port(struct rio_mport *mport)
 			__LINE__,
 			RIO_DEV_ID_CAR, priv->devid,
 			RAB_VER, rabver);
-		pr_info("rio[%d]: AR[%d] CCSR[%x]=%08x ESCSR[%x]=%08x "
-			"HBDIDLCSR[%x]=%08x\n",
+		pr_info("rio[%d]: AR[%d] [%x]=%08x [%x]=%08x [%x]=%08x\n",
 			mport->id,
 			__LINE__,
 			RIO_CCSR(priv->port_ndx), ccsr,
@@ -1055,8 +1042,13 @@ static void rio_rab_ctrl_setup(struct rio_mport *mport)
 {
 	u32 rab_ctrl;
 
-	__rio_local_write_config_32(mport, AXI_TIMEOUT, 0x1000);
+	__rio_local_write_config_32(mport, AXI_TIMEOUT, 0x00001000);
+
+#ifdef USE_DME_TIMEOUT
 	__rio_local_write_config_32(mport, DME_TIMEOUT, 0xC0001000);
+#else
+	__rio_local_write_config_32(mport, DME_TIMEOUT, 0x00000000);
+#endif
 
 	rab_ctrl = 0;
 	rab_ctrl |= (1 << 12);
@@ -1337,8 +1329,8 @@ static struct rio_ops *rio_ops_setup(void)
 	if (!ops)
 		return ERR_PTR(-ENOMEM);
 
-	ops->lcread = axxia_local_config_read;
-	ops->lcwrite = axxia_local_config_write;
+	ops->lcread = axxia_rio_local_config_read;
+	ops->lcwrite = axxia_rio_local_config_write;
 	ops->cread = axxia_rio_config_read;
 	ops->cwrite = axxia_rio_config_write;
 	ops->dsend = axxia_rio_doorbell_send;

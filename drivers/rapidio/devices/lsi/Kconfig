@@ -43,11 +43,11 @@ config SRIO_IRQ_TIME
 
 config AXXIA_RIO_16B_ID
        bool "RapidIO large common transport system"
-	 depends on AXXIA_RIO
-	 default n
-	 ---help---
-	   Say yes here to enable use of 16 bit transport ID otherwise
-	   transport ID has 8 bits.
+       depends on AXXIA_RIO && (ACP && PPC)
+       default n
+       ---help---
+         Say yes here to enable use of 16 bit transport ID otherwise
+         transport ID has 8 bits.
 
 config AXXIA_RIO_DEBUG
         bool "Switch on debug info for AXXIA RIO driver"

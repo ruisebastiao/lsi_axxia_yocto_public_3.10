@@ -346,10 +346,10 @@
 #define IB_DME_STAT_DESC_XFER_CPLT       (1 << 1)
 #define IB_DME_STAT_DESC_CHAIN_XFER_CPLT (1)
 
-#define IB_DME_STAT_ERROR_MASK           0x000000FC
+#define IB_DME_STAT_ERROR_MASK		0x000000FC
 
-#define DME_WAKEUP              (2)
-#define DME_ENABLE              (1)
+#define DME_WAKEUP			(2)
+#define DME_ENABLE			(1)
 
 /* DME Message Descriptor Table */
 #define DESC_TABLE_W0_NDX(d)         (0x10 * (d))
@@ -582,6 +582,11 @@ extern int axxia_rio_start_port(struct rio_mport *mport);
 extern void axxia_rio_set_mport_disc_mode(struct rio_mport *mport);
 extern void axxia_rio_static_win_release(struct rio_mport *mport);
 extern int axxia_rio_static_win_init(struct rio_mport *mport);
+
+extern int axxia_local_config_read(struct rio_priv *priv,
+				   u32 offset, u32 *data);
+extern int axxia_local_config_write(struct rio_priv *priv,
+				    u32 offset, u32 data);
 
 #ifdef CONFIG_RAPIDIO_HOTPLUG
 

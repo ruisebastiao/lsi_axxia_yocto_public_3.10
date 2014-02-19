@@ -40,7 +40,17 @@
 #include "axxia-rio-irq.h"
 #include "axxia-rio-ds.h"
 
-/****************************************************************************/
+/****************************************************************************
+**
+** Implementation Note:
+**
+** The Data streaming registers lie outside of the fixed page block in the
+** RAB SRIO Configuration memory.  Thus, all or almost all of its register
+** accesses may require use of the RAB memory paging register.  For safety,
+** we will direct all of these accesses through the RIO mport's lcread and
+** lcwrite interfaces which use a software spin lock to control access.
+**
+****************************************************************************/
 
 static inline void __ib_virt_m_dbg(
 	struct axxia_rio_ds_ibds_vsid_m_stats *ptr_ib_stats,

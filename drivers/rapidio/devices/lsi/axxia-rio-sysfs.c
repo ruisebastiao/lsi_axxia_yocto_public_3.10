@@ -374,26 +374,27 @@ static ssize_t axxia_rio_irq_show(struct device *dev,
 				char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat;
 	char *str = buf;
 
 	str += sprintf(str, "Interrupt enable bits:\n");
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_GNRL, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_GNRL, &stat);
 	str += sprintf(str, "General Interrupt Enable (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_GNRL, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_ODME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_ODME, &stat);
 	str += sprintf(str, "Outbound Message Engine  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_ODME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_IDME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_IDME, &stat);
 	str += sprintf(str, "Inbound Message Engine   (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_IDME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_MISC, &stat);
 	str += sprintf(str, "Miscellaneous Events     (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_MISC, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_APIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_APIO, &stat);
 	str += sprintf(str, "Axxia Bus to RIO Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_APIO, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_RPIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_RPIO, &stat);
 	str += sprintf(str, "RIO to Axxia Bus Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_RPIO, stat);
 
@@ -411,19 +412,19 @@ static ssize_t axxia_rio_tmo_show(struct device *dev,
 	char *str = buf;
 
 	str += sprintf(str, "Port Link Timeout Control Registers:\n");
-	__rio_local_read_config_32(mport, RIO_PLTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PLTOCCSR, &stat);
 	str += sprintf(str, "PLTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PLTOCCSR, stat);
-	__rio_local_read_config_32(mport, RIO_PRTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PRTOCCSR, &stat);
 	str += sprintf(str, "PRTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PRTOCCSR, stat);
-	__rio_local_read_config_32(mport, RAB_STAT, &stat);
+	axxia_local_config_read(priv, RAB_STAT, &stat);
 	str += sprintf(str, "RAB_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_STAT, stat);
-	__rio_local_read_config_32(mport, RAB_APIO_STAT, &stat);
+	axxia_local_config_read(priv, RAB_APIO_STAT, &stat);
 	str += sprintf(str, "RAB_APIO_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_APIO_STAT, stat);
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->port_ndx), &stat);
+	axxia_local_config_read(priv, RIO_ESCSR(priv->port_ndx), &stat);
 	str += sprintf(str, "PNESCSR (%p)\t%8.8x\n",
 		       (void *)RIO_ESCSR(priv->port_ndx), stat);
 
@@ -436,10 +437,11 @@ static ssize_t axxia_ib_dme_log_show(struct device *dev,
 				   char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat, log;
 	char *str = buf;
 
-	__rio_local_read_config_32(mport, RAB_INTR_STAT_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_STAT_MISC, &stat);
 	log = (stat & UNEXP_MSG_LOG) >> 24;
 	str += sprintf(str, "mbox[1:0]   %x\n", (log & 0xc0) >> 6);
 	str += sprintf(str, "letter[1:0] %x\n", (log & 0x30) >> 4);
@@ -596,7 +598,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		int dme_no = i;
 		u32 data;
 
-		__rio_local_read_config_32(mport,
+		axxia_local_config_read(priv,
 					   RAB_IB_DME_STAT(dme_no),
 					   &data);
 		if (data) {
@@ -639,7 +641,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		for (i = 0; i < priv->desc_max_entries; i++) {
 			int desc_no = i;
 			u32 data;
-			__rio_local_read_config_32(mport,
+			axxia_local_config_read(priv,
 						DESC_TABLE_W0(desc_no),
 						&data);
 			if (data & DME_DESC_DW0_READY_MASK)
@@ -711,8 +713,8 @@ retry:
 		stat->desc_done++;
 		for (i = 0; i < sz; i++) {
 			if (buf[i] != (i & 0xff)) {
-				pr_err("--- %s --- unexpected data %hhx \
-returned in byte %d\n",
+				pr_err("--- %s --- unexpected data %hhx "
+					"returned in byte %d\n",
 					__func__, buf[i], i);
 				break;
 			}
