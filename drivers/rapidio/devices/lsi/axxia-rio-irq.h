@@ -3,7 +3,6 @@
 
 /* forward declaration */
 struct rio_priv;
-struct mutex;
 
 #if !defined(CONFIG_AXXIA_RIO_STAT)
 
@@ -139,7 +138,7 @@ enum rio_ib_dme_dbg {
 	RIO_IB_DME_DESC_ERR,
 	RIO_IB_DME_RX_VBUF_EMPTY,
 	RIO_IB_DME_RX_RING_FULL,
-	RIO_IB_DME_RX_PENDING_AT_SLEEP,
+	RIO_IB_DME_RX_PEND_SLEEP,
 	RIO_IB_DME_RX_SLEEP,
 	RIO_IB_DME_RX_WAKEUP,
 	RIO_IB_DME_NUM
@@ -164,10 +163,12 @@ enum rio_ob_dme_dbg {
 #define RIO_MSG_MAX_ENTRIES                1024   /* Default Max descriptor
 						     table entries for internal
 						     descriptor builds */
+#define	RIO_MBOX_TO_IDX(mid)		\
+	((mid <= RIO_MAX_RX_MBOX_4KB) ? 0 : 1)
 #define	RIO_MBOX_TO_BUF_SIZE(mid)		\
 	((mid <= RIO_MAX_RX_MBOX_4KB) ? RIO_MSG_MULTI_SIZE : RIO_MSG_SEG_SIZE)
-#define	RIO_OUTB_DME_TO_BUF_SIZE(p,did)		\
-	((did < p->numOutbDmes[0]) ? RIO_MSG_MULTI_SIZE : RIO_MSG_SEG_SIZE)
+#define	RIO_OUTB_DME_TO_BUF_SIZE(p, did)	\
+	((did < p->num_outb_dmes[0]) ? RIO_MSG_MULTI_SIZE : RIO_MSG_SEG_SIZE)
 
 #define DME_MAX_IB_ENGINES          32
 #define     RIO_MAX_IB_DME_MSEG		32
@@ -295,7 +296,7 @@ int axxia_open_inb_mbox(struct rio_mport *mport, void *dev_id,
 int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 			     int mbox_dest, int letter, int flags,
 			     void *buffer, size_t len, void *cookie);
-void axxia_close_outb_mbox(struct rio_mport *mport, int dmeMbox);
+void axxia_close_outb_mbox(struct rio_mport *mport, int dme_mbox);
 int axxia_open_outb_mbox(struct rio_mport *mport, void *dev_id, int mbox,
 			 int entries, int prio);
 int axxia_rio_doorbell_send(struct rio_mport *mport,

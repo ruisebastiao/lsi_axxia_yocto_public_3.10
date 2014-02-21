@@ -29,7 +29,7 @@
 
 #ifdef CONFIG_AXXIA_RIO_STAT
 
-static const char *event_str[] = {
+static const char * const event_str[] = {
 	"TX Port Packet dropped                 ",
 	"TX Port Error threshold exceeded       ",
 	"Tx Port Degraded threshold exceeded    ",
@@ -41,7 +41,7 @@ static const char *event_str[] = {
 	"RIO_EVENT_NUM"
 };
 
-static const char *state_str[] = {
+static const char * const state_str[] = {
 	"TX Port stopped due to retry condition",
 	"TX Port stopped due to transmission err",
 	"RX Port stopped due to retry condition",
@@ -51,7 +51,7 @@ static const char *state_str[] = {
 	"RIO_STATE_NUM"
 };
 
-static const char *irq_str[] = {
+static const char * const irq_str[] = {
 	/* Axxia Error Events - really bad! */
 	"Axxia Master Write timouts                           ",
 	"Axxia Master Read timouts                            ",
@@ -131,7 +131,7 @@ static const char *irq_str[] = {
 	"RIO_IRQ_NUM"
 };
 
-static const char *ib_dme_str[] = {
+static const char * const ib_dme_str[] = {
 	"Inbound Message descriptors push to net stack        ",
 	"Inbound Message descriptors ok pop by net stack      ",
 	"Inbound Message descriptors err pop by net stack     ",
@@ -143,7 +143,7 @@ static const char *ib_dme_str[] = {
 	"RIO_IB_DME_NUM"
 };
 
-static const char *ob_dme_str[] = {
+static const char * const ob_dme_str[] = {
 	"Outbound Message descriptors push by net stack       ",
 	"Outbound Message descriptors net push when ring full ",
 	"Outbound Message descriptors ack to net stack        ",
@@ -374,26 +374,27 @@ static ssize_t axxia_rio_irq_show(struct device *dev,
 				char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat;
 	char *str = buf;
 
 	str += sprintf(str, "Interrupt enable bits:\n");
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_GNRL, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_GNRL, &stat);
 	str += sprintf(str, "General Interrupt Enable (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_GNRL, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_ODME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_ODME, &stat);
 	str += sprintf(str, "Outbound Message Engine  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_ODME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_IDME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_IDME, &stat);
 	str += sprintf(str, "Inbound Message Engine   (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_IDME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_MISC, &stat);
 	str += sprintf(str, "Miscellaneous Events     (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_MISC, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_APIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_APIO, &stat);
 	str += sprintf(str, "Axxia Bus to RIO Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_APIO, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_RPIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_RPIO, &stat);
 	str += sprintf(str, "RIO to Axxia Bus Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_RPIO, stat);
 
@@ -411,21 +412,21 @@ static ssize_t axxia_rio_tmo_show(struct device *dev,
 	char *str = buf;
 
 	str += sprintf(str, "Port Link Timeout Control Registers:\n");
-	__rio_local_read_config_32(mport, RIO_PLTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PLTOCCSR, &stat);
 	str += sprintf(str, "PLTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PLTOCCSR, stat);
-	__rio_local_read_config_32(mport, RIO_PRTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PRTOCCSR, &stat);
 	str += sprintf(str, "PRTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PRTOCCSR, stat);
-	__rio_local_read_config_32(mport, RAB_STAT, &stat);
+	axxia_local_config_read(priv, RAB_STAT, &stat);
 	str += sprintf(str, "RAB_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_STAT, stat);
-	__rio_local_read_config_32(mport, RAB_APIO_STAT, &stat);
+	axxia_local_config_read(priv, RAB_APIO_STAT, &stat);
 	str += sprintf(str, "RAB_APIO_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_APIO_STAT, stat);
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &stat);
+	axxia_local_config_read(priv, RIO_ESCSR(priv->port_ndx), &stat);
 	str += sprintf(str, "PNESCSR (%p)\t%8.8x\n",
-		       (void *)RIO_ESCSR(priv->portNdx), stat);
+		       (void *)RIO_ESCSR(priv->port_ndx), stat);
 
 	return str - buf;
 }
@@ -436,10 +437,11 @@ static ssize_t axxia_ib_dme_log_show(struct device *dev,
 				   char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat, log;
 	char *str = buf;
 
-	__rio_local_read_config_32(mport, RAB_INTR_STAT_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_STAT_MISC, &stat);
 	log = (stat & UNEXP_MSG_LOG) >> 24;
 	str += sprintf(str, "mbox[1:0]   %x\n", (log & 0xc0) >> 6);
 	str += sprintf(str, "letter[1:0] %x\n", (log & 0x30) >> 4);
@@ -596,7 +598,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		int dme_no = i;
 		u32 data;
 
-		__rio_local_read_config_32(mport,
+		axxia_local_config_read(priv,
 					   RAB_IB_DME_STAT(dme_no),
 					   &data);
 		if (data) {
@@ -608,7 +610,7 @@ static ssize_t ib_dme_show(struct device *dev,
 					"DME_SLEEP" : "OK"));
 		}
 	}
-	if (!priv->internalDesc) {
+	if (!priv->intern_msg_desc) {
 		int j, k;
 		int ne = 0;
 		struct rio_irq_handler *ob = NULL;
@@ -639,7 +641,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		for (i = 0; i < priv->desc_max_entries; i++) {
 			int desc_no = i;
 			u32 data;
-			__rio_local_read_config_32(mport,
+			axxia_local_config_read(priv,
 						DESC_TABLE_W0(desc_no),
 						&data);
 			if (data & DME_DESC_DW0_READY_MASK)

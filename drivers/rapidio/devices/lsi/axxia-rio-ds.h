@@ -46,8 +46,8 @@ struct axxia_rio_ds_dtb_info {
 	int     num_inb_virtual_m;      /* number of inbound virtual M */
 	int     num_outb_dses;          /* number of outbound DSEs */
 	int     inb_num_data_descs;     /* number of inbound data descriptors */
-	int     outb_num_hdr_descs;     /* number of outbound header descriptors */
-	int     outb_num_data_descs;    /* number of outbound data descriptors */
+	int     outb_num_hdr_descs;     /* number of outbound header desc */
+	int     outb_num_data_descs;    /* number of outbound data desc */
 #endif
 };
 
@@ -88,8 +88,10 @@ struct axxia_rio_ds_priv {
 	struct rio_irq_handler  ob_dse_irq[RIO_MAX_NUM_OBDS_DSE];
 	struct rio_irq_handler  ib_dse_vsid_irq[RIO_MAX_NUM_IBDS_VSID_M];
 
-	struct axxia_rio_ds_ibds_vsid_m_stats     ib_vsid_m_stats[RIO_MAX_NUM_IBDS_VSID_M];
-	struct axxia_rio_ds_obds_dse_stats        ob_dse_stats[RIO_MAX_NUM_OBDS_DSE];
+	struct axxia_rio_ds_ibds_vsid_m_stats
+				ib_vsid_m_stats[RIO_MAX_NUM_IBDS_VSID_M];
+	struct axxia_rio_ds_obds_dse_stats
+				ob_dse_stats[RIO_MAX_NUM_OBDS_DSE];
 
 	u8                      is_use_ds_feature;
 };

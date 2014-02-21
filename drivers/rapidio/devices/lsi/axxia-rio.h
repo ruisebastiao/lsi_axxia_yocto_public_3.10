@@ -17,8 +17,6 @@
 #ifndef _AXXIA_RIO_H_
 #define _AXXIA_RIO_H_
 
-/* #define DEBUG */
-
 #include <linux/device.h>
 #include <linux/of_platform.h>
 #include <linux/rio.h>
@@ -50,9 +48,19 @@
 /*****************************************/
 /* *********** ACP/AXXIA REG *********** */
 /*****************************************/
-#define SRIO_CONF_SPACE_SIZE    0x800
+#define SRIO_CONF_SPACE_SIZE          0x1000
+#define SRIO_CONF_SPACE_SIZE_FIXED    0x0800
+#define SRIO_CONF_SPACE_SIZE_PAGED    0x0800
 
 #define SRIO_SPACE_SIZE         0x40000      /* Total size GRIO + RAB Spaces */
+
+/* End point models & revisions */
+#define AXXIA_DEVID_ACP34XX		0x5101000a
+#define AXXIA_DEVID_ACP25XX		0x5108000a
+#define AXXIA_DEVID_AXM55XX		0x5120000a
+#define   AXXIA_DEVREV_AXM55XX_V1_0	  0x00000000
+#define   AXXIA_DEVREV_AXM55XX_V1_1	  0x00000001
+#define AXXIA_DEVID_AXM35XX		0x5102000a
 
 /* End Point Controller Specific Registers (0x1_0000-0x1_FFFC) */
 #define EPC_REG_BASE            0x10000
@@ -141,7 +149,7 @@
 					 >> 32) << 22)
 #define AXI_BASE(addr)                  (((u32)(addr) & 0xfffffc00) >> 10)
 
-/* register for RIO base address */
+/* Register for RIO base address */
 #define RAB_APIO_AMAP_RBAR(n)   (RAB_REG_BASE + (0x20C + (n * 0x10)))
 #define RIO_ADDR_BASE(taddr)            (((u32)(taddr) & 0xfffffc00) >> 10)
 #define RIO_ADDR_OFFSET(taddr)          ((u32)(taddr) & 0x3ff)
@@ -185,7 +193,7 @@
 
 #define RAB_INTR_STAT_APIO      (RAB_REG_BASE + 0x64)
 
-/* data_streaming */
+/* Data_streaming */
 #define RAB_INTR_ENAB_ODSE      (RAB_REG_BASE + 0x2a0c)
 #define RAB_INTR_ENAB_IBDS      (RAB_REG_BASE + 0x2a04)
 #define RAB_INTR_STAT_ODSE      (RAB_REG_BASE + 0x2a18)
@@ -316,9 +324,12 @@
 #define OB_DME_STAT_DESC_CHAIN_XFER_CPLT (1)
 
 #define OB_DME_STAT_ERROR_MASK           0x000000FC
-#define OB_DME_TID_MASK                  0xffff
+#define OB_DME_TID_MASK                  0xFFFFFFFF
 
 #define RAB_IB_DME_CTRL(e)      (RAB_REG_BASE + (0x600 + (0x10 * (e))))
+#define   RAB_IB_DME_CTRL_XMBOX(m)           (((m) & 0x3c) << 6)
+#define   RAB_IB_DME_CTRL_MBOX(m)            (((m) & 0x03) << 6)
+#define   RAB_IB_DME_CTRL_LETTER(l)          (((l) & 0x03) << 4)
 #define RAB_IB_DME_DESC_ADDR(e) (RAB_REG_BASE + (0x604 + (0x10 * (e))))
 #define RAB_IB_DME_STAT(e)      (RAB_REG_BASE + (0x608 + (0x10 * (e))))
 #define RAB_IB_DME_DESC(e)      (RAB_REG_BASE + (0x60C + (0x10 * (e))))
@@ -335,10 +346,10 @@
 #define IB_DME_STAT_DESC_XFER_CPLT       (1 << 1)
 #define IB_DME_STAT_DESC_CHAIN_XFER_CPLT (1)
 
-#define IB_DME_STAT_ERROR_MASK           0x000000FC
+#define IB_DME_STAT_ERROR_MASK		0x000000FC
 
-#define DME_WAKEUP              (2)
-#define DME_ENABLE              (1)
+#define DME_WAKEUP			(2)
+#define DME_ENABLE			(1)
 
 /* DME Message Descriptor Table */
 #define DESC_TABLE_W0_NDX(d)         (0x10 * (d))
@@ -363,6 +374,7 @@
 #define DME_DESC_DW0_DONE               (1 << 8)
 #define DME_DESC_DW0_SZ_MASK            (3 << 4)
 #define DME_DESC_DW0_EN_INT             (1 << 3)
+#define DME_DESC_DW0_END_OF_CHAIN       (1 << 2)
 #define DME_DESC_DW0_NXT_DESC_VALID     (1 << 1)
 #define DME_DESC_DW0_VALID              (1)
 
@@ -379,14 +391,14 @@
 
 #define DME_DESC_DW1_PRIO(flags)        ((flags & 0x3) << 30)
 #define DME_DESC_DW1_CRF(flags)         ((flags & 0x4) << 27)
-#define DME_DESC_DW1_SEG_SIZE_256       (0x6 << 18)
-#define DME_DESC_DW1_XMBOX(m)           ((m & 0x30) << 2)
-#define DME_DESC_DW1_MBOX(m)            ((m & 0x3) << 2)
-#define DME_DESC_DW1_SIZE(s)            ((((s + 7) & ~7) >> 3) << 8) /* Round
+#define DME_DESC_DW1_SEG_SIZE_256       (0x06 << 18)
+#define DME_DESC_DW1_XMBOX(m)           (((m) & 0x3c) << 2)
+#define DME_DESC_DW1_MBOX(m)            (((m) & 0x03) << 2)
+#define DME_DESC_DW1_LETTER(l)          ((l) & 0x03)
+#define DME_DESC_DW1_MSGLEN(s)          ((((s + 7) & ~7) >> 3) << 8) /* Round
 					 up and shift to make double word */
-#define DME_DESC_DW1_SIZE_F(d)          (((d) >> 8) & 0x3ff)
-#define DME_DESC_DW1_SIZE_SENT(sf)      ((sf) << 3) /* double words to bytes */
-#define DME_DESC_DW1_LETTER(l)          ((l) & 0x3)
+#define DME_DESC_DW1_MSGLEN_F(d)        (((d) >> 8) & 0x3ff)
+#define DME_DESC_DW1_MSGLEN_B(ml)       ((ml) << 3) /* double words to bytes */
 
 /***********************************/
 /* *********** RIO REG *********** */
@@ -491,13 +503,16 @@ struct rio_desc {
 struct rio_priv {
 	u32     cookie;
 
-	struct mutex api_mutex;
+	spinlock_t api_lock;
+	unsigned long api_lock_flags;
 	spinlock_t port_lock;
 
 	struct rio_mport *mport;
 	struct device *dev;
 	int  ndx;	/* From FDT description */
-	int  portNdx;
+	int  port_ndx;
+	u32  devid;     /* From GRIO register */
+	u32  devrev;    /* From GRIO register */
 
 	void __iomem *regs_win_fixed;
 	void __iomem *regs_win_paged;
@@ -506,17 +521,17 @@ struct rio_priv {
 	struct atmu_outb outb_atmu[RIO_OUTB_ATMU_WINDOWS];
 	struct resource acpres[ACP_MAX_RESOURCES];
 
-	int internalDesc;
+	int intern_msg_desc;
 	int desc_max_entries;
 
 	/* Chip-specific DME availability */
-	int numOutbDmes[2];	/* [0]=MSeg, [1]=Sseg */
-	int outbDmesInUse[2];
-	int outbDmes[2];	/* set of defined outbound DMEs:
+	int num_outb_dmes[2];	/* [0]=MSeg, [1]=Sseg */
+	int outb_dmes_in_use[2];
+	int outb_dmes[2];	/* set of defined outbound DMEs:
 				 *   [0]=MSeg, [1]=SSeg */
-	int numInbDmes[2];	/* [0]=MSeg, [1]=Sseg */
-	int inbDmesInUse[2];
-	int inbDmes[2];		/* set of defined inbound DMEs */
+	int num_inb_dmes[2];	/* [0]=MSeg, [1]=Sseg */
+	int inb_dmes_in_use[2];
+	int inb_dmes[2];	/* set of defined inbound DMEs */
 
 	/* Linkdown Reset; Trigger via SRDS STAT1 */
 	struct event_regs linkdown_reset;
@@ -543,7 +558,7 @@ struct rio_priv {
 	/* Fatal err */
 	void (*port_notify_cb)(struct rio_mport *mport);
 
-	/* data_streaming */
+	/* Data_streaming */
 	struct axxia_rio_ds_priv     ds_priv_data;
 	struct axxia_rio_ds_cfg      ds_cfg_data;
 };
@@ -555,17 +570,23 @@ struct rio_priv {
 
 static inline void axxia_api_lock(struct rio_priv *priv)
 {
-	mutex_lock(&priv->api_mutex);
+	spin_lock_irqsave(&priv->api_lock, priv->api_lock_flags);
 }
+
 static inline void axxia_api_unlock(struct rio_priv *priv)
 {
-	mutex_unlock(&priv->api_mutex);
+	spin_unlock_irqrestore(&priv->api_lock, priv->api_lock_flags);
 }
 
 extern int axxia_rio_start_port(struct rio_mport *mport);
 extern void axxia_rio_set_mport_disc_mode(struct rio_mport *mport);
 extern void axxia_rio_static_win_release(struct rio_mport *mport);
 extern int axxia_rio_static_win_init(struct rio_mport *mport);
+
+extern int axxia_local_config_read(struct rio_priv *priv,
+				   u32 offset, u32 *data);
+extern int axxia_local_config_write(struct rio_priv *priv,
+				    u32 offset, u32 data);
 
 #ifdef CONFIG_RAPIDIO_HOTPLUG
 
