@@ -2291,8 +2291,6 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 
 	desc = get_ob_desc(mport, mb);
 	if (!desc) {
-		dev_dbg(priv->dev,
-			"RIO: TX DMA descriptor ring exhausted\n");
 		__ob_dme_event_dbg(priv, mb->dme_no,
 				   1 << RIO_OB_DME_TX_PUSH_RING_FULL);
 		rc = -EBUSY;
