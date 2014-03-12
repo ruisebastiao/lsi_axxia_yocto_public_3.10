@@ -153,6 +153,7 @@ struct gpdma_engine;
 
 struct gpdma_desc {
 	struct descriptor               hw;
+	struct gpdma_desc              *chain;
 	dma_addr_t                      src;
 	dma_addr_t                      dst;
 	struct gpdma_engine            *engine;
@@ -209,8 +210,7 @@ struct gpdma_engine {
 		u32                     order;
 		dma_addr_t              phys;
 		struct gpdma_desc       *va;
-		int                     next;
-		struct gpdma_desc       *free[GPDMA_MAX_DESCRIPTORS];
+		struct gpdma_desc       *free;
 	} pool;
 	struct dma_device		dma_device;
 };

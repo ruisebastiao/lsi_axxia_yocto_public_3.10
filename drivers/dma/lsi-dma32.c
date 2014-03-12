@@ -59,6 +59,10 @@
 #define ch_dbg(dmac, fmt, ...)       do {} while (0)
 #endif
 
+static unsigned int burst = 5;
+module_param(burst, uint, 0644);
+MODULE_PARM_DESC(burst,
+		 "Preferred burst setting (0=SINGLE,3=INCR4,5=INCR8,7=INCR16)");
 
 static void reset_channel(struct gpdma_channel *dmac)
 {
@@ -127,9 +131,8 @@ static int alloc_desc_table(struct gpdma_engine *engine)
 		 * Controller can do full descriptor addresses, then we need no
 		 * special alignment on the descriptor block.
 		 */
-		order = ilog2((ALIGN(GPDMA_MAX_DESCRIPTORS *
-				     sizeof(struct gpdma_desc),
-				     PAGE_SIZE)) >> PAGE_SHIFT);
+		order = get_order(GPDMA_MAX_DESCRIPTORS *
+				  sizeof(struct gpdma_desc));
 	}
 
 	engine->pool.va = (struct gpdma_desc *)
@@ -141,9 +144,11 @@ static int alloc_desc_table(struct gpdma_engine *engine)
 	engine_dbg(engine, "order=%d pa=%#llx va=%p\n",
 		   engine->pool.order, engine->pool.phys, engine->pool.va);
 
-	for (i = 0; i < GPDMA_MAX_DESCRIPTORS; i++)
-		engine->pool.free[i] = &engine->pool.va[i];
-	engine->pool.next = 0;
+	engine->pool.free = NULL;
+	for (i = 0; i < GPDMA_MAX_DESCRIPTORS-1; i++)
+		engine->pool.va[i].chain = &engine->pool.va[i+1];
+	engine->pool.va[GPDMA_MAX_DESCRIPTORS-1].chain = NULL;
+	engine->pool.free = &engine->pool.va[0];
 
 	return 0;
 }
@@ -157,15 +162,31 @@ static void free_desc_table(struct gpdma_engine *engine)
 static struct gpdma_desc *get_descriptor(struct gpdma_engine *engine)
 {
 	unsigned long flags;
-	struct gpdma_desc *desc = NULL;
+	struct gpdma_desc *desc;
 
 	spin_lock_irqsave(&engine->lock, flags);
-	if (engine->pool.next < GPDMA_MAX_DESCRIPTORS)
-		desc = engine->pool.free[engine->pool.next++];
+	desc = engine->pool.free;
+	if (desc) {
+		engine->pool.free = desc->chain;
+		desc->chain = NULL;
+		desc->engine = engine;
+	}
 	spin_unlock_irqrestore(&engine->lock, flags);
-	desc->engine = engine;
 
 	return desc;
+}
+
+static phys_addr_t desc_to_paddr(const struct gpdma_channel *dmac,
+				 const struct gpdma_desc *desc)
+{
+	phys_addr_t paddr = virt_to_phys(&desc->hw);
+	WARN_ON(paddr & 0xf);
+	if (dmac->engine->chip->flags & LSIDMA_NEXT_FULL)
+		paddr |= 0x8;
+	else
+		paddr &= 0xfffff;
+
+	return paddr;
 }
 
 static void free_descriptor(struct virt_dma_desc *vd)
@@ -173,10 +194,16 @@ static void free_descriptor(struct virt_dma_desc *vd)
 	struct gpdma_desc *desc = to_gpdma_desc(vd);
 	struct gpdma_engine *engine = desc->engine;
 	unsigned long flags;
+	struct gpdma_desc *tail;
+
+	BUG_ON(desc == NULL);
+
+	for (tail = desc; tail->chain != NULL; tail = tail->chain)
+		;
 
 	spin_lock_irqsave(&engine->lock, flags);
-	BUG_ON(engine->pool.next == 0);
-	engine->pool.free[--engine->pool.next] = desc;
+	tail->chain = engine->pool.free;
+	engine->pool.free = desc;
 	spin_unlock_irqrestore(&engine->lock, flags);
 }
 
@@ -217,14 +244,9 @@ static void gpdma_start(struct gpdma_channel *dmac)
 			return;
 	}
 
-	paddr = virt_to_phys(&desc->hw);
-	WARN_ON(paddr & 0xf);
-	if (dmac->engine->chip->flags & LSIDMA_NEXT_FULL) {
-		/* Physical address of descriptor to load */
-		writel((u32)paddr | 0x8, dmac->base + DMA_NXT_DESCR);
-	} else {
-		writel((u32)paddr & 0xfffff, dmac->base + DMA_NXT_DESCR);
-	}
+	/* Physical address of descriptor to load */
+	paddr = desc_to_paddr(dmac, desc);
+	writel((u32)paddr, dmac->base + DMA_NXT_DESCR);
 
 	if (dmac->engine->chip->flags & LSIDMA_SEG_REGS) {
 		/* Segment bits [39..32] of descriptor, src and dst addresses */
@@ -414,68 +436,76 @@ gpdma_prep_memcpy(struct dma_chan *chan,
 		  unsigned long dma_flags)
 {
 	struct gpdma_channel *dmac = to_gpdma_chan(chan);
-	struct gpdma_desc *desc;
-	u16 rot_len, x_count, src_size, access_size;
+	struct gpdma_desc *first = NULL, *prev = NULL, *new;
+	u32 rot_len, x_count, src_size, access;
 
-	desc = get_descriptor(dmac->engine);
-	if (desc == NULL) {
-		ch_dbg(dmac, "ERROR: No descriptor\n");
+	if (size == 0)
 		return NULL;
-	}
 
-	/* Maximize memory access width based on job src, dst and length */
-	switch (ffs((u32)dst | (u32)src | size)) {
-	case 1:
-		src_size = 1;
-		access_size = (0 << 3);
-		break;
-	case 2:
-		src_size = 2;
-		access_size = (1 << 3);
-		break;
-	case 3:
-		src_size = 4;
-		access_size = (2 << 3);
-		break;
-	case 4:
-		src_size = 8;
-		access_size = (3 << 3);
-		break;
-	default:
-		src_size = 16;
-		access_size = (4 << 3);
-		break;
-	}
+	do {
+		new = get_descriptor(dmac->engine);
+		if (new == NULL) {
+			ch_dbg(dmac, "ERROR: No descriptor\n");
+			goto fail;
+		}
 
-	ch_dbg(dmac, "dst=%#llx src=%#llx size=%u mod=%d\n",
-		dst, src, size, src_size);
-	x_count = (size/src_size) - 1;
-	rot_len = (2 * src_size) - 1;
+		/* Maximize access width based on job src, dst and length */
+		access = min(ffs((u32)dst | (u32)src | size) - 1, 4);
+		src_size = 1 << access;
 
-	/*
-	 * Fill in descriptor in memory.
-	 */
-	desc->hw.src_x_ctr     = cpu_to_le16(x_count);
-	desc->hw.src_y_ctr     = 0;
-	desc->hw.src_x_mod     = cpu_to_le32(src_size);
-	desc->hw.src_y_mod     = 0;
-	desc->hw.src_addr      = cpu_to_le32(src & 0xffffffff);
-	desc->hw.src_data_mask = ~0;
-	desc->hw.src_access    = cpu_to_le16((rot_len << 6) | access_size);
-	desc->hw.dst_access    = cpu_to_le16(access_size);
-	desc->hw.ch_config     = cpu_to_le32(DMA_CONFIG_ONE_SHOT(1));
-	desc->hw.next_ptr      = 0;
-	desc->hw.dst_x_ctr     = cpu_to_le16(x_count);
-	desc->hw.dst_y_ctr     = 0;
-	desc->hw.dst_x_mod     = cpu_to_le32(src_size);
-	desc->hw.dst_y_mod     = 0;
-	desc->hw.dst_addr      = cpu_to_le32(dst & 0xffffffff);
+		/* Counter register is limited to 64K */
+		x_count = min((size >> access), (size_t)SZ_64K);
+		rot_len = (2 * src_size) - 1;
 
-	/* Setup sw descriptor */
-	desc->src        = src;
-	desc->dst        = dst;
+		/*
+		 * Fill in descriptor in memory.
+		 */
+		new->hw.src_x_ctr     = cpu_to_le16(x_count - 1);
+		new->hw.src_y_ctr     = 0;
+		new->hw.src_x_mod     = cpu_to_le32(src_size);
+		new->hw.src_y_mod     = 0;
+		new->hw.src_addr      = cpu_to_le32(src & 0xffffffff);
+		new->hw.src_data_mask = ~0;
+		new->hw.src_access    = cpu_to_le16((rot_len << 6) |
+						    (access << 3) |
+						    (burst & 7));
+		new->hw.dst_access    = cpu_to_le16((access << 3) |
+						    (burst & 7));
+		new->hw.ch_config     = cpu_to_le32(DMA_CONFIG_ONE_SHOT(1));
+		new->hw.next_ptr      = 0;
+		new->hw.dst_x_ctr     = cpu_to_le16(x_count - 1);
+		new->hw.dst_y_ctr     = 0;
+		new->hw.dst_x_mod     = cpu_to_le32(src_size);
+		new->hw.dst_y_mod     = 0;
+		new->hw.dst_addr      = cpu_to_le32(dst & 0xffffffff);
 
-	return vchan_tx_prep(&dmac->vc, &desc->vdesc, DMA_CTRL_ACK);
+		/* Setup sw descriptor */
+		new->src        = src;
+		new->dst        = dst;
+
+		if (!first) {
+			first = new;
+		} else {
+			prev->hw.next_ptr = desc_to_paddr(dmac, new);
+			prev->chain = new;
+			prev->hw.ch_config &=
+				~cpu_to_le32(DMA_CONFIG_LAST_BLOCK |
+					     DMA_CONFIG_INT_DST_EOT);
+		}
+		prev = new;
+
+		size -= x_count << access;
+		src  += x_count << access;
+		dst  += x_count << access;
+
+	} while (size > 0);
+
+	return vchan_tx_prep(&dmac->vc, &first->vdesc, DMA_CTRL_ACK);
+
+fail:
+	if (first)
+		free_descriptor(&first->vdesc);
+	return NULL;
 }
 
 /**

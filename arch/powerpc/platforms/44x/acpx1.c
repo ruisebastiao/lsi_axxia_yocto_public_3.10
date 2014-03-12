@@ -253,7 +253,7 @@ static int __init acpx14xx_probe(void)
 {
 	unsigned long root = of_get_flat_dt_root();
 
-	if (!of_flat_dt_is_compatible(root, "ibm,acpx1-4xx"))
+	if (!of_flat_dt_is_compatible(root, "lsi,acp"))
 		return 0;
 
 	return 1;

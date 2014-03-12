@@ -34,7 +34,6 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/smsc911x.h>
-#include <linux/spi/spi.h>
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
 #ifdef CONFIG_ARM_ARCH_TIMER
@@ -61,8 +60,6 @@ static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516-emu",
 	NULL
 };
-
-static void __iomem *ssp_base;
 
 static struct map_desc axxia_static_mappings[] __initdata = {
 #ifdef CONFIG_DEBUG_LL
@@ -151,17 +148,9 @@ struct pl061_platform_data gpio1_plat_data = {
 	.values     = 0		/* startup values */
 };
 
-static struct pl022_ssp_controller ssp_plat_data = {
-	.bus_id         = 0,
-	.num_chipselect = 5,
-	.enable_dma     = 0
-};
-
 static struct of_dev_auxdata axxia_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("arm,primecell", 0x20101E0000ULL,
 		       "mmci",  &mmc_plat_data),
-	OF_DEV_AUXDATA("arm,primecell", 0x2010088000ULL,
-		       "ssp",   &ssp_plat_data),
 	OF_DEV_AUXDATA("arm,primecell", 0x2010092000ULL,
 		       "gpio0", &gpio0_plat_data),
 	OF_DEV_AUXDATA("arm,primecell", 0x2010093000ULL,
@@ -220,49 +209,6 @@ static struct platform_device pmu_device = {
 	.dev.platform_data	= &axxia_pmu_platdata,
 };
 
-static inline void
-spidev_chip_select(u32 control, unsigned n)
-{
-	if (control == SSP_CHIP_SELECT)
-		writel(~(1<<n) & 0x1F, ssp_base + 0x30);
-	else
-		writel(0x1F, ssp_base + 0x30);
-}
-
-static void spi_cs_eeprom0(u32 control) { spidev_chip_select(control, 0); }
-static void spi_cs_eeprom1(u32 control) { spidev_chip_select(control, 1); }
-
-struct pl022_config_chip spi_eeprom0 = {
-	.iface      = SSP_INTERFACE_MOTOROLA_SPI,
-	.com_mode   = POLLING_TRANSFER,
-	.cs_control = spi_cs_eeprom0
-};
-
-struct pl022_config_chip spi_eeprom1 = {
-	.iface      = SSP_INTERFACE_MOTOROLA_SPI,
-	.com_mode   = POLLING_TRANSFER,
-	.cs_control = spi_cs_eeprom1
-};
-
-static struct spi_board_info spi_devs[] __initdata = {
-	{
-		.modalias               = "s25fl129p1",
-		.controller_data        = &spi_eeprom0,
-		.bus_num                = 0,
-		.chip_select            = 0,
-		.max_speed_hz           = 25000000,
-		.mode                   = SPI_MODE_0,
-	},
-	{
-		.modalias               = "s25fl129p1",
-		.controller_data        = &spi_eeprom1,
-		.bus_num                = 0,
-		.chip_select            = 1,
-		.max_speed_hz           = 25000000,
-		.mode                   = SPI_MODE_0,
-	}
-};
-
 static int
 axxia_bus_notifier(struct notifier_block *nb, unsigned long event, void *obj)
 {
@@ -298,14 +244,6 @@ void __init axxia_dt_init(void)
 
 	ncr_init();
 	axxia_ddr_retention_init();
-
-	spi_register_board_info(spi_devs, ARRAY_SIZE(spi_devs));
-
-	/*
-	 * Setup PL022 to handle chip-select signal automatically
-	 */
-	ssp_base = of_iomap(of_find_compatible_node(NULL, NULL, "arm,pl022"),
-			    0);
 
 	axxia_pcie_init();
 

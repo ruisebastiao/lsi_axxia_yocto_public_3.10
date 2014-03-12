@@ -1,10 +1,10 @@
 /*
- * Device Tree Source for IBM Embedded PPC 476 Platform
+ * Device Tree Source for LSI Axxia ACP344x V2.
  *
- * Copyright 2009 Torez Smith, IBM Corporation.
+ * Copyright 2013 LSI Corporation.
  *
  * Based on earlier code:
- *     Copyright (c) 2006, 2007 IBM Corp.
+ *     Copyright (c) 2009, 2006, 2007 IBM Corp.
  *     Josh Boyer <jwboyer@linux.vnet.ibm.com>, David Gibson <dwg@au1.ibm.com>
  *
  * This file is licensed under the terms of the GNU General Public
@@ -19,15 +19,16 @@
 / {
         #address-cells = <2>;
         #size-cells = <1>;
+
         model = "ibm,acpx1-4xx";
-        compatible = "ibm,acpx1-4xx","ibm,47x-AMP";
+        compatible = "lsi,acp3440", "lsi,acp", "ibm,acpx1-4xx";
         dcr-parent = <&{/cpus/cpu@0}>;
 
         aliases {
-                serial0 = &UART0;
-                serial1 = &UART1;
-                rapidio0 = &rio0;
+                serial0   = &UART0;
+                serial1   = &UART1;
 		ethernet0 = &FEMAC;
+                rapidio0  = &SRIO0;
         };
 
         cpus {
@@ -38,8 +39,8 @@
                         device_type = "cpu";
                         model = "PowerPC,4xx"; // real CPU changed in sim
                         reg = <0>;
-                        clock-frequency = <0x5f5e1000>;
-                        timebase-frequency = <0x5f5e1000>;
+                        clock-frequency = <0>; // filled in by U-Boot
+                        timebase-frequency = <0>; // filled in by U-Boot
                         i-cache-line-size = <32>;
                         d-cache-line-size = <32>;
                         i-cache-size = <32768>;
@@ -49,16 +50,70 @@
                         status = "ok";
                         reset-type = <3>; // 1=core, 2=chip, 3=system (default)
                 };
+
+                cpu@1 {
+                        device_type = "cpu";
+                        model = "PowerPC,4xx"; // real CPU changed in sim
+                        reg = <1>;
+                        clock-frequency = <0>; // filled in by U-Boot
+                        timebase-frequency = <0>; // filled in by U-Boot
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+                        dcr-controller;
+                        dcr-access-method = "native";
+                        status = "disabled";
+                        enable-method = "spin-table";
+                        cpu-release-addr = <0 0>; // Fixed by the boot loader
+                        reset-type = <3>; // 1=core, 2=chip, 3=system (default)
+                };
+
+                cpu@2 {
+                        device_type = "cpu";
+                        model = "PowerPC,4xx"; // real CPU changed in sim
+                        reg = <2>;
+                        clock-frequency = <0>; // filled in by U-Boot
+                        timebase-frequency = <0>; // filled in by U-Boot
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+                        dcr-controller;
+                        dcr-access-method = "native";
+                        status = "disabled";
+                        enable-method = "spin-table";
+                        cpu-release-addr = <0 0>; // Fixed by the boot loader
+                        reset-type = <3>; // 1=core, 2=chip, 3=system (default)
+                };
+
+                cpu@3 {
+                        device_type = "cpu";
+                        model = "PowerPC,4xx"; // real CPU changed in sim
+                        reg = <3>;
+                        clock-frequency = <0>; // filled in by U-Boot
+                        timebase-frequency = <0>; // filled in by U-Boot
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+                        dcr-controller;
+                        dcr-access-method = "native";
+                        status = "disabled";
+                        enable-method = "spin-table";
+                        cpu-release-addr = <0 0>; // Fixed by the boot loader
+                        reset-type = <3>; // 1=core, 2=chip, 3=system (default)
+                };
         };
 
         memory@0 {
                 device_type = "memory";
-                reg = <0x00000000 0x00000000 0x80000000>; // filled in by U-Boot
+                reg = <0x00000000 0x00000000 0x00000000>; // filled in by U-Boot
         };
 
         memory@80000000 {
                 device_type = "memory";
-                reg = <0x00000000 0x80000000 0x80000000>; // filled in by U-Boot
+                reg = <0x00000000 0x00000000 0x00000000>; // filled in by U-Boot
         };
 
         MPIC: interrupt-controller {
@@ -77,31 +132,36 @@
                 #address-cells = <2>;
                 #size-cells = <1>;
                 ranges;
-                clock-frequency = <0>; // Filled in by zImage
+                clock-frequency = <0>;
 
                 POB0: opb {
                         compatible = "ibm,opb-4xx", "ibm,opb";
+
                         #address-cells = <1>;
                         #size-cells = <1>;
+
                         /* Wish there was a nicer way of specifying a full 32-bit
                            range */
                         ranges = <0x00000000 0x00000020 0x00000000 0x80000000
                                   0x80000000 0x00000020 0x80000000 0x80000000>;
-                        clock-frequency = <0>; // Filled in by zImage
-                        UART0: serial@00404000 {
+
+                        clock-frequency = <0>;
+
+                        UART0: serial0 {
                                 device_type = "serial";
-                                compatible = "lsi,acp-uart0";
-                                enabled = <1>;
+                                compatible = "acp-uart0";
+                                enabled = <0>;
                                 reg = <0x00404000 0x1000>;
                                 clock-reg = <0x00408040 0x20>;
-                                clock-frequency = <0xbebc200>;
+                                clock-frequency = <200000000>;
                                 current-speed = <9600>;
                                 interrupt-parent = <&MPIC>;
                                 interrupts = <22>;
                         };
-                        UART1: serial@00405000 {
+
+                        UART1: serial1 {
                                 device_type = "serial";
-                                compatible = "lsi,acp-uart1";
+                                compatible = "acp-uart1";
                                 enabled = <0>;
                                 reg = <0x00405000 0x1000>;
                                 clock-reg = <0x00408060 0x20>;
@@ -110,39 +170,45 @@
                                 interrupt-parent = <&MPIC>;
                                 interrupts = <23>;
                         };
-                        USB0: usb@004a4000 {
+
+			USB0: usb0 {
                                 device_type = "usb";
-                                compatible = "lsi,acp-usb";
+                                compatible = "acp-usb";
                                 enabled = <0>;
-                                reg = <0x004a4000 0x00020000>;
+                                reg = <0x004a0000 0x00020000
+                                       0x0040c000 0x00001000>;
                                 interrupt-parent = <&MPIC>;
-                                interrupts = <31>;
+                                interrupts = <31 2>;
                         };
-                        I2C: i2c@00403000 {
-                                compatible = "lsi,acp-i2c";
+
+                        I2C: i2c0 {
+                                compatible = "acp-i2c";
                                 enabled = <0>;
                                 reg = <0x00403000 0x00001000>;
                                 interrupt-parent = <&MPIC>;
                                 interrupts = <21>;
                         };
-                        SSP: ssp@00402000 {
-                                compatible = "arm,acp-ssp";
+
+                        SSP: ssp0 {
+                                compatible = "acp-ssp";
                                 enabled = <0>;
                                 reg = <0x00402000 0x00001000>;
                                 interrupt-parent = <&MPIC>;
                                 interrupts = <20>;
                         };
-                        NAND: nand@00440000 {
+
+                        NAND: nand0 {
                                 device_type = "nand";
-                                compatible = "lsi,acp-nand";
-                                enabled = <1>;
+                                compatible = "acp-nand";
+                                enabled = <0>;
                                 reg = <0x00440000 0x20000
                                        0x0040c000 0x1000>;
                         };
-                        FEMAC: femac@00480000 {
+
+                        FEMAC: femac0 {
                                 device_type = "network";
-                                compatible = "lsi,acp-femac";
-                                enabled = <1>;
+                                compatible = "acp-femac";
+                                enabled = <0>;
                                 reg = <0x00480000 0x1000
                                        0x00481000 0x1000
                                        0x00482000 0x1000>;
@@ -171,10 +237,10 @@
         };
 
         chosen {
-                linux,stdout-path = "/plb/opb/serial@00404000";
+                linux,stdout-path = "/plb/opb/serial0";
         };
 
-        PCIE0: pciex@f00c0000 {
+        PCIE0: pei0 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
@@ -190,13 +256,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xa0000000
-                          0x20 0x40000000
+                ranges = <0x02000000 0x00000000 0xa0000000 
+                          0x20 0x40000000 
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                     interrupt-parent = <&MPIC>;
                 interrupts = <29 2>;
@@ -210,7 +276,7 @@
                 >;
         };
 
-        PCIE1: pciex@f00c8000 {
+        PCIE1: pei1 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
@@ -226,13 +292,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xa0000000
-                          0x20 0xc0000000
+                ranges = <0x02000000 0x00000000 0xa0000000 
+                          0x20 0xc0000000 
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                 interrupt-parent = <&MPIC>;
                 interrupts = <72 2>;
@@ -246,7 +312,7 @@
                 >;
         };
 
-        PCIE2: pciex@f00d0000 {
+        PCIE2: pei2 {
                 compatible = "lsi,plb-pciex";
                 device_type = "pci";
                 enabled = <0>;
@@ -262,13 +328,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xa0000000
-                          0x21 0x00000000
+                ranges = <0x02000000 0x00000000 0xa0000000 
+                          0x21 0x00000000 
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
 
                 interrupt-parent = <&MPIC>;
@@ -283,22 +349,14 @@
                 >;
         };
 
-        rio0: rapidio@0x2080000000 {
-                index = <0>;
-                status = "okay";
-                #address-cells = <2>;
-                #size-cells = <2>;
-                compatible = "axxia,rapidio-delta";
+	SRIO0: srio0 {
+                compatible = "acp,rapidio-delta";
                 device_type = "rapidio";
-                reg = <0x0020 0x00420000 0x0 0x1000>; /* SRIO Conf 0 region */
-                ranges = <0x0 0x0 0x0020 0x80000000 0x0 0x40000000>;
-		/*
-                linkdown-reset = <0x0200 0x100 0x0020 0x00430000 0x0 0x000010000>;
-		*/
-		interrupt-parent = <&MPIC>;
-                interrupts = <30 2>;
-                outb-dmes = <2 0x00000003 1 0x00000001>;
-		enable_ds = <1>;
+                enabled = <0>;
+                #size = <0>;    /* 0 = (256, small system)
+                                 * 1 = (65536, large system) */
+                reg = <0xf0020000 0x20000 0x1000>; /* SRIO Conf region */
+                interrupt-parent = <&MPIC>;
+                interrupts = <30 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
         };
-
 };
