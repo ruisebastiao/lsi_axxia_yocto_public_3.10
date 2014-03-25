@@ -46,7 +46,7 @@
 #define RIO_MAX_ROUTE_ENTRIES(size)	(size ? (1 << 16) : (1 << 8))
 #define RIO_ANY_DESTID(size)		(size ? 0xffff : 0xff)
 
-#define RIO_MAX_MBOX		8
+#define RIO_MAX_MBOX		64
 #define RIO_MAX_MSG_SIZE	0x1000
 
 /*

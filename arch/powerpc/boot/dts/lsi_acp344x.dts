@@ -337,7 +337,7 @@
 	rio0: rapidio@f0020000{
                 index = <0>;
 		status = "ok";
-                #address-cells = <3>;
+                #address-cells = <2>;
                 #size-cells = <2>;
                 compatible = "acp,rapidio-delta";
                 device_type = "rapidio";
@@ -345,11 +345,6 @@
                 ranges = <0x0 0x0 0x0020 0x80000000 0x0 0x40000000>;
                 interrupt-parent = <&MPIC>;
                 interrupts = <30 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
-                outb-dmes = <2 0x00000003 1 0x00000000>; /* X7 Defect 44844 */
-		enable_ds = <1>;
-		inb-dse = <0x00000020 0x00000400 0x00000100>; /* virt_m, data, dbuf */
-		/* inb-dse = <0x00000002 0x00000020 0x00000020>; */
-		outb-dse = <0x00000010 0x00000400 0x00000400 0x00000010>; /*dse,hdr,data,dbuf */
-		/* outb-dse = <0x00000002 0x00000020 0x00000020 0x00000020>; */
+                outb-dmes = <2 0x00000003 1 0x00000001>;
         };
 };

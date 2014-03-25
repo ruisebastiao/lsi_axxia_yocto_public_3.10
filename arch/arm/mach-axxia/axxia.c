@@ -3,7 +3,7 @@
  *
  * Support for the LSI Axxia boards based on ARM cores.
  *
- * Copyright (C) 2012 LSI
+ * Copyright (C) 2012-2014 LSI
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@
 #include "axxia.h"
 #include "pci.h"
 #include "i2c.h"
+#include "rapidio.h"
 
 static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516",
@@ -246,6 +247,8 @@ void __init axxia_dt_init(void)
 	axxia_ddr_retention_init();
 
 	axxia_pcie_init();
+
+	axxia_rapidio_init();
 
 	platform_device_register(&pmu_device);
 }

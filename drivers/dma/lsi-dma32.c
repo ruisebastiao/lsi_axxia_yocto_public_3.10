@@ -36,6 +36,7 @@
 #include <asm/page.h>
 #include <linux/bitops.h>
 #include <linux/atomic.h>
+#include <linux/sizes.h>
 #include "virt-dma.h"
 #include "lsi-dma32.h"
 

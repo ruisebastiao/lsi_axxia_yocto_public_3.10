@@ -9,8 +9,6 @@
 
 /* Constants, Macros, etc. */
 
-#define AXXIA_RIO_SMALL_SYSTEM
-
 #define AXXIA_RIO_SYSMEM_BARRIER() \
     __asm__ __volatile__ ("dmb" : : : "memory")
 

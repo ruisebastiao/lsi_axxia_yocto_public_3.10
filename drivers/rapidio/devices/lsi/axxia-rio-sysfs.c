@@ -15,6 +15,7 @@
  */
 
 /* #define DEBUG */
+/* #define IO_OPERATIONS */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -29,7 +30,7 @@
 
 #ifdef CONFIG_AXXIA_RIO_STAT
 
-static const char *event_str[] = {
+static const char * const event_str[] = {
 	"TX Port Packet dropped                 ",
 	"TX Port Error threshold exceeded       ",
 	"Tx Port Degraded threshold exceeded    ",
@@ -41,7 +42,7 @@ static const char *event_str[] = {
 	"RIO_EVENT_NUM"
 };
 
-static const char *state_str[] = {
+static const char * const state_str[] = {
 	"TX Port stopped due to retry condition",
 	"TX Port stopped due to transmission err",
 	"RX Port stopped due to retry condition",
@@ -51,7 +52,7 @@ static const char *state_str[] = {
 	"RIO_STATE_NUM"
 };
 
-static const char *irq_str[] = {
+static const char * const irq_str[] = {
 	/* Axxia Error Events - really bad! */
 	"Axxia Master Write timouts                           ",
 	"Axxia Master Read timouts                            ",
@@ -95,8 +96,8 @@ static const char *irq_str[] = {
 	"Outbound Doorbell retry response                     ",
 	"Outbound Doorbell error response                     ",
 	"Outbound Doorbell response timeouts                  ",
-	"Inbound Dorrbell completed                           ",
-	"Inbound Dorrbell spurious                            ",
+	"Inbound Doorbell completed                           ",
+	"Inbound Doorbell spurious                            ",
 	/* Outbound Messaging unit - service irq */
 	"Outbound Message Engine response timeouts            ",
 	"Outbound Message Engine response error               ",
@@ -131,7 +132,7 @@ static const char *irq_str[] = {
 	"RIO_IRQ_NUM"
 };
 
-static const char *ib_dme_str[] = {
+static const char * const ib_dme_str[] = {
 	"Inbound Message descriptors push to net stack        ",
 	"Inbound Message descriptors ok pop by net stack      ",
 	"Inbound Message descriptors err pop by net stack     ",
@@ -143,7 +144,7 @@ static const char *ib_dme_str[] = {
 	"RIO_IB_DME_NUM"
 };
 
-static const char *ob_dme_str[] = {
+static const char * const ob_dme_str[] = {
 	"Outbound Message descriptors push by net stack       ",
 	"Outbound Message descriptors net push when ring full ",
 	"Outbound Message descriptors ack to net stack        ",
@@ -155,8 +156,8 @@ static const char *ob_dme_str[] = {
 };
 
 static ssize_t axxia_rio_stat_show(struct device *dev,
-				 struct device_attribute *attr,
-				 char *buf)
+				   struct device_attribute *attr,
+				   char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
 	struct rio_priv *priv = mport->priv;
@@ -186,8 +187,8 @@ static ssize_t axxia_rio_stat_show(struct device *dev,
 static DEVICE_ATTR(stat, S_IRUGO, axxia_rio_stat_show, NULL);
 
 static ssize_t axxia_rio_ib_dme_show(struct device *dev,
-				   struct device_attribute *attr,
-				   char *buf)
+				    struct device_attribute *attr,
+				    char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
 	struct rio_priv *priv = mport->priv;
@@ -208,9 +209,9 @@ static ssize_t axxia_rio_ib_dme_show(struct device *dev,
 }
 
 static ssize_t axxia_rio_ib_dme_store(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf,
-				    size_t count)
+				     struct device_attribute *attr,
+				     const char *buf,
+				     size_t count)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
 	struct rio_priv *priv = mport->priv;
@@ -222,7 +223,7 @@ static ssize_t axxia_rio_ib_dme_store(struct device *dev,
 	}
 	return count;
 }
-static DEVICE_ATTR(ib_dme_event, S_IRUGO|S_IWUGO,
+static DEVICE_ATTR(ib_dme_event, S_IRUGO|S_IWUSR,
 		   axxia_rio_ib_dme_show, axxia_rio_ib_dme_store);
 
 static ssize_t axxia_rio_ob_dme_show(struct device *dev,
@@ -262,12 +263,12 @@ static ssize_t axxia_rio_ob_dme_store(struct device *dev,
 	}
 	return count;
 }
-static DEVICE_ATTR(ob_dme_event, S_IWUGO|S_IRUGO,
+static DEVICE_ATTR(ob_dme_event, S_IWUSR|S_IRUGO,
 		   axxia_rio_ob_dme_show, axxia_rio_ob_dme_store);
 
 #ifdef CONFIG_SRIO_IRQ_TIME
 
-static ssize_t axxia_rio_ib_dme_time_show(struct device *dev,
+static ssize_t axxia_rio_ib_mbox_time_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
@@ -319,7 +320,7 @@ static ssize_t axxia_rio_ib_dme_time_show(struct device *dev,
 	return str - buf;
 }
 
-static ssize_t axxia_rio_ib_dme_time_store(struct device *dev,
+static ssize_t axxia_rio_ib_mbox_time_store(struct device *dev,
 					 struct device_attribute *attr,
 					 const char *buf,
 					 size_t count)
@@ -365,8 +366,8 @@ static ssize_t axxia_rio_ib_dme_time_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(ib_dme_time, S_IWUGO|S_IRUGO,
-		   axxia_rio_ib_dme_time_show, axxia_rio_ib_dme_time_store);
+static DEVICE_ATTR(ib_dme_time, S_IWUSR|S_IRUGO,
+		   axxia_rio_ib_mbox_time_show, axxia_rio_ib_mbox_time_store);
 #endif
 
 static ssize_t axxia_rio_irq_show(struct device *dev,
@@ -374,26 +375,27 @@ static ssize_t axxia_rio_irq_show(struct device *dev,
 				char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat;
 	char *str = buf;
 
 	str += sprintf(str, "Interrupt enable bits:\n");
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_GNRL, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_GNRL, &stat);
 	str += sprintf(str, "General Interrupt Enable (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_GNRL, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_ODME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_ODME, &stat);
 	str += sprintf(str, "Outbound Message Engine  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_ODME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_IDME, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_IDME, &stat);
 	str += sprintf(str, "Inbound Message Engine   (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_IDME, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_MISC, &stat);
 	str += sprintf(str, "Miscellaneous Events     (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_MISC, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_APIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_APIO, &stat);
 	str += sprintf(str, "Axxia Bus to RIO Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_APIO, stat);
-	__rio_local_read_config_32(mport, RAB_INTR_ENAB_RPIO, &stat);
+	axxia_local_config_read(priv, RAB_INTR_ENAB_RPIO, &stat);
 	str += sprintf(str, "RIO to Axxia Bus Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_RPIO, stat);
 
@@ -411,21 +413,21 @@ static ssize_t axxia_rio_tmo_show(struct device *dev,
 	char *str = buf;
 
 	str += sprintf(str, "Port Link Timeout Control Registers:\n");
-	__rio_local_read_config_32(mport, RIO_PLTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PLTOCCSR, &stat);
 	str += sprintf(str, "PLTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PLTOCCSR, stat);
-	__rio_local_read_config_32(mport, RIO_PRTOCCSR, &stat);
+	axxia_local_config_read(priv, RIO_PRTOCCSR, &stat);
 	str += sprintf(str, "PRTOCCSR (%p)\t%8.8x\n",
 		       (void *)RIO_PRTOCCSR, stat);
-	__rio_local_read_config_32(mport, RAB_STAT, &stat);
+	axxia_local_config_read(priv, RAB_STAT, &stat);
 	str += sprintf(str, "RAB_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_STAT, stat);
-	__rio_local_read_config_32(mport, RAB_APIO_STAT, &stat);
+	axxia_local_config_read(priv, RAB_APIO_STAT, &stat);
 	str += sprintf(str, "RAB_APIO_STAT (%p)\t%8.8x\n",
 		       (void *)RAB_APIO_STAT, stat);
-	__rio_local_read_config_32(mport, RIO_ESCSR(priv->portNdx), &stat);
+	axxia_local_config_read(priv, RIO_ESCSR(priv->port_ndx), &stat);
 	str += sprintf(str, "PNESCSR (%p)\t%8.8x\n",
-		       (void *)RIO_ESCSR(priv->portNdx), stat);
+		       (void *)RIO_ESCSR(priv->port_ndx), stat);
 
 	return str - buf;
 }
@@ -436,10 +438,11 @@ static ssize_t axxia_ib_dme_log_show(struct device *dev,
 				   char *buf)
 {
 	struct rio_mport *mport = dev_get_drvdata(dev);
+	struct rio_priv *priv = mport->priv;
 	u32 stat, log;
 	char *str = buf;
 
-	__rio_local_read_config_32(mport, RAB_INTR_STAT_MISC, &stat);
+	axxia_local_config_read(priv, RAB_INTR_STAT_MISC, &stat);
 	log = (stat & UNEXP_MSG_LOG) >> 24;
 	str += sprintf(str, "mbox[1:0]   %x\n", (log & 0xc0) >> 6);
 	str += sprintf(str, "letter[1:0] %x\n", (log & 0x30) >> 4);
@@ -466,7 +469,7 @@ static ssize_t apio_enable(struct device *dev,
 	}
 	return rc;
 }
-static DEVICE_ATTR(apio_enable, S_IWUGO, NULL, apio_enable);
+static DEVICE_ATTR(apio_enable, S_IWUSR, NULL, apio_enable);
 
 static ssize_t apio_disable(struct device *dev,
 			    struct device_attribute *attr,
@@ -488,7 +491,7 @@ static ssize_t apio_disable(struct device *dev,
 	}
 	return rc;
 }
-static DEVICE_ATTR(apio_disable, S_IWUGO, NULL, apio_disable);
+static DEVICE_ATTR(apio_disable, S_IWUSR, NULL, apio_disable);
 
 static ssize_t rpio_enable(struct device *dev,
 			   struct device_attribute *attr,
@@ -507,7 +510,7 @@ static ssize_t rpio_enable(struct device *dev,
 	}
 	return rc;
 }
-static DEVICE_ATTR(rpio_enable, S_IWUGO, NULL, rpio_enable);
+static DEVICE_ATTR(rpio_enable, S_IWUSR, NULL, rpio_enable);
 
 static ssize_t rpio_disable(struct device *dev,
 			    struct device_attribute *attr,
@@ -529,7 +532,7 @@ static ssize_t rpio_disable(struct device *dev,
 	}
 	return rc;
 }
-static DEVICE_ATTR(rpio_disable, S_IWUGO, NULL, rpio_disable);
+static DEVICE_ATTR(rpio_disable, S_IWUSR, NULL, rpio_disable);
 
 #define MBOX_MAGIC 0xabcdefaa
 
@@ -544,8 +547,8 @@ struct ob_dme_stat {
 	u8 *bufs;
 };
 
-static struct ob_dme_stat ob_stat[RIO_MAX_TX_MBOX];
-static struct ob_dme_stat ib_stat[RIO_MAX_TX_MBOX];
+static struct ob_dme_stat ob_stat[DME_MAX_OB_ENGINES];
+static struct ob_dme_stat ib_stat[DME_MAX_IB_ENGINES];
 
 static ssize_t ob_dme_show(struct device *dev,
 			   struct device_attribute *attr,
@@ -554,12 +557,12 @@ static ssize_t ob_dme_show(struct device *dev,
 	int i;
 	char *str = buf;
 
-	for (i = 0; i < RIO_MAX_TX_MBOX; i++) {
+	for (i = 0; i < DME_MAX_OB_ENGINES; i++) {
 		struct ob_dme_stat *stat = &ob_stat[i];
 
 		if (stat->magic != MBOX_MAGIC)
 			continue;
-		str += sprintf(str, "mbox id      %d\n", i);
+		str += sprintf(str, "dme id       %d\n", i);
 		str += sprintf(str, "tx_cb        %d\n", stat->tx_cb);
 		str += sprintf(str, "desc_error   %d\n", stat->desc_error);
 		str += sprintf(str, "desc_done    %d\n", stat->desc_done);
@@ -582,12 +585,12 @@ static ssize_t ib_dme_show(struct device *dev,
 	int ready = 0, valid = 0, not_valid = 0;
 	char *str = buf;
 
-	for (i = 0; i < RIO_MAX_RX_MBOX; i++) {
+	for (i = 0; i < DME_MAX_IB_ENGINES; i++) {
 		struct ob_dme_stat *stat = &ib_stat[i];
 
 		if (stat->magic != MBOX_MAGIC)
 			continue;
-		str += sprintf(str, "mbox id      %d\n", i);
+		str += sprintf(str, "dme id       %d\n", i);
 		str += sprintf(str, "tx_cb        %d\n", stat->tx_cb);
 		str += sprintf(str, "desc_error   %d\n", stat->desc_error);
 		str += sprintf(str, "desc_done    %d\n", stat->desc_done);
@@ -596,7 +599,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		int dme_no = i;
 		u32 data;
 
-		__rio_local_read_config_32(mport,
+		axxia_local_config_read(priv,
 					   RAB_IB_DME_STAT(dme_no),
 					   &data);
 		if (data) {
@@ -608,7 +611,7 @@ static ssize_t ib_dme_show(struct device *dev,
 					"DME_SLEEP" : "OK"));
 		}
 	}
-	if (!priv->internalDesc) {
+	if (!priv->intern_msg_desc) {
 		int j, k;
 		int ne = 0;
 		struct rio_irq_handler *ob = NULL;
@@ -639,7 +642,7 @@ static ssize_t ib_dme_show(struct device *dev,
 		for (i = 0; i < priv->desc_max_entries; i++) {
 			int desc_no = i;
 			u32 data;
-			__rio_local_read_config_32(mport,
+			axxia_local_config_read(priv,
 						DESC_TABLE_W0(desc_no),
 						&data);
 			if (data & DME_DESC_DW0_READY_MASK)
@@ -728,7 +731,9 @@ add_buff:
 	}
 }
 
-static ssize_t open_ob_dme(struct device *dev,
+#ifdef IO_OPERATIONS
+
+static ssize_t open_ob_mbox(struct device *dev,
 			   struct device_attribute *attr,
 			   const char *buf,
 			   size_t count)
@@ -753,9 +758,9 @@ static ssize_t open_ob_dme(struct device *dev,
 	} else
 			return -EINVAL;
 }
-static DEVICE_ATTR(open_ob_mbox, S_IWUGO, NULL, open_ob_dme);
+static DEVICE_ATTR(open_ob_mbox, S_IWUSR, NULL, open_ob_mbox);
 
-static ssize_t open_ib_dme(struct device *dev,
+static ssize_t open_ib_mbox(struct device *dev,
 			   struct device_attribute *attr,
 			   const char *buf,
 			   size_t count)
@@ -798,7 +803,7 @@ err:
 	} else
 		return -EINVAL;
 }
-static DEVICE_ATTR(open_ib_mbox, S_IWUGO, NULL, open_ib_dme);
+static DEVICE_ATTR(open_ib_mbox, S_IWUSR, NULL, open_ib_mbox);
 
 struct axxia_mbox_work {
 	struct rio_mport *mport;
@@ -827,7 +832,7 @@ static void mbox_work(struct work_struct *work)
 			__func__, mb_work->mbox, rc);
 }
 
-static ssize_t close_ob_dme(struct device *dev,
+static ssize_t close_ob_mbox(struct device *dev,
 			    struct device_attribute *attr,
 			    const char *buf,
 			    size_t count)
@@ -851,9 +856,9 @@ static ssize_t close_ob_dme(struct device *dev,
 	} else
 		return -EINVAL;
 }
-static DEVICE_ATTR(close_ob_mbox, S_IWUGO, NULL, close_ob_dme);
+static DEVICE_ATTR(close_ob_mbox, S_IWUSR, NULL, close_ob_mbox);
 
-static ssize_t close_ib_dme(struct device *dev,
+static ssize_t close_ib_mbox(struct device *dev,
 			    struct device_attribute *attr,
 			    const char *buf,
 			    size_t count)
@@ -877,9 +882,9 @@ static ssize_t close_ib_dme(struct device *dev,
 	} else
 		return -EINVAL;
 }
-static DEVICE_ATTR(close_ib_mbox, S_IWUGO, NULL, close_ib_dme);
+static DEVICE_ATTR(close_ib_mbox, S_IWUSR, NULL, close_ib_mbox);
 
-static ssize_t ob_dme_send(struct device *dev,
+static ssize_t ob_mbox_send(struct device *dev,
 			   struct device_attribute *attr,
 			   const char *buf,
 			   size_t count)
@@ -920,7 +925,9 @@ static ssize_t ob_dme_send(struct device *dev,
 	} else
 		return -EINVAL;
 }
-static DEVICE_ATTR(ob_send, S_IWUGO, NULL, ob_dme_send);
+static DEVICE_ATTR(ob_send, S_IWUSR, NULL, ob_mbox_send);
+
+#endif /* IO_OPERATIONS */
 
 
 static struct attribute *rio_attributes[] = {
@@ -937,6 +944,7 @@ static struct attribute *rio_attributes[] = {
 	&dev_attr_apio_disable.attr,
 	&dev_attr_rpio_enable.attr,
 	&dev_attr_rpio_disable.attr,
+#ifdef IO_OPERATIONS
 	&dev_attr_ob_mbox_stat.attr,
 	&dev_attr_ib_mbox_stat.attr,
 	&dev_attr_open_ob_mbox.attr,
@@ -944,6 +952,11 @@ static struct attribute *rio_attributes[] = {
 	&dev_attr_close_ob_mbox.attr,
 	&dev_attr_close_ib_mbox.attr,
 	&dev_attr_ob_send.attr,
+#endif /* IO_OPERATIONS */
+	/* &dev_attr_ob_mbox_log.attr    * ??? */
+	/* &dev_attr_ib_mbox_log.attr    * ??? */
+	/* &dev_attr_ob_ds_log.attr      * ??? */
+	/* &dev_attr_ib_ds_log.attr      * ??? */
 	NULL
 };
 

@@ -289,5 +289,7 @@
 		reg = <0xf0020000 0x20000 0x1000>; /* SRIO Conf region */
 		interrupt-parent = <&MPIC>;
 		interrupts = <30 0x2 /* NCP_INTR_MPIC_SRC_AXIS_SRIO */>;
-	};
+                outb-dmes = <2 0x00000003 1 0x00000000>; /* Defect 48444 */
+        };
+
 };
