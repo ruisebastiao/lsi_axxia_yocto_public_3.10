@@ -36,7 +36,6 @@
 #include <linux/swap.h>
 #include <linux/pci.h>
 #include <linux/dma-buf.h>
-#include <linux/module.h>
 
 static void i915_gem_object_flush_gtt_write_domain(struct drm_i915_gem_object *obj);
 static void i915_gem_object_flush_cpu_write_domain(struct drm_i915_gem_object *obj,
@@ -2968,10 +2967,6 @@ static inline int fence_number(struct drm_i915_private *dev_priv,
 {
 	return fence - dev_priv->fence_regs;
 }
-
-static bool do_wbinvd = true;
-module_param(do_wbinvd, bool, 0644);
-MODULE_PARM_DESC(do_wbinvd, "Do expensive synchronization. Say no after you pin each GPU process to the same CPU in order to lower the latency.");
 
 static void i915_gem_object_update_fence(struct drm_i915_gem_object *obj,
 					 struct drm_i915_fence_reg *fence,
