@@ -909,6 +909,10 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 	u32 irqstat, irqnr;
 	struct gic_chip_data *gic = &gic_data;
 	void __iomem *cpu_base = gic_data_cpu_base(gic);
+	void __iomem *dist_base = gic_data_dist_base(gic);
+	u32 pcpu = cpu_logical_map(smp_processor_id());
+	u32 cluster = pcpu / CORES_PER_CLUSTER;
+	u32 next, mask;
 
 	do {
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
@@ -968,6 +972,27 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 				/* Not currently used */
 				writel_relaxed(irqnr, cpu_base + GIC_CPU_EOI);
 				break;
+
+			case IRQ_PMU:
+				/*
+				 * The PMU IRQ line is OR'ed among all cores
+				 * within a cluster, so no way to tell which
+				 * core actually generated the interrupt.
+				 * Therefore, rotate PMU IRQ affinity to allow
+				 * perf to work accurately as possible. Skip
+				 * over offline cpus.
+				 */
+				do {
+					next = (++pcpu % CORES_PER_CLUSTER) +
+						(cluster * CORES_PER_CLUSTER);
+				} while (!cpu_online(next));
+
+				mask = 0x01 << (next % CORES_PER_CLUSTER);
+				raw_spin_lock(&irq_controller_lock);
+				writeb_relaxed(mask, dist_base +
+						GIC_DIST_TARGET + IRQ_PMU);
+				raw_spin_unlock(&irq_controller_lock);
+				/* Fall through ... */
 
 			default:
 				/* External interrupt */

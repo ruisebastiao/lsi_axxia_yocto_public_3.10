@@ -22,6 +22,7 @@
 #include <asm/mach/map.h>
 #include <asm/virt.h>
 
+#include "axxia.h"
 #include <mach/axxia-gic.h>
 
 extern void axxia_secondary_startup(void);
@@ -246,4 +247,8 @@ struct smp_operations axxia_smp_ops __initdata = {
 	.smp_prepare_cpus	= axxia_smp_prepare_cpus,
 	.smp_secondary_init	= axxia_secondary_init,
 	.smp_boot_secondary	= axxia_boot_secondary,
+#ifdef CONFIG_HOTPLUG_CPU
+	.cpu_die		= axxia_platform_cpu_die,
+#endif
+
 };
