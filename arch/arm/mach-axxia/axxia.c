@@ -98,34 +98,14 @@ static void __init axxia_dt_init_irq(void)
 
 void __init axxia_dt_timer_init(void)
 {
-	const char *path;
-	struct device_node *node;
-	void __iomem *base;
 	int is_sim;
 
 	is_sim = of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim") != NULL;
 
 	axxia_init_clocks(is_sim);
 
-#ifdef CONFIG_ARM_ARCH_TIMER
 	of_clk_init(NULL);
 	clocksource_of_init();
-#endif
-
-	if (of_property_read_string(of_aliases, "timer", &path)) {
-		WARN_ON(1);
-		return;
-	}
-
-	node = of_find_node_by_path(path);
-	if (WARN_ON(node == NULL))
-		return;
-
-	base = of_iomap(node, 0);
-	if (WARN_ON(base == NULL))
-		return;
-
-	sp804_clocksource_and_sched_clock_init(base, "axxia-timer0");
 }
 
 static struct mmci_platform_data mmc_plat_data = {
