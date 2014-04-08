@@ -279,6 +279,9 @@
 				// The following will get filled in by
 				// the boot loader.
 				mdio-clock = <0>;
+				// offset and period
+				mdio-clock-offset = <0x10>;
+				mdio-clock-period = <0x2c>;
 				phy-address = <0>;
 				ad-value = <0>;
 				mac-address = [00 00 00 00 00 00];

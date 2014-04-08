@@ -28,6 +28,8 @@
 
 &femac {
 	status = "okay";
+	mdio-clock-offset = <0x1c>;
+	mdio-clock-period = <0xf0>;
 };
 
 &pcie0 {
