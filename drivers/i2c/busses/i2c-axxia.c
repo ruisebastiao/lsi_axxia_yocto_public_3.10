@@ -50,8 +50,6 @@ struct i2c_regs {
 	__le32 mst_tx_xfer;
 	__le32 mst_addr_1;
 	__le32 mst_addr_2;
-#define CHIP_READ(_chip)  (((_chip) << 1) | 1)
-#define CHIP_WRITE(_chip) (((_chip) << 1) | 0)
 	__le32 mst_data;
 	__le32 mst_tx_fifo;
 	__le32 mst_rx_fifo;
@@ -248,6 +246,12 @@ i2c_m_rd(const struct i2c_msg *msg)
 }
 
 static int
+i2c_m_ten(const struct i2c_msg *msg)
+{
+	return (msg->flags & I2C_M_TEN) != 0;
+}
+
+static int
 i2c_m_recv_len(const struct i2c_msg *msg)
 {
 	return (msg->flags & I2C_M_RECV_LEN) != 0;
@@ -376,6 +380,7 @@ static int
 axxia_i2c_xfer_msg(struct axxia_i2c_dev *idev, struct i2c_msg *msg)
 {
 	u32 int_mask = MST_STATUS_ERR | MST_STATUS_SNS;
+	u32 addr_1, addr_2;
 	int ret;
 
 	if (msg->len == 0 || msg->len > 255)
@@ -394,17 +399,32 @@ axxia_i2c_xfer_msg(struct axxia_i2c_dev *idev, struct i2c_msg *msg)
 			writel(I2C_SMBUS_BLOCK_MAX, &idev->regs->mst_rx_xfer);
 		else
 			writel(msg->len, &idev->regs->mst_rx_xfer);
-		/* Chip address for write */
-		writel(CHIP_READ(msg->addr), &idev->regs->mst_addr_1);
 	} else {
 		/* TX # bytes */
 		writel(msg->len, &idev->regs->mst_tx_xfer);
 		/* RX 0 bytes */
 		writel(0, &idev->regs->mst_rx_xfer);
-		/* Chip address for write */
-		writel(CHIP_WRITE(msg->addr), &idev->regs->mst_addr_1);
 	}
-	writel(msg->addr >> 8, &idev->regs->mst_addr_2);
+
+	if (i2c_m_ten(msg)) {
+		/* 10-bit address
+		 *   addr_1: 5'b11110 | addr[9:8] | (R/W)
+		 *   addr_2: addr[7:0]
+		 */
+		addr_1 = 0xF0 | ((msg->addr >> 7) & 0x06);
+		addr_2 = msg->addr & 0xFF;
+	} else {
+		/* 7-bit address
+		 *   addr_1: addr[6:0] | (R/W)
+		 *   addr_2: dont care
+		 */
+		addr_1 = (msg->addr << 1) & 0xFF;
+		addr_2 = 0;
+	}
+	if (i2c_m_rd(msg))
+		addr_1 |= 1;
+	writel(addr_1, &idev->regs->mst_addr_1);
+	writel(addr_2, &idev->regs->mst_addr_2);
 
 	if (i2c_m_rd(msg)) {
 		int_mask |= MST_STATUS_RFL;
