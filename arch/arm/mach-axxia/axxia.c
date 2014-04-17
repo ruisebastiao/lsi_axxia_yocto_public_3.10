@@ -43,6 +43,7 @@
 #include <asm/pmu.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <asm/kexec.h>
 #include <asm/mach/time.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <mach/hardware.h>
@@ -61,6 +62,44 @@ static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516-emu",
 	NULL
 };
+
+#ifdef CONFIG_KEXEC
+
+static void __iomem *dickens;
+
+static void set_l3_pstate(u32 newstate)
+{
+	static const u8 hnf[] = {
+		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
+	};
+	int i;
+	u32 status;
+
+	for (i = 0; i < ARRAY_SIZE(hnf); ++i)
+		writel(newstate, dickens + (hnf[i] << 16) + 0x10);
+
+	for (i = 0; i < ARRAY_SIZE(hnf); ++i) {
+		int retry;
+		for (retry = 10000; retry > 0; --retry) {
+			status = readl(dickens + (hnf[i] << 16) + 0x18);
+			if (((status >> 2) & 3) == newstate)
+				break;
+			udelay(1);
+		}
+		BUG_ON(retry == 0);
+	}
+}
+
+static void
+flush_l3(void)
+{
+	/* Shutdown to flush */
+	set_l3_pstate(0);
+	/* ...and then back up again */
+	set_l3_pstate(3);
+}
+
+#endif
 
 static struct map_desc axxia_static_mappings[] __initdata = {
 #ifdef CONFIG_DEBUG_LL
@@ -180,6 +219,13 @@ static struct notifier_block axxia_amba_nb = {
 
 void __init axxia_dt_init(void)
 {
+#ifdef CONFIG_KEXEC
+	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim")) {
+		dickens = ioremap(0x2000000000, SZ_4M);
+		kexec_reinit = flush_l3;
+	}
+#endif
+
 	bus_register_notifier(&platform_bus_type, &axxia_platform_nb);
 	bus_register_notifier(&amba_bustype, &axxia_amba_nb);
 

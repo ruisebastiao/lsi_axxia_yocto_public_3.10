@@ -139,6 +139,7 @@ struct gic_chip_data {
 #endif
 	struct irq_domain *domain;
 	unsigned int gic_irqs;
+	unsigned long dist_init_done;
 };
 
 enum gic_rpc_func_mask {
@@ -572,8 +573,6 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
 #define gic_set_wake	NULL
 #endif
 
-#ifdef CONFIG_CPU_PM
-
 static u32 get_cluster_id(void)
 {
 	u32 mpidr, cluster;
@@ -590,6 +589,8 @@ static u32 get_cluster_id(void)
 
 	return cluster;
 }
+
+#ifdef CONFIG_CPU_PM
 
 /*
  * Saves the GIC distributor registers during suspend or idle.  Must be called
@@ -1057,6 +1058,10 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	u32 enableoff;
 	u32 val;
 
+	/* Initialize the distributor interface once per CPU cluster */
+	if (test_and_set_bit(get_cluster_id(), &gic->dist_init_done))
+		return;
+
 	cpumask = 1 << cpu;
 	cpumask |= cpumask << 8;
 	cpumask |= cpumask << 16;
@@ -1351,21 +1356,10 @@ void __init axxia_gic_init_bases(int irq_start,
 
 void __cpuinit axxia_gic_secondary_init(void)
 {
-	gic_cpu_init(&gic_data);
-}
-
-
-void __cpuinit axxia_gic_secondary_cluster_init(void)
-{
 	struct gic_chip_data *gic = &gic_data;
 
-	/*
-	 * Initialize the GIC distributor and cpu interfaces
-	 * for secondary clusters in the Axxia SoC.
-	 */
-
 	gic_dist_init(gic);
-	gic_cpu_init(gic);
+	gic_cpu_init(&gic_data);
 }
 
 #ifdef CONFIG_OF

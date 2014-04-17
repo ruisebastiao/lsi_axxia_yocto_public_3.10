@@ -80,15 +80,7 @@ void __cpuinit axxia_secondary_init(unsigned int cpu)
 	/* Fixup for cross-cluster SEV */
 	do_fixup_sev();
 
-	/*
-	 * If this isn't the first physical core in a secondary cluster
-	 * then run the standard GIC secondary init routine. Otherwise,
-	 * run the Axxia secondary cluster init routine.
-	 */
-	if (cpu_logical_map(cpu) % 4)
-		axxia_gic_secondary_init();
-	else
-		axxia_gic_secondary_cluster_init();
+	axxia_gic_secondary_init();
 
 	/*
 	 * Let the primary processor know we're out of the
@@ -213,8 +205,8 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 		 * from reset in hyp mode.
 		 */
 		if (!is_hyp_mode_available()) {
-			u32 phys_cpu = cpu_logical_map(cpu);
-			if (phys_cpu != 0) {
+			if (cpu != 0) {
+				u32 phys_cpu = cpu_logical_map(cpu);
 				u32 tmp = readl(syscon + 0x1010);
 				writel(0xab, syscon + 0x1000);
 				tmp &= ~(1 << phys_cpu);
@@ -233,10 +225,16 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 		 * "holding pen".
 		 */
 		if (release_phys != 0) {
-			release_virt = (u32 *)phys_to_virt(release_phys);
+			int is_kmapped = pfn_valid(__phys_to_pfn(release_phys));
+			if (is_kmapped)
+				release_virt = phys_to_virt(release_phys);
+			else
+				release_virt = ioremap(release_phys, PAGE_SIZE);
 			*release_virt = virt_to_phys(axxia_secondary_startup);
 			smp_wmb();
 			__cpuc_flush_dcache_area(release_virt, sizeof(u32));
+			if (!is_kmapped)
+				iounmap(release_virt);
 		}
 	}
 
