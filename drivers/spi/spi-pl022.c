@@ -50,15 +50,14 @@
  * val shifted sb steps to the left.
  */
 #define SSP_WRITE_BITS(reg, val, mask, sb) \
- ((reg) = (((reg) & ~(mask)) | (((val)<<(sb)) & (mask))))
+	((reg) = (((reg) & ~(mask)) | (((val)<<(sb)) & (mask))))
 
 /*
  * This macro is also used to define some default values.
  * It will just shift val by sb steps to the left and mask
  * the result with mask.
  */
-#define GEN_MASK_BITS(val, mask, sb) \
- (((val)<<(sb)) & (mask))
+#define GEN_MASK_BITS(val, mask, sb) (((val)<<(sb)) & (mask))
 
 #define DRIVE_TX		0
 #define DO_NOT_DRIVE_TX		1
@@ -1167,7 +1166,7 @@ err_no_txchan:
 err_no_rxchan:
 	return -ENODEV;
 }
-		
+
 static void terminate_dma(struct pl022 *pl022)
 {
 	struct dma_chan *rxchan = pl022->dma_rx_channel;
@@ -1297,9 +1296,7 @@ static irqreturn_t pl022_interrupt_handler(int irq, void *dev_id)
 		       SSP_IMSC(pl022->virtbase));
 		writew(CLEAR_ALL_INTERRUPTS, SSP_ICR(pl022->virtbase));
 		if (unlikely(pl022->rx > pl022->rx_end)) {
-			dev_warn(&pl022->adev->dev, "read %u surplus "
-				 "bytes (did you request an odd "
-				 "number of bytes on a 16bit bus?)\n",
+			dev_warn(&pl022->adev->dev, "read %u surplus bytes (did you request an odd number of bytes on a 16bit bus?)\n",
 				 (u32) (pl022->rx - pl022->rx_end));
 		}
 		/* Update total bytes transferred */
@@ -1773,7 +1770,7 @@ static int calculate_effective_freq(struct pl022 *pl022, int freq, struct
 		scr = SCR_MIN;
 	}
 
-	WARN(!best_freq, "pl022: Matching cpsdvsr and scr not found for %d Hz rate \n",
+	WARN(!best_freq, "pl022: Matching cpsdvsr and scr not found for %d Hz rate\n",
 			freq);
 
 	clk_freq->cpsdvsr = (u8) (best_cpsdvsr & 0xFF);
@@ -2222,8 +2219,8 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 		status = -ENOMEM;
 		goto err_no_ioremap;
 	}
-	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
-	       adev->res.start, pl022->virtbase);
+	pr_info("pl022: mapped registers from 0x%08x to %p\n",
+			adev->res.start, pl022->virtbase);
 
 	pl022->clk = devm_clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {

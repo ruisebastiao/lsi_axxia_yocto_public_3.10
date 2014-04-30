@@ -218,6 +218,59 @@ void udbg_init_pas_realmode(void)
 #endif /* CONFIG_PPC_MAPLE */
 
 #ifdef CONFIG_PPC_EARLY_DEBUG_44x
+#if defined(CONFIG_ACP)
+
+#include <asm/io.h>
+#include <asm/udbg.h>
+#include <linux/amba/serial.h>
+#include <platforms/44x/44x.h>
+
+static void *uart_base;
+
+static void
+acp_putc_as1(char c)
+{
+
+	while (0 != (as1_readb(uart_base + UART01x_FR) & UART01x_FR_TXFF))
+		;
+
+	if ('\n' == c) {
+		as1_writeb('\r', uart_base + UART01x_DR);
+		while (0 != (as1_readb(uart_base + UART01x_FR) & UART01x_FR_TXFF))
+			;
+	}
+
+	as1_writeb(c, uart_base + UART01x_DR);
+
+	return;
+}
+
+static int
+acp_getc_as1(void)
+{
+	while (0 != (as1_readb(uart_base + UART01x_FR) & UART01x_FR_RXFE))
+		;
+	return as1_readb(uart_base + UART01x_DR);
+}
+
+void __init
+udbg_init_44x_as1(void)
+{
+	uart_base = (void *)0xf0004000;	/* 34xx UART0 address... */
+
+	if (0x11 != as1_readb(uart_base + 0xfe0) ||
+	    0x10 != as1_readb(uart_base + 0xfe4) ||
+	    0x24 != as1_readb(uart_base + 0xfe8) ||
+	    0x00 != as1_readb(uart_base + 0xfec))
+		uart_base = (void *)0xf0024000;	/* 25xx UART0 address... */
+	udbg_putc = acp_putc_as1;
+	udbg_getc = acp_getc_as1;
+
+	return;
+}
+
+#else	/* CONFIG_ACP */
+
 #include <platforms/44x/44x.h>
 
 static void udbg_44x_as1_flush(void)
@@ -257,6 +310,7 @@ void __init udbg_init_44x_as1(void)
 	udbg_flush = udbg_44x_as1_flush;
 	udbg_getc = udbg_44x_as1_getc;
 }
+#endif /* CONFIG_ACP */
 #endif /* CONFIG_PPC_EARLY_DEBUG_44x */
 
 #ifdef CONFIG_PPC_EARLY_DEBUG_40x
