@@ -562,7 +562,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 {
 	struct axxia_pciex_port *port = &axxia_pciex_ports[sys->domain];
 	u32 pci_config, pci_status, link_state;
-	int i, num_pages, err;
+	int i, num_pages, err, ret;
 	u32 outbound_size;
 	u32 inbound_size;
 	u64 dest;
@@ -573,7 +573,8 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	port->regs = ioremap(port->utl_regs.start,
 			     resource_size(&port->utl_regs));
 	if (!port->regs) {
-		pr_err("PCIE%d: Failed to map control registers\n", portno);
+		pr_err("PCIE%d: Failed to map control registers\n",
+			sys->domain);
 		goto fail;
 	}
 
@@ -581,12 +582,30 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	port->cfg_data = ioremap(port->cfg_space.start,
 				 resource_size(&port->cfg_space));
 	if (!port->cfg_data) {
-		pr_err("PCIE%d: Failed to map config space\n", portno);
+		pr_err("PCIE%d: Failed to map config space\n", sys->domain);
 		goto fail;
 	}
 
 	pci_add_resource_offset(&sys->resources, &port->outbound,
 				port->outbound.start - port->pci_addr);
+
+	/* add IO_RESOURCE for legacy support expected by bios32 driver
+	 * not used by AXM55xx */
+	sys->io_res.start = (sys->domain * 0x100);
+	sys->io_res.end =  sys->io_res.start + 0xff;
+	sys->io_res.flags = IORESOURCE_IO;
+	sys->io_res.name = sys->io_res_name;
+	sprintf(sys->io_res_name, "PCI%d I/O", sys->domain);
+	pr_info("PCIE%d: ioport start =  %#llx (PCI) -> %#llx\n",
+		sys->domain, sys->io_res.start, sys->io_res.end);
+
+	ret = request_resource(&ioport_resource, &sys->io_res);
+	if (ret) {
+		pr_err("PCI: unable to allocate I/O port region (%d)\n", ret);
+		goto fail;
+	}
+	pci_add_resource_offset(&sys->resources, &sys->io_res,
+		sys->io_offset);
 
 	/* Status/error interrupt */
 	port->irq[0] = irq_of_parse_and_map(port->node, 0);
@@ -594,7 +613,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 			  "pcie", port);
 	if (err) {
 		pr_err("PCIE%d: Failed to request IRQ#%d (%d)\n",
-		       portno, port->irq[0], err);
+		       sys->domain, port->irq[0], err);
 		goto fail;
 	}
 
@@ -617,6 +636,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	/* make sure the ACP device is configured as PCI Root Complex */
 	if ((pci_status & 0x18) != 0x18) {
 		pr_err("PCIE%d: Device is not Root Complex\n", port->index);
+		release_resource(&sys->io_res);
 		goto fail;
 	}
 
@@ -677,6 +697,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 
 	/* Set the BASE1 address to 0x0 */
 	writel(0x0, port->regs + PCI_BASE_ADDRESS_1);
+
 
 	/* Setup TPAGE registers for inbound mapping
 	 *
@@ -1007,9 +1028,12 @@ axxia_pcie_init(void)
 		return;
 	}
 
+
 	for_each_compatible_node(np, NULL, "lsi,plb-pciex") {
-		if (!of_device_is_available(np))
+		if (!of_device_is_available(np)) {
+			num_ports++;
 			continue;
+		}
 
 		axxia_probe_pciex_bridge(np);
 		pci_common_init(&axxia_pcie_hw[num_ports]);
