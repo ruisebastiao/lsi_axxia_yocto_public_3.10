@@ -601,6 +601,18 @@ lsi_nand_command(struct mtd_info *mtd, unsigned int command,
 	register struct nand_chip *chip = mtd->priv;
 	unsigned int status = 0;
 	struct lsi_nand_private *priv = &lsi_nand_private;
+	struct device_node *np = NULL;
+	void *busy_reg;
+	unsigned long busy_mask;
+
+	np = of_find_compatible_node(NULL, NULL, "lsi,acp3500");
+	if (NULL != np) {
+		busy_reg = (gpreg_base + 0x80);
+		busy_mask = (1 << 20);
+	} else {
+		busy_reg = LSI_NAND_PECC_BUSY_REGISTER;
+		busy_mask = LSI_NAND_PECC_BUSY_MASK;
+	}
 
 	DEBUG_PRINT("command=0x%x\n", command);
 	command &= 0xff;
@@ -705,8 +717,8 @@ lsi_nand_command(struct mtd_info *mtd, unsigned int command,
 			       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
 		do {
 			udelay(chip->chip_delay);
-			status = READL((void *)LSI_NAND_PECC_BUSY_REGISTER);
-		} while (0 != (status & LSI_NAND_PECC_BUSY_MASK));
+			status = READL((void *)busy_reg);
+		} while (0 != (status & busy_mask));
 
 		/* wait until CHIP_BUSY goes low */
 		do {
@@ -802,6 +814,18 @@ static int lsi_nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 {
 	unsigned long status = 0;
 	loff_t offset = 0;
+	struct device_node *np = NULL;
+	void *busy_reg;
+	unsigned long busy_mask;
+
+	np = of_find_compatible_node(NULL, NULL, "lsi,acp3500");
+	if (NULL != np) {
+		busy_reg = (gpreg_base + 0x80);
+		busy_mask = (1 << 20);
+	} else {
+		busy_reg = LSI_NAND_PECC_BUSY_REGISTER;
+		busy_mask = LSI_NAND_PECC_BUSY_MASK;
+	}
 
 	/*
 	  When reading or writing, wait for the
@@ -810,9 +834,9 @@ static int lsi_nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 #ifdef NOT_USED
 	if (FL_READING == chip->state || FL_WRITING == chip->state) {
 		for (;;) {
-			status = READL((void *)LSI_NAND_PECC_BUSY_REGISTER);
+			status = READL((void *)busy_reg);
 
-			if (0 == (status & LSI_NAND_PECC_BUSY_MASK))
+			if (0 == (status & busy_mask))
 				break;
 
 			udelay(chip->chip_delay);
@@ -820,9 +844,9 @@ static int lsi_nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 	}
 #else
 	for (;;) {
-		status = READL((void *)LSI_NAND_PECC_BUSY_REGISTER);
+		status = READL((void *)busy_reg);
 
-		if (0 == (status & LSI_NAND_PECC_BUSY_MASK))
+		if (0 == (status & busy_mask))
 			break;
 
 		udelay(chip->chip_delay);
@@ -3432,13 +3456,6 @@ lsi_nand_init(void)
 	struct mtd_part_parser_data ppdata;
 	static const char *part_probe_types[]
 	= { "cmdlinepart", "ofpart", NULL };
-
-	np = of_find_compatible_node(NULL, NULL, "lsi,acp3500");
-
-	if (NULL != np) {
-		pr_err("NAND Support is Not Yet Available on 3500\n");
-		return -1;
-	}
 
 	memset(&ppdata, 0, sizeof(ppdata));
 
