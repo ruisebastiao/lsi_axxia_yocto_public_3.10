@@ -30,6 +30,18 @@ extern void axxia_secondary_startup(void);
 #define SYSCON_PHYS_ADDR 0x002010030000ULL
 
 static int __cpuinitdata wfe_fixup;
+static int wfe_available;
+
+inline void
+__axxia_arch_wfe(void)
+{
+	if (0 != wfe_available)
+		wfe();
+
+	return;
+}
+
+EXPORT_SYMBOL(__axxia_arch_wfe);
 
 /*
  * Check if we need to enable cross-cluster SEV workaround for a bug in
@@ -180,6 +192,14 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 
 	check_fixup_sev(syscon);
 	do_fixup_sev();
+
+	if (of_find_compatible_node(NULL, NULL,
+				    "lsi,axm5516-sim") != NULL ||
+	    of_find_compatible_node(NULL, NULL,
+				    "lsi,axm5516-emu") != NULL)
+		wfe_available = 0;
+	else
+		wfe_available = 1;
 
 	/*
 	 * Initialise the present map, which describes the set of CPUs actually
