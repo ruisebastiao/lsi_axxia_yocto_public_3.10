@@ -126,6 +126,14 @@
 	};
 };
 
+&i2c0 {
+	status = "okay";
+
+	sysfpga@40 {
+		reg = <0x40>;
+	};
+};
+
 &i2c1 {
 	status = "okay";
 
@@ -135,7 +143,7 @@
 	};
 
 	adt7467@2e {
-		compatible = "atd7473";
+		compatible = "adt7473";
 		reg = <0x2e>;
 	};
 

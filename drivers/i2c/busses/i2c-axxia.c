@@ -221,6 +221,9 @@ axxia_i2c_init(struct axxia_i2c_dev *idev)
 	/* Timeout in divided clocks */
 	writel((1<<15) | tmo_clk, &idev->regs->wait_timer_control);
 
+	/* Mask all master interrupt bits */
+	i2c_int_disable(idev, ~0);
+
 	/* Interrupt enable */
 	writel(0x01, &idev->regs->interrupt_enable);
 
@@ -332,6 +335,12 @@ axxia_i2c_isr(int irq, void *_dev)
 {
 	struct axxia_i2c_dev *idev = _dev;
 	u32 status = readl(&idev->regs->mst_int_status);
+
+	if ((readl(&idev->regs->interrupt_status) & 0x1) == 0)
+		return IRQ_NONE;
+
+	if (!idev->msg)
+		return IRQ_NONE;
 
 	/* Clear interrupt */
 	writel(0x01, &idev->regs->interrupt_status);
