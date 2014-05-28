@@ -32,6 +32,14 @@
 	mdio-clock-period = <0xf0>;
 };
 
+&sm0 {
+	status = "okay";
+};
+
+&sm1 {
+	status = "okay";
+};
+
 &pcie0 {
 	status = "okay";
 };
