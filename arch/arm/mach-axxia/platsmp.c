@@ -217,21 +217,15 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 			continue;
 
 		/*
-		 * Release all physical cpus when not in hyp mode since we
-		 * might want to bring them online later.
-		 *
-		 * Also we need to get the execution into kernel code (it's
-		 * currently executing in u-boot).  u-boot releases the cores
-		 * from reset in hyp mode.
+		 * Release all physical cpus since we might want to
+		 * bring them online later.
 		 */
-		if (!is_hyp_mode_available()) {
-			if (cpu != 0) {
-				u32 phys_cpu = cpu_logical_map(cpu);
-				u32 tmp = readl(syscon + 0x1010);
-				writel(0xab, syscon + 0x1000);
-				tmp &= ~(1 << phys_cpu);
-				writel(tmp, syscon + 0x1010);
-			}
+		if (cpu != 0) {
+			u32 phys_cpu = cpu_logical_map(cpu);
+			u32 tmp = readl(syscon + 0x1010);
+			writel(0xab, syscon + 0x1000);
+			tmp &= ~(1 << phys_cpu);
+			writel(tmp, syscon + 0x1010);
 		}
 
 		if (cpu_count < max_cpus) {

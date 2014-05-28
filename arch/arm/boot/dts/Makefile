@@ -224,7 +224,9 @@ dtb-$(CONFIG_ARCH_AXXIA) += axm5504-sim.dtb \
 	axm5516-sim.dtb \
 	axm5504-emu.dtb \
 	axm5507-emu.dtb \
-	axm5516-amarillo.dtb
+	axm5516-amarillo.dtb \
+	axm5512-amarillo.dtb \
+	axm5508-amarillo.dtb
 dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
 	zynq-zc706.dtb
 
