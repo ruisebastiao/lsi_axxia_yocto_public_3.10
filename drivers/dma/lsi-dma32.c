@@ -145,11 +145,13 @@ static int alloc_desc_table(struct gpdma_engine *engine)
 	engine_dbg(engine, "order=%d pa=%#llx va=%p\n",
 		   engine->pool.order, engine->pool.phys, engine->pool.va);
 
-	engine->pool.free = NULL;
-	for (i = 0; i < GPDMA_MAX_DESCRIPTORS-1; i++)
-		engine->pool.va[i].chain = &engine->pool.va[i+1];
-	engine->pool.va[GPDMA_MAX_DESCRIPTORS-1].chain = NULL;
-	engine->pool.free = &engine->pool.va[0];
+	INIT_LIST_HEAD(&engine->free_list);
+	for (i = 0; i < GPDMA_MAX_DESCRIPTORS; i++) {
+		struct gpdma_desc *desc = &engine->pool.va[i];
+		async_tx_ack(&desc->vdesc.tx);
+		desc->engine = engine;
+		list_add_tail(&desc->vdesc.node, &engine->free_list);
+	}
 
 	return 0;
 }
@@ -163,18 +165,59 @@ static void free_desc_table(struct gpdma_engine *engine)
 static struct gpdma_desc *get_descriptor(struct gpdma_engine *engine)
 {
 	unsigned long flags;
-	struct gpdma_desc *desc;
+	struct gpdma_desc *new = NULL, *desc, *tmp;
 
 	spin_lock_irqsave(&engine->lock, flags);
-	desc = engine->pool.free;
-	if (desc) {
-		engine->pool.free = desc->chain;
-		desc->chain = NULL;
-		desc->engine = engine;
+	list_for_each_entry_safe(desc, tmp, &engine->free_list, vdesc.node) {
+		if (async_tx_test_ack(&desc->vdesc.tx)) {
+			list_del(&desc->vdesc.node);
+			new = desc;
+			new->chain = NULL;
+			pr_info(" get_desc %p\n", new);
+			break;
+		}
 	}
 	spin_unlock_irqrestore(&engine->lock, flags);
 
-	return desc;
+	return new;
+}
+
+/**
+ * init_descriptor - Fill out all descriptor fields
+ */
+static void init_descriptor(struct gpdma_desc *desc,
+			    dma_addr_t src, u32 src_acc,
+			    dma_addr_t dst, u32 dst_acc,
+			    size_t len)
+{
+	u32 src_count = len >> src_acc;
+	u32 dst_count = len >> dst_acc;
+	u32 rot_len = (2 * (1 << src_acc)) - 1;
+
+	BUG_ON(src_count * (1<<src_acc) != len);
+	BUG_ON(dst_count * (1<<dst_acc) != len);
+
+	desc->src = src;
+	desc->dst = dst;
+
+	desc->hw.src_x_ctr     = cpu_to_le16(src_count - 1);
+	desc->hw.src_y_ctr     = 0;
+	desc->hw.src_x_mod     = cpu_to_le32(1 << src_acc);
+	desc->hw.src_y_mod     = 0;
+	desc->hw.src_addr      = cpu_to_le32(src & 0xffffffff);
+	desc->hw.src_data_mask = ~0;
+	desc->hw.src_access    = cpu_to_le16((rot_len << 6) |
+					    (src_acc << 3) |
+					    (burst & 7));
+	desc->hw.dst_access    = cpu_to_le16((dst_acc << 3) |
+					    (burst & 7));
+	desc->hw.ch_config     = cpu_to_le32(DMA_CONFIG_ONE_SHOT(1));
+	desc->hw.next_ptr      = 0;
+	desc->hw.dst_x_ctr     = cpu_to_le16(dst_count - 1);
+	desc->hw.dst_y_ctr     = 0;
+	desc->hw.dst_x_mod     = cpu_to_le32(1 << dst_acc);
+	desc->hw.dst_y_mod     = 0;
+	desc->hw.dst_addr      = cpu_to_le32(dst & 0xffffffff);
 }
 
 static phys_addr_t desc_to_paddr(const struct gpdma_channel *dmac,
@@ -195,16 +238,15 @@ static void free_descriptor(struct virt_dma_desc *vd)
 	struct gpdma_desc *desc = to_gpdma_desc(vd);
 	struct gpdma_engine *engine = desc->engine;
 	unsigned long flags;
-	struct gpdma_desc *tail;
 
 	BUG_ON(desc == NULL);
 
-	for (tail = desc; tail->chain != NULL; tail = tail->chain)
-		;
-
 	spin_lock_irqsave(&engine->lock, flags);
-	tail->chain = engine->pool.free;
-	engine->pool.free = desc;
+	while (desc) {
+		pr_info("free_desc %p\n", desc);
+		list_add_tail(&desc->vdesc.node, &engine->free_list);
+		desc = desc->chain;
+	}
 	spin_unlock_irqrestore(&engine->lock, flags);
 }
 
@@ -388,9 +430,7 @@ reset_engine(struct device *dev,
 
 	return count;
 }
-
 static DEVICE_ATTR(soft_reset, S_IWUSR, NULL, reset_engine);
-
 
 /*
  *===========================================================================
@@ -426,6 +466,109 @@ static void gpdma_free_chan_resources(struct dma_chan *chan)
 }
 
 /**
+ * gpdma_prep_sg - Prepares a transfer using sg lists.
+ *
+ */
+static struct dma_async_tx_descriptor *
+gpdma_prep_sg(struct dma_chan *chan,
+	      struct scatterlist *dst_sg, unsigned int dst_nents,
+	      struct scatterlist *src_sg, unsigned int src_nents,
+	      unsigned long flags)
+{
+	struct gpdma_channel *dmac = to_gpdma_chan(chan);
+	struct gpdma_desc *first = NULL, *prev = NULL, *new;
+	size_t dst_avail, src_avail;
+	dma_addr_t dst, src;
+	u32 src_acc, dst_acc;
+	size_t len;
+
+	if (dst_nents == 0 || src_nents == 0)
+		return NULL;
+
+	if (dst_sg == NULL || src_sg == NULL)
+		return NULL;
+
+	dst_avail = sg_dma_len(dst_sg);
+	src_avail = sg_dma_len(src_sg);
+
+	/* Loop until we run out of entries... */
+	for (;;) {
+		/* Descriptor count is limited to 64K */
+		len = min_t(size_t, src_avail, dst_avail);
+		len = min_t(size_t, len, (size_t)SZ_64K);
+
+		if (len > 0) {
+			dst = sg_dma_address(dst_sg) +
+				sg_dma_len(dst_sg) - dst_avail;
+			src = sg_dma_address(src_sg) +
+				sg_dma_len(src_sg) - src_avail;
+
+			src_acc = min(ffs((u32)src | len) - 1, 4);
+			dst_acc = min(ffs((u32)dst | len) - 1, 4);
+
+			new = get_descriptor(dmac->engine);
+			if (!new) {
+				ch_dbg(dmac, "ERROR: No descriptor\n");
+				goto fail;
+			}
+
+			init_descriptor(new, src, src_acc, dst, dst_acc, len);
+
+			/* Link descriptors together */
+			if (!first) {
+				first = new;
+			} else {
+				prev->hw.next_ptr = desc_to_paddr(dmac, new);
+				prev->chain = new;
+			}
+			prev = new;
+
+			/* update metadata */
+			dst_avail -= len;
+			src_avail -= len;
+		}
+
+		/* dst: Advance to next sg-entry */
+		if (dst_avail == 0) {
+			/* no more entries: we're done */
+			if (dst_nents == 0)
+				break;
+			/* fetch the next entry: if there are no more: done */
+			dst_sg = sg_next(dst_sg);
+			if (dst_sg == NULL)
+				break;
+
+			dst_nents--;
+			dst_avail = sg_dma_len(dst_sg);
+		}
+
+		/* src: Advance to next sg-entry */
+		if (src_avail == 0) {
+			/* no more entries: we're done */
+			if (src_nents == 0)
+				break;
+			/* fetch the next entry: if there are no more: done */
+			src_sg = sg_next(src_sg);
+			if (src_sg == NULL)
+				break;
+
+			src_nents--;
+			src_avail = sg_dma_len(src_sg);
+		}
+	}
+
+	/* Interrupt on last descriptor in chain */
+	prev->hw.ch_config |= cpu_to_le32(DMA_CONFIG_END);
+
+	return vchan_tx_prep(&dmac->vc, &first->vdesc, flags);
+
+fail:
+	if (first)
+		free_descriptor(&first->vdesc);
+	return NULL;
+}
+
+/**
  * gpdma_prep_memcpy - Prepares a memcpy operation.
  *
  */
@@ -438,7 +581,8 @@ gpdma_prep_memcpy(struct dma_chan *chan,
 {
 	struct gpdma_channel *dmac = to_gpdma_chan(chan);
 	struct gpdma_desc *first = NULL, *prev = NULL, *new;
-	u32 rot_len, x_count, src_size, access;
+	u32 src_acc, dst_acc;
+	size_t len;
 
 	if (size == 0)
 		return NULL;
@@ -450,56 +594,29 @@ gpdma_prep_memcpy(struct dma_chan *chan,
 			goto fail;
 		}
 
-		/* Maximize access width based on job src, dst and length */
-		access = min(ffs((u32)dst | (u32)src | size) - 1, 4);
-		src_size = 1 << access;
+		len = min_t(size_t, size, (size_t)SZ_64K);
 
-		/* Counter register is limited to 64K */
-		x_count = min((size >> access), (size_t)SZ_64K);
-		rot_len = (2 * src_size) - 1;
+		/* Maximize access width based on address and length alignmet */
+		src_acc = min(ffs((u32)src | len) - 1, 4);
+		dst_acc = min(ffs((u32)dst | len) - 1, 4);
 
-		/*
-		 * Fill in descriptor in memory.
-		 */
-		new->hw.src_x_ctr     = cpu_to_le16(x_count - 1);
-		new->hw.src_y_ctr     = 0;
-		new->hw.src_x_mod     = cpu_to_le32(src_size);
-		new->hw.src_y_mod     = 0;
-		new->hw.src_addr      = cpu_to_le32(src & 0xffffffff);
-		new->hw.src_data_mask = ~0;
-		new->hw.src_access    = cpu_to_le16((rot_len << 6) |
-						    (access << 3) |
-						    (burst & 7));
-		new->hw.dst_access    = cpu_to_le16((access << 3) |
-						    (burst & 7));
-		new->hw.ch_config     = cpu_to_le32(DMA_CONFIG_ONE_SHOT(1));
-		new->hw.next_ptr      = 0;
-		new->hw.dst_x_ctr     = cpu_to_le16(x_count - 1);
-		new->hw.dst_y_ctr     = 0;
-		new->hw.dst_x_mod     = cpu_to_le32(src_size);
-		new->hw.dst_y_mod     = 0;
-		new->hw.dst_addr      = cpu_to_le32(dst & 0xffffffff);
-
-		/* Setup sw descriptor */
-		new->src        = src;
-		new->dst        = dst;
+		init_descriptor(new, src, src_acc, dst, dst_acc, len);
 
 		if (!first) {
 			first = new;
 		} else {
 			prev->hw.next_ptr = desc_to_paddr(dmac, new);
 			prev->chain = new;
-			prev->hw.ch_config &=
-				~cpu_to_le32(DMA_CONFIG_LAST_BLOCK |
-					     DMA_CONFIG_INT_DST_EOT);
 		}
 		prev = new;
 
-		size -= x_count << access;
-		src  += x_count << access;
-		dst  += x_count << access;
+		size -= len;
+		src  += len;
+		dst  += len;
 
 	} while (size > 0);
+
+	prev->hw.ch_config |= cpu_to_le32(DMA_CONFIG_END);
 
 	return vchan_tx_prep(&dmac->vc, &first->vdesc, DMA_CTRL_ACK);
 
@@ -650,12 +767,14 @@ static int gpdma_of_probe(struct platform_device *op)
 	dma->dev = &op->dev;
 	dma_cap_zero(dma->cap_mask);
 	dma_cap_set(DMA_MEMCPY, dma->cap_mask);
+	dma_cap_set(DMA_SG, dma->cap_mask);
 	dma->copy_align = 2;
 	dma->chancnt = engine->chip->num_channels;
 	dma->device_alloc_chan_resources = gpdma_alloc_chan_resources;
 	dma->device_free_chan_resources = gpdma_free_chan_resources;
 	dma->device_tx_status = gpdma_tx_status;
 	dma->device_prep_dma_memcpy = gpdma_prep_memcpy;
+	dma->device_prep_dma_sg = gpdma_prep_sg;
 	dma->device_issue_pending = gpdma_issue_pending;
 	dma->device_control = gpdma_device_control;
 	INIT_LIST_HEAD(&dma->channels);

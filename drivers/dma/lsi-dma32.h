@@ -104,10 +104,11 @@
 					 DMA_STATUS_TR_COMPLETE   | \
 					 DMA_STATUS_BLK_COMPLETE)
 
+#define DMA_CONFIG_END			(DMA_CONFIG_LAST_BLOCK | \
+					 DMA_CONFIG_INT_DST_EOT)
+
 #define DMA_CONFIG_ONE_SHOT(__ext)	(DMA_CONFIG_DST_SPACE((__ext)) | \
 					 DMA_CONFIG_SRC_SPACE((__ext)) | \
-					 DMA_CONFIG_LAST_BLOCK         | \
-					 DMA_CONFIG_INT_DST_EOT        | \
 					 DMA_CONFIG_TX_EN              | \
 					 DMA_CONFIG_CHAN_EN)
 
@@ -206,11 +207,11 @@ struct gpdma_engine {
 	void __iomem			*gbase;
 	void __iomem			*gpreg;
 	spinlock_t			lock;
+	struct list_head                free_list;
 	struct {
 		u32                     order;
 		dma_addr_t              phys;
 		struct gpdma_desc       *va;
-		struct gpdma_desc       *free;
 	} pool;
 	struct dma_device		dma_device;
 };
