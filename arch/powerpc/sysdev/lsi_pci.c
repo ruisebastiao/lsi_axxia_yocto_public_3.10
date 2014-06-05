@@ -753,16 +753,44 @@ configure_acp_pciex_PIMs(struct pciex_port *port,
 		  window.  We use this elsewhere to set up the
 		  dma_base.
 		*/
-
-		pci_dram_offset = size;
-		hose->dma_window_base_cur = size;
-
-		out_le32(mbase + PCI_BASE_ADDRESS_0, RES_TO_U32_LOW(size));
-		out_le32(mbase + PCI_BASE_ADDRESS_1, RES_TO_U32_HIGH(size));
+		if (0x10 == port->acpChipType) {
+			/* For 3500, set base address to pci base */
+			pci_dram_offset = res->start;
+			hose->dma_window_base_cur = res->start;
+		} else {
+			pci_dram_offset = size;
+			hose->dma_window_base_cur = size;
+		}
 
 		if (5 == port->acpChipType) {
-			pr_warn("Setting SIZE for 2500\n");
+			pr_info("Setting SIZE for 2500\n");
 			out_le32(mbase + 0x11f4, 0xf0000000UL);
+			out_le32(mbase + PCI_BASE_ADDRESS_0,
+					RES_TO_U32_LOW(size));
+			out_le32(mbase + PCI_BASE_ADDRESS_1,
+				RES_TO_U32_HIGH(size));
+		} else if (0x10 == port->acpChipType) {
+			pr_info("Setting SIZE for 3500\n");
+			out_le32(mbase + 0x11f4, size);
+			/* Verify BAR0 size */
+			{
+				u32 bar0_size;
+				out_le32(mbase + PCI_BASE_ADDRESS_0, ~0);
+				out_le32(mbase + PCI_BASE_ADDRESS_1, ~0);
+				bar0_size = in_le32(mbase + PCI_BASE_ADDRESS_0);
+				if ((bar0_size & ~0xf) != size)
+					pr_err("PCIE%d: Config BAR0 failed\n", port->index);
+				bar0_size = in_le32(mbase + PCI_BASE_ADDRESS_1);
+			}
+			/* Set the BASE0 address to start of PCIe base */
+			out_le32(mbase + PCI_BASE_ADDRESS_0, res->start);
+			/* Set the BASE1 address to 0x0 */
+			out_le32(mbase + PCI_BASE_ADDRESS_1, 0x0);
+		} else {
+			out_le32(mbase + PCI_BASE_ADDRESS_0,
+				RES_TO_U32_LOW(size));
+			out_le32(mbase + PCI_BASE_ADDRESS_1,
+				RES_TO_U32_HIGH(size));
 		}
 
 		/*
