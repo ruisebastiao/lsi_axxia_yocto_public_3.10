@@ -20,7 +20,7 @@
 	#address-cells = <2>;
 	#size-cells = <1>;
 	model = "ibm,acpx1-4xx";
-	compatible = "lsi,acp3500", "lsi,acp", "ibm,acpx1-4xx";
+	compatible = "lsi,acp3500", "lsi,axxia35xx", "lsi,acp", "ibm,acpx1-4xx";
 	dcr-parent = <&{/cpus/cpu@0}>;
 
 	aliases {
@@ -64,7 +64,7 @@
 			dcr-access-method = "native";
 			status = "disabled";
 			enable-method = "spin-table";
-			cpu-release-addr = <0 0>; // Fixed by the boot loader
+			cpu-release-addr = <0>; // filled in by U-Boot
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
@@ -82,11 +82,11 @@
 			dcr-access-method = "native";
 			status = "disabled";
 			enable-method = "spin-table";
-			cpu-release-addr = <0 0>; // Fixed by the boot loader
+			cpu-release-addr = <0>; // filled in by U-Boot
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
-
+		
 		cpu@3 {
 			device_type = "cpu";
 			model = "PowerPC,4xx"; // real CPU changed in sim
@@ -101,11 +101,11 @@
 			dcr-access-method = "native";
 			status = "disabled";
 			enable-method = "spin-table";
-			cpu-release-addr = <0 0>; // Fixed by the boot loader
+			cpu-release-addr = <0>; // filled in by U-Boot
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
-	cpu@4 {
+		cpu@4 {
 			device_type = "cpu";
 			model = "PowerPC,4xx"; // real CPU changed in sim
 			reg = <4>;
@@ -119,11 +119,11 @@
 			dcr-access-method = "native";
 			status = "disabled";
 			enable-method = "spin-table";
-			cpu-release-addr = <0 0>; // Fixed by the boot loader
+			cpu-release-addr = <0>; // filled in by U-Boot
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
 
-	cpu@5 {
+		cpu@5 {
 			device_type = "cpu";
 			model = "PowerPC,4xx"; // real CPU changed in sim
 			reg = <5>;
@@ -137,22 +137,19 @@
 			dcr-access-method = "native";
 			status = "disabled";
 			enable-method = "spin-table";
-			cpu-release-addr = <0 0>; // Fixed by the boot loader
+			cpu-release-addr = <0>; // filled in by U-Boot
 			reset-type = <3>; // 1=core, 2=chip, 3=system (default)
 		};
-
-
-
 	};
 
         memory@0 {
                 device_type = "memory";
-                reg = <0x00000000 0x00000000 0x00000000>; // filled in by U-Boot
+		reg = <0 0 0>; // filled in by U-Boot
         };
 
         memory@80000000 {
                 device_type = "memory";
-                reg = <0x00000000 0x08000000 0x00000000>; // filled in by U-Boot
+                reg = <0 0 0>; // filled in by U-Boot
         };
 
 	MPIC: interrupt-controller {
@@ -189,7 +186,7 @@
 				enabled = <0>;
 				reg = <0x00424000 0x1000>;
 				clock-reg = <0x00429040 0x20>;
-				clock-frequency = <0>;
+				clock-frequency = <200000000>;
 				current-speed = <9600>;
 				interrupt-parent = <&MPIC>;
 				interrupts = <29>;
@@ -202,7 +199,7 @@
 				enabled = <0>;
 				reg = <0x00425000 0x1000>;
 				clock-reg = <0x00429060 0x20>;
-				clock-frequency = <0>;
+				clock-frequency = <200000000>;
 				current-speed = <9600>;
 				interrupt-parent = <&MPIC>;
 				interrupts = <30>;
@@ -211,42 +208,18 @@
 			USB0: usb0 {
 				device_type = "usb";
 				compatible = "acp-usb";
-				enabled = <1>;
-				reg = <0x20 0x004a0000 0x0 0x00020000>,
-				       <0x20 0x0040c000 0x0 0x00001000>;
+				enabled = <0>;
+				reg = <0x004a4000 0x00020000>;
 				interrupt-parent = <&MPIC>;
 				interrupts = <36>;
 			};
 
-			I2C0: i2c0 {
-				compatible = "lsi,api2c";
-				device_type = "i2c";
-				#address-cells = <1>;
-				#size-cells = <0>;
-				reg = <0x20 0x00426000 0x00 0x00001000>;
+			I2C: i2c0 {
+				compatible = "acp-i2c";
+				enabled = <0>;
+				reg = <0x00403000 0x00001000>;
 				interrupt-parent = <&MPIC>;
-				interrupts = <0 27 4>;
-				status = "disabled";
-			};
-			I2C1: i2c1 {
-				compatible = "lsi,api2c";
-				device_type = "i2c";
-				#address-cells = <1>;
-				#size-cells = <0>;
-				reg = <0x20 0x00427000 0x00 0x00001000>;
-				interrupt-parent = <&MPIC>;
-				interrupts = <0 28 4>;
-				status = "disabled";
-			};
-			I2C2: i2c2 {
-				compatible = "lsi,api2c";
-				device_type = "i2c";
-				#address-cells = <1>;
-				#size-cells = <0>;
-				reg = <0x20 0x00428000 0x00 0x00001000>;
-				interrupt-parent = <&MPIC>;
-				interrupts = <0 39 4>;
-				status = "disabled";
+				interrupts = <27>;
 			};
 
 			SSP: ssp0 {
@@ -279,9 +252,6 @@
 				// The following will get filled in by
 				// the boot loader.
 				mdio-clock = <0>;
-				// offset and period
-				mdio-clock-offset = <0x10>;
-				mdio-clock-period = <0x2c>;
 				phy-address = <0>;
 				ad-value = <0>;
 				mac-address = [00 00 00 00 00 00];
@@ -329,13 +299,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xa0000000
+                ranges = <0x02000000 0x00000000 0xa0000000 
                           0x20 0x40000000
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                     interrupt-parent = <&MPIC>;
                 interrupts = <52 2>;
@@ -365,13 +335,13 @@
                 bus-range = <0 0x0f>;
                 /* Outbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU (PLB) addr> <2-cell size> > */
-                ranges = <0x02000000 0x00000000 0xb0000000
+                ranges = <0x02000000 0x00000000 0xb0000000 
                           0x20 0x80000000
                           0x00 0x10000000>;
                 /* Inbound ranges */
                 /* < <3-cell PCI addr> <2-cell CPU addr> <2-cell size> > */
-                dma-ranges = <0x02000000 0x00000000 0x00000000
-                              0x00 0x00000000
+                dma-ranges = <0x02000000 0x00000000 0x00000000 
+                              0x00 0x00000000 
                               0x00 0x10000000>;
                 interrupt-parent = <&MPIC>;
                 interrupts = <54 2>;
