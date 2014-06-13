@@ -173,7 +173,6 @@ static struct gpdma_desc *get_descriptor(struct gpdma_engine *engine)
 			list_del(&desc->vdesc.node);
 			new = desc;
 			new->chain = NULL;
-			pr_info(" get_desc %p\n", new);
 			break;
 		}
 	}
@@ -243,7 +242,6 @@ static void free_descriptor(struct virt_dma_desc *vd)
 
 	spin_lock_irqsave(&engine->lock, flags);
 	while (desc) {
-		pr_info("free_desc %p\n", desc);
 		list_add_tail(&desc->vdesc.node, &engine->free_list);
 		desc = desc->chain;
 	}
