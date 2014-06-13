@@ -50,6 +50,12 @@
 		interrupt-parent = <&gic>;
 		ranges;
 
+		virtio_block@0130000 {
+        		compatible = "virtio,mmio";
+                	reg = <0x20 0x101f0000 0 0x10000>;
+                	interrupts = <0 223 4>;
+		};
+
 		mmci@020101E0000 {
 			compatible = "arm,pl180", "arm,primecell";
 			reg = <0x20 0x101E0000 0x00 0x1000>;

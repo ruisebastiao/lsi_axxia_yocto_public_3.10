@@ -55,6 +55,7 @@
 		      <0x20 0x01006000 0 0x2000>,  /* vgic cpu base */
 		      <0x20 0x10030000 0 0x1000>,  /* axm IPI mask reg base */
 		      <0x20 0x10040000 0 0x20000>; /* axm IPI send reg base */
+		interrupts = <1 9 0xf04>;          /* vgic for kvm */
 	};
 
 	timer {
