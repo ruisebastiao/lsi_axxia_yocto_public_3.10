@@ -54,6 +54,9 @@
 #include "axxia.h"
 #include "pci.h"
 #include "i2c.h"
+#ifdef CONFIG_AXXIA_RIO
+#include <mach/rio.h>
+#endif
 
 static const char *axxia_dt_match[] __initconst = {
 	"lsi,axm5516",
@@ -236,6 +239,10 @@ void __init axxia_dt_init(void)
 	axxia_ddr_retention_init();
 
 	axxia_pcie_init();
+
+#ifdef CONFIG_AXXIA_RIO
+	axxia_rapidio_init();
+#endif
 
 	platform_device_register(&pmu_device);
 }
