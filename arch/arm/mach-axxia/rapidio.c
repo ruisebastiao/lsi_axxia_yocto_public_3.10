@@ -32,7 +32,6 @@
 #include <linux/io.h>
 #include <linux/signal.h>
 
-#include <mach/ncr.h>
 #include <mach/rio.h>
 
 /**
@@ -68,13 +67,6 @@ int axxia_rapidio_board_init(
 
 	iounmap(gpreg_base);
 
-	/* Verify that this device is actually enabled */
-	ncr_read(NCP_REGION_ID(0x115, 0), 0x23c, 4, &reg);
-	if ((reg & (1 << (21+(dev_num*4)))) == 0) {
-		dev_dbg(&dev->dev, "%s: SRIO%d link not ready\n",
-			dev->dev.of_node->full_name, dev_num);
-		return -ENXIO;
-	}
 	return 0;
 }
 

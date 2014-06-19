@@ -1051,6 +1051,7 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h)
 
 	axxia_local_config_read(priv, RAB_INTR_STAT_ODME, &int_stat);
 	mask = int_stat;
+	axxia_local_config_write(priv, RAB_INTR_STAT_ODME, mask);
 	while (int_stat) {
 		dme_no = __fls(int_stat);
 		int_stat ^= (1 << dme_no);
@@ -1082,7 +1083,6 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h)
 		axxia_local_config_write(priv, RAB_OB_DME_STAT(dme_no),
 								dme_stat);
 	}
-	axxia_local_config_write(priv, RAB_INTR_STAT_ODME, mask);
 }
 
 static int alloc_ob_dme_shared(struct rio_priv *priv,
@@ -1367,6 +1367,7 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/)
 
 	axxia_local_config_read(priv, RAB_INTR_STAT_IDME, &dme_mask);
 	mask = dme_mask;
+	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, mask);
 	/**
 	 * Inbound mbox has 4 engines, 1 per letter.
 	 * For each message engine that contributes to IRQ state,
@@ -1424,7 +1425,6 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/)
 		}
 
 	}
-	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, mask);
 }
 /**
  * open_inb_mbox - Initialize AXXIA inbound mailbox
