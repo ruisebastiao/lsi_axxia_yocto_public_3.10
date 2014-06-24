@@ -17,8 +17,8 @@
 /include/ "axm5504-cpus.dtsi"
 
 / {
-	model = "Emulation Platform AXM55xx";
-	compatible = "lsi,axm5516-emu", "lsi,axm5516";
+	model = "Emulation Platform AXM5500";
+	compatible = "lsi,axm5500-emu", "lsi,axm5500";
 
 	memory {
 		device_type = "memory";

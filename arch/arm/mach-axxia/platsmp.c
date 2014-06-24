@@ -194,9 +194,9 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 	do_fixup_sev();
 
 	if (of_find_compatible_node(NULL, NULL,
-				    "lsi,axm5516-sim") != NULL ||
+				    "lsi,axm5500-sim") != NULL ||
 	    of_find_compatible_node(NULL, NULL,
-				    "lsi,axm5516-emu") != NULL)
+				    "lsi,axm5500-emu") != NULL)
 		wfe_available = 0;
 	else
 		wfe_available = 1;

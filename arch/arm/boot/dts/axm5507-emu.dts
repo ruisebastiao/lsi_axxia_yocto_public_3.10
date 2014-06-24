@@ -1,5 +1,5 @@
 /*
- * arch/arm/boot/dts/axm5504-emulation.dts
+ * arch/arm/boot/dts/axm5507-emu.dts
  *
  * Copyright (C) 2013 LSI
  *
@@ -17,8 +17,8 @@
 /include/ "axm5507-cpus.dtsi"
 
 / {
-	model = "Emulation Platform AXM55xx";
-	compatible = "lsi,axm5516-emu", "lsi,axm5516";
+	model = "Emulation Platform AXM5500";
+	compatible = "lsi,axm5500-emu", "lsi,axm5500";
 
 	memory {
 		device_type = "memory";

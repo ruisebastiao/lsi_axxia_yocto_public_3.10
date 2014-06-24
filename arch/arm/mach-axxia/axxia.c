@@ -59,9 +59,7 @@
 #endif
 
 static const char *axxia_dt_match[] __initconst = {
-	"lsi,axm5516",
-	"lsi,axm5516-sim",
-	"lsi,axm5516-emu",
+	"lsi,axm5500",
 	NULL
 };
 
@@ -141,7 +139,7 @@ void __init axxia_dt_timer_init(void)
 {
 	int is_sim;
 
-	is_sim = of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim") != NULL;
+	is_sim = of_find_compatible_node(NULL, NULL, "lsi,axm5500-sim") != NULL;
 
 	axxia_init_clocks(is_sim);
 
@@ -222,7 +220,7 @@ static struct notifier_block axxia_amba_nb = {
 void __init axxia_dt_init(void)
 {
 #ifdef CONFIG_KEXEC
-	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5516-sim")) {
+	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5500-sim")) {
 		dickens = ioremap(0x2000000000, SZ_4M);
 		kexec_reinit = flush_l3;
 	}

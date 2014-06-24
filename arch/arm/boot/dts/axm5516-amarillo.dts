@@ -17,8 +17,8 @@
 /include/ "axm5516-cpus.dtsi"
 
 / {
-	model = "Amarillo AXM5516";
-	compatible = "lsi,axm5516-amarillo", "lsi,axm5516";
+	model = "Amarillo AXM5500";
+	compatible = "lsi,axm5500-amarillo", "lsi,axm5500";
 
 	memory {
 		device_type = "memory";
