@@ -4,7 +4,7 @@ AS		= $(CROSS_COMPILE)gcc -c
 LD		= $(CROSS_COMPILE)ld
 
 DTC = $(obj)/../../../../scripts/dtc/dtc
-DTS = $(obj)/../dts/axm5504-sim.dts
+DTS = $(obj)/../dts/axm5504-sim-mmc.dts
 ZIMAGE = $(obj)/../zImage
 
 clean:
@@ -13,7 +13,6 @@ clean:
 arch/arm/boot/linux.img: $(obj)/fmboot.o $(srctree)/$(obj)/fmboot.lds $(obj)/zImage.fm
 	cd $(obj) && $(LD) -o ../linux.img --script=$(srctree)/$(obj)/fmboot.lds
 	tar jcf $(obj)/../linux.img.tar.bz2 $(obj)/../linux.img
-	#rm -rf $(obj)/../linux.img
 
 $(obj)/zImage.fm: $(ZIMAGE) $(obj)/axm5504-sim.dtb
 	python $(srctree)/$(obj)/pack.py $(ZIMAGE) $(obj)/axm5504-sim.dtb > $@
