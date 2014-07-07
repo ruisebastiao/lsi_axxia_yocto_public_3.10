@@ -26,6 +26,10 @@
 	};
 };
 
+&edac {
+        status = "okay";
+};
+
 &femac {
 	status = "okay";
 	mdio-clock-offset = <0x1c>;

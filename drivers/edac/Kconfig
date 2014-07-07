@@ -368,4 +368,9 @@ config EDAC_OCTEON_PCI
 	  Support for error detection and correction on the
 	  Cavium Octeon family of SOCs.
 
+config EDAC_AXXIA
+	tristate "AXXIA EDAC Controller"
+	help
+	  Support for error detection on AXXIA AXM55xx devices
+
 endif # EDAC
