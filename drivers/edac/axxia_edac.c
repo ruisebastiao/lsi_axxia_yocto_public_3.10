@@ -69,7 +69,7 @@ void log_cpumerrsr(void *edac)
 		/* increment correctable error counts */
 		for (i = 0; i < count0+count1; i++) {
 			edac_device_handle_ce(edac_dev, 0,
-				smp_processor_id(), edac_dev->ctl_name);
+				raw_smp_processor_id(), edac_dev->ctl_name);
 		}
 
 		/* Clear the valid bit */
@@ -113,7 +113,7 @@ void log_l2merrsr(void *edac)
 		/* increment correctable error counts */
 		for (i = 0; i < count0+count1; i++) {
 			edac_device_handle_ce(edac_dev, 0,
-				smp_processor_id()/CORES_PER_CLUSTER,
+				raw_smp_processor_id()/CORES_PER_CLUSTER,
 				edac_dev->ctl_name);
 		}
 
@@ -141,7 +141,7 @@ static void lsi_l2_error_check(struct edac_device_ctl_info *edac_dev)
 
 	for (i = 0; i < nr_cluster_ids; i++) {
 		/* No need to run on local cluster. */
-		if (i == (smp_processor_id() / CORES_PER_CLUSTER))
+		if (i == (raw_smp_processor_id() / CORES_PER_CLUSTER))
 			continue;
 		/*
 		 * Have some core in each cluster execute this,
