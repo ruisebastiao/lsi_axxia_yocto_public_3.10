@@ -1,13 +1,26 @@
-/*
-* This file is subject to the terms and conditions of the GNU General Public
-* License.  See the file "COPYING" in the main directory of this archive
-* for more details.
-*
-* Copyright (C) 2012 Cavium, Inc.
-*
-* Copyright (C) 2009 Wind River Systems,
-*   written by Ralf Baechle <ralf@linux-mips.org>
-*/
+ /*
+  * drivers/edac/axxia_edac.c
+  *
+  * EDAC Driver for Avago's Axxia 5500
+  *
+  * Copyright (C) 2010 LSI Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  *
+  */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -37,7 +50,7 @@ struct lsi_edac_dev_info {
 	int edac_idx;
 	u32 sm0_region;
 	u32 sm1_region;
-	u32 dickens_L3;
+	void __iomem *dickens_L3[8];
 	struct edac_device_ctl_info *edac_dev;
 	void (*init)(struct lsi_edac_dev_info *dev_info);
 	void (*exit)(struct lsi_edac_dev_info *dev_info);
@@ -161,7 +174,7 @@ static void lsi_l2_error_check(struct edac_device_ctl_info *edac_dev)
 /* Check for L3 Errors */
 static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 {
-	unsigned long regVal1, regVal2, clearVal;
+	unsigned long regVal1, regVal2;
 	unsigned count = 0;
 	int i, instance;
 	struct lsi_edac_dev_info *dev_info;
@@ -169,8 +182,8 @@ static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 	dev_info = (struct lsi_edac_dev_info *) edac_dev->pvt_info;
 
 	for (instance = 0; instance < 8; instance++) {
-		ncr_read(dev_info->dickens_L3+instance, 0x400, 4, &regVal1);
-		ncr_read(dev_info->dickens_L3+instance, 0x404, 4, &regVal2);
+		regVal1 = readl(dev_info->dickens_L3[instance]);
+		regVal2 = readl(dev_info->dickens_L3[instance] + 4);
 		/* First error valid */
 		if (regVal2 & 0x40000000) {
 			if (regVal2 & 0x30000000) {
@@ -182,10 +195,8 @@ static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 			for (i = 0; i < count; i++)
 				edac_device_handle_ce(edac_dev, 0,
 					instance, edac_dev->ctl_name);
-			clearVal = 0x48000000;
 			/* clear the valid bit */
-			ncr_write(NCP_REGION_ID(0x1e0, 0x20+instance),
-				0x484, 4, &clearVal);
+			writel(0x48000000, dev_info->dickens_L3[instance] + 84);
 		}
 	}
 }
@@ -270,7 +281,9 @@ static void lsi_add_edac_devices(struct platform_device *pdev)
 	struct lsi_edac_dev_info *dev_info;
 	/* 4 cores per cluster */
 	int nr_cluster_ids = ((nr_cpu_ids - 1) / CORES_PER_CLUSTER) + 1;
-	struct resource *io0, *io1, *io2;
+	struct resource *io0, *io1;
+	struct device_node *np = pdev->dev.of_node;
+	int i;
 
 	for (dev_info = &lsi_edac_devs[0]; dev_info->init; dev_info++) {
 		dev_info->pdev = platform_device_register_simple(
@@ -307,13 +320,15 @@ static void lsi_add_edac_devices(struct platform_device *pdev)
 				NULL, 0, dev_info->edac_idx);
 
 		} else if (strcmp(dev_info->ctl_name, "LSI_L3") == 0) {
-			io2 = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-			if (!io2) {
-				dev_err(&pdev->dev, "Unable to get mem resource\n");
-				goto err2;
+			/* 8 L3 caches */
+			for (i = 0; i < 8; i++) {
+				dev_info->dickens_L3[i] = of_iomap(np, i+2);
+				if (!dev_info->dickens_L3[i]) {
+					dev_err(&pdev->dev,
+						"LSI_L3 iomap error\n");
+					goto err2;
+				}
 			}
-
-			dev_info->dickens_L3 = io2->start;
 			dev_info->edac_dev =
 			edac_device_alloc_ctl_info(0, dev_info->ctl_name,
 			1, dev_info->blk_name, 8, 0, NULL, 0,
@@ -379,6 +394,7 @@ static int lsi_edac_probe(struct platform_device *pdev)
 
 static int lsi_edac_remove(struct platform_device *pdev)
 {
+	platform_device_unregister(pdev);
 	return 0;
 }
 
