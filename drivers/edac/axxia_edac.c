@@ -50,6 +50,7 @@ struct lsi_edac_dev_info {
 	int edac_idx;
 	u32 sm0_region;
 	u32 sm1_region;
+	void __iomem *apb2ser3_region;
 	void __iomem *dickens_L3[8];
 	struct edac_device_ctl_info *edac_dev;
 	void (*init)(struct lsi_edac_dev_info *dev_info);
@@ -70,7 +71,11 @@ void log_cpumerrsr(void *edac)
 	struct edac_device_ctl_info *edac_dev =
 		(struct edac_device_ctl_info *)edac;
 	u32 tmp1, tmp2, count0, count1;
+	unsigned long setVal;
 	int i;
+	struct lsi_edac_dev_info *dev_info;
+
+	dev_info = (struct lsi_edac_dev_info *) edac_dev->pvt_info;
 
 	/* Read cp15 for CPUMERRSR counts */
 	asm volatile("mrrc\tp15, 0, %0, %1, c15" : "=r"(tmp1),
@@ -92,6 +97,10 @@ void log_cpumerrsr(void *edac)
 			"r"(tmp2));
 	}
 	if (tmp2 & 0x80000000) {
+		setVal = readl(dev_info->apb2ser3_region + 0xdc);
+		/* set bit 3 in pscratch reg */
+		setVal = (setVal) | (0x1 << 3);
+		writel(setVal, dev_info->apb2ser3_region + 0xdc);
 		pr_info("CPU uncorrectable error\n");
 		machine_restart(NULL);
 	}
@@ -114,7 +123,11 @@ void log_l2merrsr(void *edac)
 	struct edac_device_ctl_info *edac_dev =
 			(struct edac_device_ctl_info *)edac;
 	u32 tmp1, tmp2, count0, count1;
+	unsigned long setVal;
 	int i;
+	struct lsi_edac_dev_info *dev_info;
+
+	dev_info = (struct lsi_edac_dev_info *) edac_dev->pvt_info;
 
 	/* Read cp15 for L2MERRSR counts */
 	asm volatile("mrrc\tp15, 1, %0, %1, c15" : "=r"(tmp1),
@@ -137,6 +150,10 @@ void log_l2merrsr(void *edac)
 			"r"(tmp2));
 	}
 	if (tmp2 & 0x80000000) {
+		setVal = readl(dev_info->apb2ser3_region + 0xdc);
+		/* set bit 3 in pscratch reg */
+		setVal = (setVal) | (0x1 << 3);
+		writel(setVal, dev_info->apb2ser3_region + 0xdc);
 		pr_info("L2 uncorrectable error\n");
 		machine_restart(NULL);
 	}
@@ -174,7 +191,7 @@ static void lsi_l2_error_check(struct edac_device_ctl_info *edac_dev)
 /* Check for L3 Errors */
 static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 {
-	unsigned long regVal1, regVal2;
+	unsigned long regVal1, regVal2, setVal;
 	unsigned count = 0;
 	int i, instance;
 	struct lsi_edac_dev_info *dev_info;
@@ -187,6 +204,12 @@ static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 		/* First error valid */
 		if (regVal2 & 0x40000000) {
 			if (regVal2 & 0x30000000) {
+				setVal = readl(dev_info->apb2ser3_region +
+					0xdc);
+				/* set bit 3 in pscratch reg */
+				setVal = (setVal) | (0x1 << 3);
+				writel(setVal, dev_info->apb2ser3_region +
+					0xdc);
 				/* Fatal error */
 				pr_info("L3 uncorrectable error\n");
 				machine_restart(NULL);
@@ -204,7 +227,7 @@ static void lsi_l3_error_check(struct edac_device_ctl_info *edac_dev)
 /* Check for SysMem Errors */
 static void lsi_sm_error_check(struct edac_device_ctl_info *edac_dev)
 {
-	unsigned long sm0_regVal, sm1_regVal, clearVal;
+	unsigned long sm0_regVal, sm1_regVal, clearVal, setVal;
 	struct lsi_edac_dev_info *dev_info;
 
 	dev_info = (struct lsi_edac_dev_info *) edac_dev->pvt_info;
@@ -219,6 +242,10 @@ static void lsi_sm_error_check(struct edac_device_ctl_info *edac_dev)
 		ncr_write(dev_info->sm0_region, 0x548, 4, &clearVal);
 	}
 	if (sm0_regVal & 0x40) {
+		setVal = readl(dev_info->apb2ser3_region + 0xdc);
+		/* set bit 3 in pscratch reg */
+		setVal = (setVal) | (0x1 << 3);
+		writel(setVal, dev_info->apb2ser3_region + 0xdc);
 		/* single bit and multiple bit uncorrectable errors */
 		pr_info("SM0 uncorrectable error\n");
 		machine_restart(NULL);
@@ -234,6 +261,10 @@ static void lsi_sm_error_check(struct edac_device_ctl_info *edac_dev)
 		ncr_write(dev_info->sm1_region, 0x548, 4, &clearVal);
 	}
 	if (sm1_regVal & 0x40) {
+		setVal = readl(dev_info->apb2ser3_region + 0xdc);
+		/* set bit 3 in pscratch reg */
+		setVal = (setVal) | (0x1 << 3);
+		writel(setVal, dev_info->apb2ser3_region + 0xdc);
 		/* single bit and multiple bit uncorrectable errors */
 		pr_info("SM1 uncorrectable error\n");
 		machine_restart(NULL);
@@ -278,12 +309,19 @@ static struct lsi_edac_dev_info lsi_edac_devs[] = {
 /* static void lsi_add_edac_devices(void __iomem *vbase) */
 static void lsi_add_edac_devices(struct platform_device *pdev)
 {
-	struct lsi_edac_dev_info *dev_info;
+	struct lsi_edac_dev_info *dev_info = NULL;
 	/* 4 cores per cluster */
 	int nr_cluster_ids = ((nr_cpu_ids - 1) / CORES_PER_CLUSTER) + 1;
 	struct resource *io0, *io1;
 	struct device_node *np = pdev->dev.of_node;
+	void __iomem *apb2ser3_region;
 	int i;
+
+	apb2ser3_region = of_iomap(np, 2);
+	if (!apb2ser3_region) {
+		dev_err(&pdev->dev, "LSI_apb2ser3_region iomap error\n");
+		goto err2;
+	}
 
 	for (dev_info = &lsi_edac_devs[0]; dev_info->init; dev_info++) {
 		dev_info->pdev = platform_device_register_simple(
@@ -313,32 +351,34 @@ static void lsi_add_edac_devices(struct platform_device *pdev)
 
 			dev_info->sm0_region = io0->start;
 			dev_info->sm1_region = io1->start;
-
+			dev_info->apb2ser3_region = apb2ser3_region;
 			dev_info->edac_dev =
 			edac_device_alloc_ctl_info(0, dev_info->ctl_name,
 			1, dev_info->blk_name, 2, 0,
 				NULL, 0, dev_info->edac_idx);
-
 		} else if (strcmp(dev_info->ctl_name, "LSI_L3") == 0) {
 			/* 8 L3 caches */
 			for (i = 0; i < 8; i++) {
-				dev_info->dickens_L3[i] = of_iomap(np, i+2);
+				dev_info->dickens_L3[i] = of_iomap(np, i+3);
 				if (!dev_info->dickens_L3[i]) {
 					dev_err(&pdev->dev,
 						"LSI_L3 iomap error\n");
 					goto err2;
 				}
 			}
+			dev_info->apb2ser3_region = apb2ser3_region;
 			dev_info->edac_dev =
 			edac_device_alloc_ctl_info(0, dev_info->ctl_name,
 			1, dev_info->blk_name, 8, 0, NULL, 0,
 			dev_info->edac_idx);
 		} else if (strcmp(dev_info->ctl_name, "LSI_CPU") == 0) {
+			dev_info->apb2ser3_region = apb2ser3_region;
 			dev_info->edac_dev =
 			edac_device_alloc_ctl_info(0, dev_info->ctl_name,
 			1, dev_info->blk_name, num_possible_cpus(), 0, NULL,
 			0, dev_info->edac_idx);
 		} else if (strcmp(dev_info->ctl_name, "LSI_L2") == 0) {
+			dev_info->apb2ser3_region = apb2ser3_region;
 			dev_info->edac_dev =
 			edac_device_alloc_ctl_info(0, dev_info->ctl_name,
 				1, dev_info->blk_name, nr_cluster_ids, 0, NULL,
