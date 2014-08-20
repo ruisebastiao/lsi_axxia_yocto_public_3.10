@@ -15,6 +15,8 @@
 #include <asm/cacheflush.h>
 #include <asm/smp_plat.h>
 #include <asm/cp15.h>
+#include "lsi_power_management.h"
+
 
 extern volatile int pen_release;
 
@@ -63,49 +65,10 @@ static inline void cpu_leave_lowpower(void)
 	  : "cc");
 }
 
-static void __ref platform_do_lowpower(unsigned int cpu, int *spurious)
+
+int axxia_platform_cpu_kill(unsigned int cpu)
 {
-	int phys_cpu, cluster;
-
-	/*
-	 * there is no power-control hardware on this platform, so all
-	 * we can do is put the core into WFI; this is safe as the calling
-	 * code will have already disabled interrupts
-	 */
-	for (;;) {
-		wfi();
-
-		/*
-		 * Convert the "cpu" variable to be compatible with the
-		 * ARM MPIDR register format (CLUSTERID and CPUID):
-		 *
-		 * Bits:   |11 10 9 8|7 6 5 4 3 2|1 0
-		 *         | CLUSTER | Reserved  |CPU
-		 */
-		phys_cpu = cpu_logical_map(cpu);
-		cluster = (phys_cpu / 4) << 8;
-		phys_cpu = cluster + (phys_cpu % 4);
-
-		if (pen_release == phys_cpu) {
-			/*
-			 * OK, proper wakeup, we're done
-			 */
-			break;
-		}
-
-		/*
-		 * Getting here, means that we have come out of WFI without
-		 * having been woken up - this shouldn't happen
-		 *
-		 * Just note it happening - when we're woken, we can report
-		 * its occurrence.
-		 */
-		(*spurious)++;
-	}
-}
-
-int platform_cpu_kill(unsigned int cpu)
-{
+	pm_cpu_shutdown(cpu);
 	return 1;
 }
 
@@ -114,24 +77,29 @@ int platform_cpu_kill(unsigned int cpu)
  *
  * Called with IRQs disabled
  */
+
 void axxia_platform_cpu_die(unsigned int cpu)
 {
-	int spurious = 0;
 
-	/*
-	 * we're ready for shutdown now, so do it
-	 */
-	cpu_enter_lowpower_a15();
-	platform_do_lowpower(cpu, &spurious);
+	pm_data pm_request;
+	int rVal = 0;
+	bool lastCpu;
 
-	/*
-	 * bring this CPU back into the world of cache
-	 * coherency, and then restore interrupts
-	 */
-	cpu_leave_lowpower();
+	pm_request.cpu = cpu;
+	pm_request.cluster = 0;
 
-	if (spurious)
-		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+
+	lastCpu = pm_cpu_last_of_cluster(cpu);
+	if (lastCpu)
+		rVal = pm_cpul2_logical_die(&pm_request);
+	else
+		rVal = pm_cpu_logical_die(&pm_request);
+	if (rVal)
+		pr_err("CPU %d failed to die\n", cpu);
+
+	for (;;)
+		wfi();
+
 }
 
 int platform_cpu_disable(unsigned int cpu)

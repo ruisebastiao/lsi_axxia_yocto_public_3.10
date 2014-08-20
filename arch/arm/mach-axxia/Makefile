@@ -12,5 +12,5 @@ obj-y					+= ddr_retention.o ddr_shutdown.o
 obj-$(CONFIG_I2C)			+= i2c.o
 obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
 obj-$(CONFIG_ARCH_AXXIA_GIC)		+= axxia-gic.o
-obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o lsi_power_management.o
 obj-$(CONFIG_AXXIA_RIO)                 += rapidio.o
