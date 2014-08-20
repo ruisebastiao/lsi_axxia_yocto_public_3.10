@@ -45,6 +45,7 @@
 #include <asm/mach/irq.h>
 
 #include <mach/axxia-gic.h>
+#include "lsi_power_management.h"
 
 #define MAX_GIC_INTERRUPTS  1020
 #define MAX_NUM_CLUSTERS    4
@@ -1057,9 +1058,10 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	u32 enablemask;
 	u32 enableoff;
 	u32 val;
+	u32 this_cluster = get_cluster_id();
 
 	/* Initialize the distributor interface once per CPU cluster */
-	if (test_and_set_bit(get_cluster_id(), &gic->dist_init_done))
+	if ((test_and_set_bit(get_cluster_id(), &gic->dist_init_done)) && (!cluster_power_up[this_cluster]))
 		return;
 
 	cpumask = 1 << cpu;
@@ -1359,6 +1361,12 @@ void __cpuinit axxia_gic_secondary_init(void)
 	struct gic_chip_data *gic = &gic_data;
 
 	gic_dist_init(gic);
+	gic_cpu_init(&gic_data);
+}
+
+void __cpuinit axxia_hotplug_gic_secondary_init(void)
+{
+	struct gic_chip_data *gic = &gic_data;
 	gic_cpu_init(&gic_data);
 }
 

@@ -23,6 +23,7 @@
 #include <asm/virt.h>
 
 #include "axxia.h"
+#include "lsi_power_management.h"
 #include <mach/axxia-gic.h>
 
 extern void axxia_secondary_startup(void);
@@ -40,7 +41,6 @@ __axxia_arch_wfe(void)
 
 	return;
 }
-
 EXPORT_SYMBOL(__axxia_arch_wfe);
 
 /*
@@ -89,10 +89,25 @@ static DEFINE_RAW_SPINLOCK(boot_lock);
 
 void __cpuinit axxia_secondary_init(unsigned int cpu)
 {
-	/* Fixup for cross-cluster SEV */
-	do_fixup_sev();
+	int phys_cpu, cluster;
 
-	axxia_gic_secondary_init();
+	phys_cpu = cpu_logical_map(cpu);
+	cluster = (phys_cpu / 4) << 8;
+
+	/*
+	 * Only execute this when powering up a cpu for hotplug.
+	 */
+	if (!pm_in_progress[cpu]) {
+		/* Fixup for cross-cluster SEV */
+		do_fixup_sev();
+
+		axxia_gic_secondary_init();
+	} else {
+		axxia_gic_secondary_init();
+		pm_cpu_logical_powerup();
+		pm_in_progress[cpu] = false;
+		cluster_power_up[cluster] = false;
+	}
 
 	/*
 	 * Let the primary processor know we're out of the
@@ -109,14 +124,33 @@ void __cpuinit axxia_secondary_init(unsigned int cpu)
 
 int __cpuinit axxia_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
-	unsigned long timeout;
+
 	int phys_cpu, cluster;
+	unsigned long timeout;
+	unsigned long powered_down_cpu;
+	int rVal = 0;
+
 
 	/*
 	 * Set synchronisation state between this boot processor
 	 * and the secondary one.
 	 */
 	_raw_spin_lock(&boot_lock);
+
+	phys_cpu = cpu_logical_map(cpu);
+
+	powered_down_cpu = pm_get_powered_down_cpu();
+
+	if (powered_down_cpu & (1 << phys_cpu)) {
+		pm_in_progress[cpu] = true;
+
+		rVal = pm_cpu_powerup(phys_cpu);
+		if (rVal) {
+			_raw_spin_unlock(&boot_lock);
+			return rVal;
+		}
+
+	}
 
 	/*
 	 * In the Axxia, the bootloader does not put the secondary cores
@@ -261,6 +295,7 @@ struct smp_operations axxia_smp_ops __initdata = {
 	.smp_boot_secondary	= axxia_boot_secondary,
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_die		= axxia_platform_cpu_die,
+	.cpu_kill		= axxia_platform_cpu_kill,
 #endif
 
 };
