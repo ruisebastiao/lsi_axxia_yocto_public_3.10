@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/err.h>
 #include <linux/dma-mapping.h>
+#include <linux/workqueue.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
@@ -49,6 +50,8 @@ static LIST_HEAD(udc_list);
 static DEFINE_MUTEX(udc_lock);
 
 /* ------------------------------------------------------------------------- */
+
+#ifdef	CONFIG_HAS_DMA
 
 int usb_gadget_map_request(struct usb_gadget *gadget,
 		struct usb_request *req, int is_in)
@@ -99,13 +102,22 @@ void usb_gadget_unmap_request(struct usb_gadget *gadget,
 }
 EXPORT_SYMBOL_GPL(usb_gadget_unmap_request);
 
+#endif	/* CONFIG_HAS_DMA */
+
 /* ------------------------------------------------------------------------- */
+
+static void usb_gadget_state_work(struct work_struct *work)
+{
+	struct usb_gadget	*gadget = work_to_gadget(work);
+
+	sysfs_notify(&gadget->dev.kobj, NULL, "status");
+}
 
 void usb_gadget_set_state(struct usb_gadget *gadget,
 		enum usb_device_state state)
 {
 	gadget->state = state;
-	sysfs_notify(&gadget->dev.kobj, NULL, "state");
+	schedule_work(&gadget->work);
 }
 EXPORT_SYMBOL_GPL(usb_gadget_set_state);
 
@@ -192,11 +204,14 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 		goto err1;
 
 	dev_set_name(&gadget->dev, "gadget");
+	INIT_WORK(&gadget->work, usb_gadget_state_work);
 	gadget->dev.parent = parent;
 
+#ifdef	CONFIG_HAS_DMA
 	dma_set_coherent_mask(&gadget->dev, parent->coherent_dma_mask);
 	gadget->dev.dma_parms = parent->dma_parms;
 	gadget->dev.dma_mask = parent->dma_mask;
+#endif
 
 	if (release)
 		gadget->dev.release = release;
@@ -309,6 +324,7 @@ found:
 		usb_gadget_remove_driver(udc);
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_REMOVE);
+	flush_work(&gadget->work);
 	device_unregister(&udc->dev);
 	device_unregister(&gadget->dev);
 }
