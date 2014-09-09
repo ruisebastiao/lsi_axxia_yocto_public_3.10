@@ -53,7 +53,6 @@
 #include <mach/ncr.h>
 #include "axxia.h"
 #include "pci.h"
-#include "i2c.h"
 #ifdef CONFIG_AXXIA_RIO
 #include <mach/rio.h>
 #endif
