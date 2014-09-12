@@ -39,6 +39,7 @@
 #include "axxia-rio.h"
 #include "axxia-rio-irq.h"
 
+#define USE_DME_TIMEOUT
 static DEFINE_SPINLOCK(rio_io_lock);
 
 #ifdef IODEBUG
@@ -965,7 +966,7 @@ static void rio_rab_ctrl_setup(struct rio_mport *mport)
 	__rio_local_write_config_32(mport, AXI_TIMEOUT, 0x00001000);
 
 #ifdef USE_DME_TIMEOUT
-	__rio_local_write_config_32(mport, DME_TIMEOUT, 0xC0001000);
+	__rio_local_write_config_32(mport, DME_TIMEOUT, 0xC0080000);
 #else
 	__rio_local_write_config_32(mport, DME_TIMEOUT, 0x00000000);
 #endif
@@ -1383,7 +1384,6 @@ static struct rio_priv *rio_priv_dtb_setup(
 	priv->ndx = ndx;
 	priv->port_ndx = port_ndx;
 	mutex_init(&priv->api_lock);
-
 	/* Max descriptors */
 	priv->desc_max_entries = RIO_MSG_MAX_ENTRIES;
 
