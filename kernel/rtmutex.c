@@ -738,8 +738,8 @@ static void remove_waiter(struct rt_mutex *lock,
 		}
 		__rt_mutex_adjust_prio(owner);
 
-		if (rt_mutex_real_waiter(owner->pi_blocked_on))
-			chain_walk = 1;
+		/* Store the lock on which owner is blocked or NULL */
+		next_lock = task_blocked_on_lock(owner);
 
 		raw_spin_unlock_irqrestore(&owner->pi_lock, flags);
 	}
