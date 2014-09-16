@@ -36,9 +36,51 @@
 
 #include <linux/io.h>
 #include <linux/uaccess.h>
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
 
 #include "axxia-rio.h"
+unsigned int axxia_dme_tmr_mode[2] = { AXXIA_IBDME_INTERRUPT_MODE,
+					AXXIA_IBDME_TIMER_MODE };
+static int axxia_timer_mode_setup(char *str)
+{
+	unsigned int tmr_mode[3];
+	int i;
+	(void)get_options(str, ARRAY_SIZE(tmr_mode), tmr_mode);
+	for (i = 0; i < tmr_mode[0]; i++) {
+		if (tmr_mode[i+1] > 1)
+			pr_debug("Invalid parameter value for Timer Mode\n");
+		else
+			axxia_dme_tmr_mode[i] = AXXIA_IBDME_TIMER_MODE;
+	}
+	return 1;
+}
+__setup("axm_srio_tmr_mode=", axxia_timer_mode_setup);
 
+static int axxia_int_mode_setup(char *str)
+{
+	unsigned int int_mode[3];
+	int i;
+	(void)get_options(str, ARRAY_SIZE(int_mode), int_mode);
+	for (i = 0; i < int_mode[0]; i++) {
+		if (int_mode[i+1] > 1)
+			pr_debug("Invalid param value for Interrupt Mode\n");
+		else
+			axxia_dme_tmr_mode[i] = AXXIA_IBDME_INTERRUPT_MODE;
+	}
+	return 1;
+}
+__setup("axm_srio_int_mode=", axxia_int_mode_setup);
+
+#define AXXIA_HRTIMER_DELAY	(200 * 1000UL)
+unsigned int axxia_hrtimer_delay = AXXIA_HRTIMER_DELAY;
+static int __init axxia_hrtimer_setup(char *str)
+{
+	get_option(&str, &axxia_hrtimer_delay);
+	return 1;
+}
+__setup("axm_srio_tmr_period=", axxia_hrtimer_setup);
+static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/);
 /****************************************************************************
 **
 ** Implementation Note:
@@ -67,8 +109,7 @@ static inline void __dme_dw_dbg(struct rio_msg_dme *dme, u32 dw0)
 		if (dw0 & DME_DESC_DW0_TIMEOUT_ERR)
 			dme->desc_tmo_err_count++;
 	}
-	if (dw0 & DME_DESC_DW0_DONE)
-		dme->desc_done_count++;
+	dme->desc_done_count++;
 }
 
 
@@ -125,6 +166,17 @@ static irqreturn_t hw_irq_handler(int irq, void *data)
 		return IRQ_WAKE_THREAD;
 	}
 	return IRQ_NONE;
+}
+
+static irqreturn_t hw_irq_dme_handler(int irq, void *data)
+{
+	struct rio_irq_handler *h;
+	struct rio_priv *priv = data;
+
+	h = &priv->ib_dme_irq;
+	ib_dme_irq_handler(h);
+
+	return IRQ_HANDLED;
 }
 
 /**
@@ -987,12 +1039,7 @@ static void  ob_dme_msg_handler(struct rio_irq_handler *h, u32 dme_no)
 ob_dme_restart:
 	while (dme->read_idx != dme->write_idx) {
 		AXXIA_RIO_SYSMEM_BARRIER();
-		if (!priv->intern_msg_desc) {
-			dw0 = *((u32 *)DESC_TABLE_W0_MEM(dme, dme->read_idx));
-		} else {
-			__rio_local_read_config_32(mport,
-			DESC_TABLE_W0(dme->dres.start + dme->read_idx), &dw0);
-		}
+		dw0 = *((u32 *)DESC_TABLE_W0_MEM(dme, dme->read_idx));
 		if ((dw0 & DME_DESC_DW0_VALID) &&
 			(dw0 & DME_DESC_DW0_READY_MASK)) {
 			*((u32 *)DESC_TABLE_W0_MEM(dme, dme->read_idx))
@@ -1005,20 +1052,22 @@ ob_dme_restart:
 			mbox = (dw1 >> 2) & 0x3;
 			mb = priv->ob_mbox[mbox];
 			if (mb) {
-				mb->tx_slot = (mb->tx_slot + 1)%(mb->ring_size);
-				if (mport->outb_msg[mbox].mcback)
+				if (mport->outb_msg[mbox].mcback) {
+					mb->tx_slot = (mb->tx_slot + 1)
+							%(mb->ring_size);
 					mport->outb_msg[mbox].mcback(mport,
 							mb->dev_id,
 							mbox, mb->tx_slot);
+				}
 #ifdef CONFIG_AXXIA_RIO_STAT
 				mb->compl_msg_count++;
 #endif
-				}
+			}
 			iteration++;
 		} else
 			break;
 	}
-	if (iteration > 0) {
+	if (iteration) {
 		iteration = 0;
 		goto ob_dme_restart;
 	}
@@ -1033,31 +1082,28 @@ ob_dme_restart:
  * msg handler if dscriptor xfer complete is set.
  * or reports the error
  */
-static void ob_dme_irq_handler(struct rio_irq_handler *h)
+enum hrtimer_restart ob_dme_tmr_handler(struct hrtimer *hr)
 {
-	struct rio_priv *priv = h->data;
+	struct rio_tx_dme *obd = container_of(hr, struct rio_tx_dme, tmr);
+	struct rio_msg_dme *me = obd->me;
+	struct rio_priv *priv = me->priv;
+	struct rio_irq_handler *h = &priv->ob_dme_irq;
 	u32 dme_stat, dme_no;
-	u32 int_stat, mask;
 
-	axxia_local_config_read(priv, RAB_INTR_STAT_ODME, &int_stat);
-	mask = int_stat;
-	axxia_local_config_write(priv, RAB_INTR_STAT_ODME, mask);
-	while (int_stat) {
-		dme_no = __fls(int_stat);
-		int_stat ^= (1 << dme_no);
-		axxia_local_config_read(priv, RAB_OB_DME_STAT(dme_no),
-							&dme_stat);
+	dme_no = me->dme_no;
+	axxia_local_config_read(priv, RAB_OB_DME_STAT(dme_no),
+						&dme_stat);
 
-
-/*		if (dme_stat & (OB_DME_STAT_DESC_XFER_CPLT |
-				OB_DME_STAT_DESC_CHAIN_XFER_CPLT))
-			ob_dme_msg_handler(h, dme_no);*/
-		if (unlikely(dme_stat & OB_DME_STAT_ERROR_MASK)) {
-			if (dme_stat & (OB_DME_STAT_DESC_FETCH_ERR |
-					OB_DME_STAT_DESC_ERR |
-					OB_DME_STAT_DESC_UPD_ERR))
-				dev_err(priv->dev, "OB DME%d: Descriptor Error\n",
+	if (dme_stat & (OB_DME_STAT_DESC_FETCH_ERR |
+				OB_DME_STAT_DESC_ERR |
+				OB_DME_STAT_DESC_UPD_ERR))
+		dev_err(priv->dev, "OB DME%d: Descriptor Error\n",
 								dme_no);
+	else {
+
+		if (dme_stat & (OB_DME_STAT_DATA_TRANS_ERR |
+				OB_DME_STAT_RESP_ERR |
+				OB_DME_STAT_RESP_TO)) {
 			if (dme_stat & OB_DME_STAT_DATA_TRANS_ERR)
 				dev_err(priv->dev, "OB DME%d: Transaction Error\n",
 								dme_no);
@@ -1070,9 +1116,11 @@ static void ob_dme_irq_handler(struct rio_irq_handler *h)
 								dme_no);
 		}
 		ob_dme_msg_handler(h, dme_no);
-		axxia_local_config_write(priv, RAB_OB_DME_STAT(dme_no),
-								dme_stat);
 	}
+	axxia_local_config_write(priv, RAB_OB_DME_STAT(dme_no),
+							dme_stat);
+	hrtimer_forward_now(&obd->tmr, ktime_set(0, axxia_hrtimer_delay));
+	return HRTIMER_RESTART;
 }
 
 static int alloc_ob_dme_shared(struct rio_priv *priv,
@@ -1280,6 +1328,16 @@ static int open_outb_mbox_static(struct rio_mport *mport,
 	me->sz++;
 	mdelay(500); /* Delay added to ensure completion of any pending TX
 			before Transmission on this Mailbox */
+
+	if (me->sz == 1) {
+		hrtimer_init(&priv->ob_dme_shared[dme_no].tmr,
+				 CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		priv->ob_dme_shared[dme_no].tmr.function = ob_dme_tmr_handler;
+		hrtimer_start(&priv->ob_dme_shared[dme_no].tmr,
+				ktime_set(0, (axxia_hrtimer_delay)),
+					HRTIMER_MODE_REL_PINNED);
+	}
+
 	test_and_set_bit(RIO_MB_MAPPED, &mb->state);
 
 	priv->ob_dme_shared[dme_no].ring_size += entries;
@@ -1357,9 +1415,11 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/)
 	int mbox_no;
 	int letter;
 	u32 dme_mask, mask;
-
+ib_dme_restart:
 	axxia_local_config_read(priv, RAB_INTR_STAT_IDME, &dme_mask);
 	mask = dme_mask;
+	if (!mask)
+		return;
 	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, mask);
 	/**
 	 * Inbound mbox has 4 engines, 1 per letter.
@@ -1385,6 +1445,8 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/)
 
 		mbox_no = me->mbox;
 		letter = me->letter;
+		if (!(dme_stat & 0xff))
+			continue;
 
 		if (dme_stat & (IB_DME_STAT_DESC_XFER_CPLT |
 				IB_DME_STAT_DESC_XFER_CPLT)) {
@@ -1418,6 +1480,87 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/)
 		}
 
 	}
+	goto ib_dme_restart;
+}
+
+enum hrtimer_restart ib_dme_tmr_handler(struct hrtimer *hr)
+{
+	struct rio_rx_mbox *mb = container_of(hr, struct rio_rx_mbox, tmr);
+	struct rio_mport *mport = mb->mport;
+	struct rio_priv *priv = mport->priv;
+	int mbox_no;
+	int letter;
+	u32 dme_mask, mask;
+ib_dme_restart:
+	axxia_local_config_read(priv, RAB_INTR_STAT_IDME, &dme_mask);
+	dme_mask &= mb->irq_state_mask;
+	mask = dme_mask;
+	if (!mask) {
+		hrtimer_forward_now(&mb->tmr,
+				ktime_set(0, axxia_hrtimer_delay));
+		return HRTIMER_RESTART;
+	}
+	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, mask);
+	/**
+	 * Inbound mbox has 4 engines, 1 per letter.
+	 * For each message engine that contributes to IRQ state,
+	 * go through all descriptors in queue that have been
+	 * written but not handled.
+	 */
+	while (dme_mask) {
+		struct rio_msg_dme *me;
+		u32 dme_stat;
+		int dme_no = __fls(dme_mask);
+		dme_mask ^= (1 << dme_no);
+		me = priv->ib_dme[dme_no];
+		/**
+		 * Get and clear latched state
+		 */
+		axxia_local_config_read(priv,
+					   RAB_IB_DME_STAT(dme_no), &dme_stat);
+		axxia_local_config_write(priv,
+					    RAB_IB_DME_STAT(dme_no), dme_stat);
+		if (!me)
+			continue;
+
+		mbox_no = me->mbox;
+		letter = me->letter;
+		if (!(dme_stat & 0xff))
+			continue;
+
+		if (dme_stat & (IB_DME_STAT_DESC_XFER_CPLT |
+				IB_DME_STAT_DESC_XFER_CPLT)) {
+			if (mport->inb_msg[mbox_no].mcback)
+				mport->inb_msg[mbox_no].mcback(mport,
+					me->dev_id, mbox_no, letter);
+		}
+
+		if (dme_stat & IB_DME_STAT_ERROR_MASK) {
+			if (dme_stat & (IB_DME_STAT_DESC_UPDATE_ERR |
+					IB_DME_STAT_DESC_ERR |
+					IB_DME_STAT_DESC_FETCH_ERR))
+				dev_err(priv->dev,
+				"IB Mbox%d Letter%d DME%d: Descriptor Error\n",
+						mbox_no, letter, dme_no);
+
+			if (dme_stat & IB_DME_STAT_DATA_TRANS_ERR)
+				dev_err(priv->dev,
+				"IB Mbox%d Letter%d DME%d: Transaction Error\n",
+						mbox_no, letter, dme_no);
+
+			if (dme_stat & IB_DME_STAT_MSG_ERR)
+				dev_err(priv->dev,
+				"IB MBOX%d Letter%d DME%d: Message Error\n",
+						mbox_no, letter, dme_no);
+
+			if (dme_stat & (IB_DME_STAT_MSG_TIMEOUT))
+				dev_err(priv->dev,
+				"IB MBOX%d Letter%d DME%d: SRIO Timeout\n",
+						mbox_no, letter, dme_no);
+		}
+
+	}
+	goto ib_dme_restart;
 }
 /**
  * open_inb_mbox - Initialize AXXIA inbound mailbox
@@ -1656,13 +1799,21 @@ static int open_inb_mbox(struct rio_mport *mport, void *dev_id,
 	/**
 	* Create irq handler and enable MBOX irq
 	*/
+
 	mb->irq_state_mask = irq_state_mask;
 	h->irq_state_mask |= irq_state_mask;
 	priv->ib_mbox[mbox] = mb;
 	AXXIA_RIO_SYSMEM_BARRIER();
 	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, irq_state_mask);
-	axxia_local_config_write(priv, RAB_INTR_ENAB_IDME,
-					h->irq_state_mask);
+
+	if (priv->dme_mode == AXXIA_IBDME_TIMER_MODE) {
+		hrtimer_init(&mb->tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		mb->tmr.function = ib_dme_tmr_handler;
+		hrtimer_start(&mb->tmr, ktime_set(0, (axxia_hrtimer_delay)),
+					HRTIMER_MODE_REL_PINNED);
+	} else
+		axxia_local_config_write(priv, RAB_INTR_ENAB_IDME,
+						h->irq_state_mask);
 	return 0;
 
 err:
@@ -1746,6 +1897,7 @@ int axxia_rio_port_irq_enable(struct rio_mport *mport)
 	struct rio_priv *priv = mport->priv;
 	int rc;
 
+	priv->dme_mode = axxia_dme_tmr_mode[priv->ndx];
 	/**
 	 * Clean up history
 	 * from port reset/restart
@@ -1758,27 +1910,31 @@ int axxia_rio_port_irq_enable(struct rio_mport *mport)
 	rc = alloc_irq_handler(&priv->apio_irq, priv, "rio-apio");
 	if (rc)
 		goto err2;
+
 	rc = alloc_irq_handler(&priv->rpio_irq, priv, "rio-rpio");
 	if (rc)
 		goto err3;
+	priv->ib_dme_irq.data = priv;
+	priv->ob_dme_irq.data = priv;
 
-	rc = alloc_irq_handler(&priv->ib_dme_irq, priv, "rio-ibmb");
-	if (rc)
-		goto err4;
+	if (priv->dme_mode == AXXIA_IBDME_INTERRUPT_MODE) {
+		rc = request_threaded_irq(priv->irq_line,
+				hw_irq_dme_handler, NULL,
+				IRQF_TRIGGER_NONE | IRQF_SHARED,
+				"rio-mb", (void *)priv);
+		if (rc)
+			goto err4;
 
-	rc = alloc_irq_handler(&priv->ob_dme_irq, priv, "rio-obmb");
-	if (rc)
-		goto err5;
-
-	axxia_local_config_write(priv, RAB_INTR_ENAB_GNRL,
+		axxia_local_config_write(priv, RAB_INTR_ENAB_GNRL,
+				    (RAB_INTR_ENAB_GNRL_SET | IB_DME_INT_EN));
+	} else
+		axxia_local_config_write(priv, RAB_INTR_ENAB_GNRL,
 				    RAB_INTR_ENAB_GNRL_SET);
 out:
 	return rc;
 err0:
 	dev_warn(priv->dev, "RIO: unable to request irq.\n");
 	goto out;
-err5:
-	release_irq_handler(&priv->ib_dme_irq);
 err4:
 	release_irq_handler(&priv->rpio_irq);
 err3:
@@ -1948,7 +2104,6 @@ void axxia_close_outb_mbox(struct rio_mport *mport, int mbox_id)
 	if (wait_cnt > 250)
 		pr_debug("Closed when outb mbox%d while transaction pending\n",
 								mbox_id);
-
 	priv->ob_mbox[mbox_id] = NULL;
 	dme_no = mb->dme_no;
 	mb->dme_no = 0xff;
@@ -1962,8 +2117,9 @@ void axxia_close_outb_mbox(struct rio_mport *mport, int mbox_id)
 	clear_bit(RIO_MB_MAPPED, &mb->state);
 	kfree(mb);
 	me->sz--;
+	if (!(me->sz))
+		hrtimer_cancel(&priv->ob_dme_shared[dme_no].tmr);
 	mutex_unlock(&priv->api_lock);
-
 	return;
 }
 
@@ -2027,6 +2183,7 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 	u32 idx;
 	u32 seg;
 	u32 lock = 0;
+	u32 cp = 0;
 
 	if (!mb)
 		return -EINVAL;
@@ -2045,17 +2202,27 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 
 
 	/* Copy and clear rest of buffer */
-	if ((u32)buffer & 0xFF) {
-		if (unlikely(desc->msg_virt == NULL)) {
+	if ((u32)buffer > PAGE_OFFSET) {
+		if ((u32)buffer & 0xFF) {
+			if (unlikely(desc->msg_virt == NULL)) {
+				rc = -ENXIO;
+				goto done;
+			}
+			memcpy(desc->msg_virt, buffer, len);
+			cp = 1;
+		}
+	} else {
+		if (copy_from_user(desc->msg_virt, buffer, len)) {
 			rc = -ENXIO;
 			goto done;
 		}
-		memcpy(desc->msg_virt, buffer, len);
+		cp = 1;
 	}
 
 	dw0 = DME_DESC_DW0_SRC_DST_ID(destid) |
-		DME_DESC_DW0_EN_INT|
+	/*	DME_DESC_DW0_EN_INT|*/
 		DME_DESC_DW0_VALID;
+
 #if 0
 	if (!(me->write_idx % 4))
 		dw0 |=	DME_DESC_DW0_EN_INT;
@@ -2074,7 +2241,7 @@ int axxia_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 		DME_DESC_DW1_LETTER(letter);
 	idx = me->write_idx;
 	dw2_r  = *((u32 *)DESC_TABLE_W2_MEM(me, idx));
-	if ((u32)buffer & 0xFF)
+	if (cp)
 		dw2 = (u32)(desc->msg_phys >> 8) & 0x3fffffff;
 	else
 		dw2 = (u32)(virt_to_phys(buffer) >> 8) & 0x3fffffff;
@@ -2184,9 +2351,10 @@ void axxia_close_inb_mbox(struct rio_mport *mport, int mbox)
 	axxia_local_config_write(priv, RAB_INTR_STAT_IDME, mb->irq_state_mask);
 	mb->irq_state_mask = 0;
 	msleep(100);
+	if (priv->dme_mode == AXXIA_IBDME_TIMER_MODE)
+		hrtimer_cancel(&mb->tmr);
 	mbox_put(mb);
 	mutex_unlock(&priv->api_lock);
-
 	return;
 }
 
@@ -2255,7 +2423,6 @@ int axxia_add_inb_buffer(struct rio_mport *mport, int mbox, void *buf)
 	dme_ctrl |= (DME_WAKEUP | DME_ENABLE);*/
 	axxia_local_config_write(priv,
 		RAB_IB_DME_CTRL(me->dme_no), me->dme_ctrl);
-
 done:
 	return rc;
 busy:
@@ -2395,7 +2562,7 @@ void axxia_rio_port_irq_init(struct rio_mport *mport)
 	priv->ob_dme_irq.irq_enab_reg_addr = RAB_INTR_ENAB_ODME;
 	priv->ob_dme_irq.irq_state_reg_addr = RAB_INTR_STAT_ODME;
 	priv->ob_dme_irq.irq_state_mask = 0;
-	priv->ob_dme_irq.thrd_irq_fn = ob_dme_irq_handler;
+/*	priv->ob_dme_irq.thrd_irq_fn = ob_dme_irq_handler;*/
 	priv->ob_dme_irq.data = NULL;
 	priv->ob_dme_irq.release_fn = release_outb_dme;
 

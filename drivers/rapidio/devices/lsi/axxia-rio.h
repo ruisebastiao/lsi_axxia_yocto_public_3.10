@@ -174,7 +174,7 @@
 #define APIO_INT_EN             (1)
 
 #define RAB_INTR_ENAB_GNRL_SET  (MISC_INT_EN | RPIO_INT_EN | \
-				 APIO_INT_EN | OB_DME_INT_EN | IB_DME_INT_EN)
+			 APIO_INT_EN/* | OB_DME_INT_EN | IB_DME_INT_EN*/)
 
 #define RAB_INTR_STAT_GNRL      (RAB_REG_BASE + 0x60)
 /* General int status bits */
@@ -467,7 +467,8 @@
 
 #define RIO_PNPTAACR		0x10120
 
-
+#define AXXIA_IBDME_INTERRUPT_MODE	0x1
+#define AXXIA_IBDME_TIMER_MODE		0x2
 /*************************************/
 /* *********** Constants *********** */
 /*************************************/
@@ -539,6 +540,7 @@ struct rio_priv {
 	struct rio_rx_mbox     *ib_mbox[RIO_MAX_RX_MBOX];
 	struct rio_msg_dme     *ib_dme[DME_MAX_IB_ENGINES];
 	struct rio_pw_irq *pw_data;
+	unsigned int dme_mode;
 	/* Linkdown Reset; Trigger via SRDS STAT1 */
 	struct event_regs linkdown_reset;
 

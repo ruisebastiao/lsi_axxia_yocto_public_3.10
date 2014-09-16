@@ -89,6 +89,7 @@ struct rio_rx_mbox {
 	int ring_size;
 	struct rio_msg_dme *me[RIO_MSG_MAX_LETTER];
 	unsigned int irq_state_mask;
+	struct hrtimer tmr;
 };
 
 struct rio_tx_mbox {
@@ -111,6 +112,7 @@ struct rio_tx_dme {
 	int	ring_size;
 	int	ring_size_free;
 	struct rio_msg_dme *me;
+	struct hrtimer tmr;
 };
 
 #define PW_MSG_WORDS (RIO_PW_MSG_SIZE/sizeof(u32))
@@ -143,7 +145,7 @@ struct rio_irq_handler {
 	void *data;
 };
 
-
+extern unsigned int axxia_hrtimer_delay;
 /**********************************************/
 /* *********** External Functions *********** */
 /**********************************************/
@@ -181,7 +183,6 @@ void release_irq_handler(struct rio_irq_handler *h);
 void db_irq_handler(struct rio_irq_handler *h, u32 state);
 extern int axxia_rio_init_sysfs(struct platform_device *dev);
 extern void axxia_rio_release_sysfs(struct platform_device *dev);
-extern unsigned int axxia_mb_zc[RIO_MAX_MBOX];
 
 #if defined(CONFIG_RAPIDIO_HOTPLUG)
 

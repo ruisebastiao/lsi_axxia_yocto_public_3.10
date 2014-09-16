@@ -29,7 +29,6 @@
 #include "axxia-rio.h"
 #include "axxia-rio-irq.h"
 
-
 static ssize_t axxia_rio_stat_show(struct device *dev,
 				   struct device_attribute *attr,
 				   char *buf)
@@ -151,6 +150,8 @@ static ssize_t axxia_rio_ob_dme_show(struct device *dev,
 	str += sprintf(str, "Outbound Mbox stats\n");
 	for (e = 0; e < RIO_MAX_TX_MBOX; e++) {
 		mb = priv->ob_mbox[e];
+		if (!mb)
+			continue;
 		if ((mb->sent_msg_count) || (mb->compl_msg_count)) {
 			if (test_bit(RIO_DME_OPEN, &mb->state))
 				str += sprintf(str, "Mailbox %d: DME %d\n",
@@ -199,6 +200,14 @@ static ssize_t axxia_rio_irq_show(struct device *dev,
 	str += sprintf(str, "RIO to Axxia Bus Events  (%p)\t%8.8x\n",
 		       (void *)RAB_INTR_ENAB_RPIO, stat);
 
+	str += sprintf(str, "OBDME : in Timer Mode, Period %9.9d nanosecond\n",
+			axxia_hrtimer_delay);
+	str += sprintf(str, "IBDME : ");
+	if (priv->dme_mode == AXXIA_IBDME_TIMER_MODE)
+		str += sprintf(str, "in Timer Mode, Period %9.9d nanosecond\n",
+			axxia_hrtimer_delay);
+	else
+		str += sprintf(str, "in Interrupt Mode\n");
 	return str - buf;
 }
 static DEVICE_ATTR(irq, S_IRUGO, axxia_rio_irq_show, NULL);
