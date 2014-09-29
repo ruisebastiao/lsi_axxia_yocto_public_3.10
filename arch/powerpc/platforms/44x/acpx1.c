@@ -260,12 +260,113 @@ static int __init acpx14xx_probe(void)
 	return 1;
 }
 
+/*
+ * Issue a "core" reset.
+ */
+
+void
+acp_jump_to_boot_loader(void *input)
+{
+	mpic_teardown_this_cpu(0);
+	/* This is only valid in the "core" reset case, so 0x10000000. */
+	mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) | 0x10000000);
+
+	while (1)
+		;		/* Just in case the jump fails. */
+}
+
+/*
+ * Get all other cores to run "acp_jump_to_boot_loader()" then go
+ * there as well.
+ */
+
+void
+acp_reset_cores(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		if (cpu != smp_processor_id())
+			smp_call_function_single(cpu, acp_jump_to_boot_loader,
+						 NULL, 0);
+	}
+
+	acp_jump_to_boot_loader(NULL);
+}
+
+/*
+ * Apply a system reset. Alternatively a board specific value may be
+ * provided via the "reset-type" property in the cpu node.
+ */
+void acpx14xx_reset_system(char *cmd)
+{
+	struct device_node *np;
+	u32 reset_type = DBCR0_RST_SYSTEM;
+	const u32 *prop;
+
+	np = of_find_node_by_type(NULL, "cpu");
+	if (np) {
+		prop = of_get_property(np, "reset-type", NULL);
+
+		/*
+		 * Check if property exists and if it is in range:
+		 * 1 - PPC4xx core reset
+		 * 2 - PPC4xx chip reset
+		 * 3 - PPC4xx system reset (default)
+		 */
+		if ((prop) && ((prop[0] >= 1) && (prop[0] <= 3)))
+			reset_type = prop[0] << 28;
+	}
+
+	if (DBCR0_RST_CORE == reset_type) {
+		acp_reset_cores();
+	} else {
+		/*
+		  In this case, reset_type is either chip or system.
+
+		  On the AXM3500 (PVR=0x7ff520c1), writing to DBCR0
+		  will occasionally stall the system.  As a
+		  work-around, write to the system control register.
+		*/
+
+		u32 pvr_value;
+
+		asm volatile ("mfpvr    %0" : "=r"(pvr_value));
+
+		if (0x7ff520c1 == pvr_value) {
+			u32 value;
+
+			/* Enable privileged accesses */
+			value = mfdcrx(0xd0a);
+			value |= 0xab;
+			mtdcrx(0xd0a, value);
+
+			/* Switch to the reference clock */
+			printk(KERN_WARNING
+			       "Switching PPCs to Reference Clock\n");
+			value = mfdcrx(0xd00);
+			value &= ~0xc0000000;
+			mtdcrx(0xd00, value);
+
+			/* Reset */
+			printk(KERN_WARNING
+			       "Resetting Using SYSCON\n");
+			mtdcrx(0xe00, (reset_type >> 28));
+		} else {
+			mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) | reset_type);
+		}
+	}
+
+	while (1)
+		;	/* Just in case the reset doesn't work */
+}
+
 define_machine(acpx14xx) {
 	.name			= "ACPX1",
 	.probe			= acpx14xx_probe,
 	.progress		= udbg_progress,
 	.init_IRQ		= acpx14xx_init_irq,
 	.setup_arch		= acpx14xx_setup_arch,
-	.restart		= ppc4xx_reset_system,
+	.restart		= acpx14xx_reset_system,
 	.calibrate_decr		= generic_calibrate_decr,
 };
