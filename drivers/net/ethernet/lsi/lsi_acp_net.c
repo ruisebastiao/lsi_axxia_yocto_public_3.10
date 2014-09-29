@@ -701,6 +701,7 @@ static void lsinet_rx_packet(struct net_device *dev)
 	while (0 < queue_initialized(queue, pdata->rx_tail_copy,
 				     pdata->rx_num_desc)) {
 
+		if (skb_tailroom(sk_buff) >= descriptor.pdu_length)
 		{
 			unsigned char *buffer;
 			buffer = skb_put(sk_buff, descriptor.pdu_length);
@@ -708,6 +709,14 @@ static void lsinet_rx_packet(struct net_device *dev)
 			       (void *)(descriptor.host_data_memory_pointer +
 				 pdata->dma_alloc_offset_rx),
 			       descriptor.pdu_length);
+		}
+		else
+		{
+			pr_err("%s: PDU overrun (len %u/%u, err %d)\n",
+			       LSI_DRV_NAME,
+			       descriptor.pdu_length,
+			       bytes_copied,
+			       descriptor.error);
 		}
 		bytes_copied += descriptor.pdu_length;
 		descriptor.data_transfer_length = pdata->rx_buf_per_desc;
