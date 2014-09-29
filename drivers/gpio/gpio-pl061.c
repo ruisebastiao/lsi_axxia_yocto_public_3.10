@@ -298,7 +298,11 @@ static int pl061_probe(struct device *dev,
 		if (irq_base <= 0)
 			return -ENODEV;
 	} else if (dev->of_node) {
-		chip->gc.base = -1;
+		int id = of_alias_get_id(dev->of_node, "gpio");
+		if (id < 0)
+			chip->gc.base = -1;
+		else
+			chip->gc.base = id * PL061_GPIO_NR;
 		irq_base = 0;
 	} else {
 		if (retchip)

@@ -614,6 +614,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 	if (err) {
 		pr_err("PCIE%d: Failed to request IRQ#%d (%d)\n",
 		       sys->domain, port->irq[0], err);
+		release_resource(&sys->io_res);
 		goto fail;
 	}
 
@@ -654,6 +655,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 		if (link_state != 0xb) {
 			pr_warn("PCIE%d: Link in bad state - giving up!\n",
 				port->index);
+			release_resource(&sys->io_res);
 			goto fail;
 		}
 	}

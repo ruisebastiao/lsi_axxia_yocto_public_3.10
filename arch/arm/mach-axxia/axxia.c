@@ -53,7 +53,6 @@
 #include <mach/ncr.h>
 #include "axxia.h"
 #include "pci.h"
-#include "i2c.h"
 #ifdef CONFIG_AXXIA_RIO
 #include <mach/rio.h>
 #endif
@@ -154,27 +153,9 @@ static struct mmci_platform_data mmc_plat_data = {
 	.gpio_cd  = -ENOSYS
 };
 
-struct pl061_platform_data gpio0_plat_data = {
-	.gpio_base  = 0,
-	.irq_base   = 0,
-	.directions = 0,	/* startup directions, 1: out, 0: in */
-	.values     = 0		/* startup values */
-};
-
-struct pl061_platform_data gpio1_plat_data = {
-	.gpio_base  = 8,
-	.irq_base   = 0,
-	.directions = 0,	/* startup directions, 1: out, 0: in */
-	.values     = 0		/* startup values */
-};
-
 static struct of_dev_auxdata axxia_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("arm,primecell", 0x20101E0000ULL,
 		       "mmci",  &mmc_plat_data),
-	OF_DEV_AUXDATA("arm,primecell", 0x2010092000ULL,
-		       "gpio0", &gpio0_plat_data),
-	OF_DEV_AUXDATA("arm,primecell", 0x2010093000ULL,
-		       "gpio1", &gpio1_plat_data),
 	{}
 };
 
