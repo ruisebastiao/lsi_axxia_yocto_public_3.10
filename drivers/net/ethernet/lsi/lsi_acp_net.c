@@ -1545,8 +1545,10 @@ int appnic_init(struct net_device *dev)
 	write_mac(0x40010000, APPNIC_DMA_PCI_CONTROL);
 	write_mac(0x30000, APPNIC_DMA_CONTROL);
 #ifdef CONFIG_ARM
-	writel(0x280044, (unsigned long)pdata->dma_base + 0x60);
-	writel(0xc0, (unsigned long)pdata->dma_base + 0x64);
+	writel(0x280044,
+	       (void __iomem *)((unsigned long)pdata->dma_base + 0x60));
+	writel(0xc0,
+	       (void __iomem *)((unsigned long)pdata->dma_base + 0x64));
 #else
 	out_le32((unsigned *)pdata->dma_base + 0x60, 0x280044);
 	out_le32((unsigned *)pdata->dma_base + 0x64, 0xc0);

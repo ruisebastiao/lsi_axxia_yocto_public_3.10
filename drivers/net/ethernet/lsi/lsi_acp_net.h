@@ -488,8 +488,8 @@ struct appnic_device {
 
 #ifdef CONFIG_ARM
 
-#define read_mac(address)         readl((address))
-#define write_mac(value, address) writel((value), (address))
+#define read_mac(address)         readl((void __iomem *)(address))
+#define write_mac(value, address) writel((value), (void __iomem *)(address))
 
 static inline void
 readdescriptor(unsigned long address, struct appnic_dma_descriptor *descriptor)
@@ -518,7 +518,7 @@ static inline void
 femac_uncache(struct appnic_device *pdata)
 {
 	/* Set FEMAC to uncached */
-	writel(0x0, GPREG_HPROT_FEMAC);
+	writel(0x0, (void __iomem *)GPREG_HPROT_FEMAC);
 }
 
 #else
