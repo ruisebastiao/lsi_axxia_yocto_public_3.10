@@ -335,6 +335,8 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 	__arch_ioremap((cookie), (size), MT_DEVICE)
 #define ioremap_nocache(cookie, size) \
 	__arch_ioremap((cookie), (size), MT_DEVICE)
+#define ioremap_cache(cookie, size) \
+	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_cached(cookie, size) \
 	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_wc(cookie, size) \

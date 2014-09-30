@@ -2219,8 +2219,8 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 		status = -ENOMEM;
 		goto err_no_ioremap;
 	}
-	pr_info("pl022: mapped registers from 0x%08x to %p\n",
-			adev->res.start, pl022->virtbase);
+	pr_info("pl022: mapped registers from 0x%08lx to %p\n",
+		(unsigned long)adev->res.start, pl022->virtbase);
 
 	pl022->clk = devm_clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {

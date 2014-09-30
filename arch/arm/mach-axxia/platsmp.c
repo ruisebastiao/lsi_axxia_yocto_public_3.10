@@ -60,7 +60,7 @@ static void __init check_fixup_sev(void __iomem *syscon)
 	pr_info("axxia: Cross-cluster SEV fixup: %s\n", wfe_fixup ? "yes" : "no");
 }
 
-static void __init do_fixup_sev(void)
+static void __cpuinit do_fixup_sev(void)
 {
 	u32 tmp;
 
