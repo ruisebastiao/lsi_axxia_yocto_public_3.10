@@ -48,8 +48,6 @@
 #include "lsi_power_management.h"
 
 #define MAX_GIC_INTERRUPTS  1020
-#define MAX_NUM_CLUSTERS    4
-#define CORES_PER_CLUSTER   4
 
 static u32 irq_cpuid[MAX_GIC_INTERRUPTS];
 static void __iomem *ipi_mask_reg_base;
@@ -1366,7 +1364,6 @@ void __cpuinit axxia_gic_secondary_init(void)
 
 void __cpuinit axxia_hotplug_gic_secondary_init(void)
 {
-	struct gic_chip_data *gic = &gic_data;
 	gic_cpu_init(&gic_data);
 }
 
