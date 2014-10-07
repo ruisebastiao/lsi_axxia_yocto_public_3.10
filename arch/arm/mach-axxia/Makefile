@@ -11,5 +11,5 @@ obj-y					+= pci.o
 obj-y					+= ddr_retention.o ddr_shutdown.o
 obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
 obj-$(CONFIG_ARCH_AXXIA_GIC)		+= axxia-gic.o
-obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o lsi_power_management.o
+obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o lsi_power_management.o axxia_circular_queue.o
 obj-$(CONFIG_AXXIA_RIO)                 += rapidio.o
