@@ -17,17 +17,22 @@
 #include <linux/platform_device.h>
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
+#include <linux/io.h>
+#include <linux/of_address.h>
+#include <linux/reboot.h>
 
 #include <mach/ncr.h>
+
+#define APB2_SER3_PHY_ADDR        0x002010030000ULL
+#define APB2_SER3_PHY_SIZE   0x1000
 
 static int log = 1;
 module_param(log, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(log, "Log each error to kernel log.");
 
-static int panic_on_fatal = 1;
-module_param(panic_on_fatal, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(panic_on_fatal, "Panic on fatal error.");
-
+static int machineRestart = 1;
+module_param(machineRestart, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(machineRestart, "Machine restart on fatal error.");
 /*
   AXM55xx memory controller interrupt status bits:
 
@@ -129,6 +134,7 @@ struct smmon_attr {
 struct sm_dev {
 	struct platform_device *pdev;
 	u32 region; /* NCR region address */
+	void __iomem *apb2ser3_region;
 	u32 counter[NR_EVENTS];
 };
 
@@ -176,6 +182,7 @@ smmon_isr(int interrupt, void *device)
 {
 	struct sm_dev *sm = device;
 	u32 status;
+	unsigned long setVal;
 	int i;
 
 	if (ncr_read(sm->region, 0x410, 4, &status)) {
@@ -187,10 +194,14 @@ smmon_isr(int interrupt, void *device)
 	for (i = 0; i < NR_EVENTS; ++i) {
 		if ((status & event_mask[i]) != 0) {
 			++sm->counter[i];
-			if (panic_on_fatal && event_logging[i].fatal)
-				panic("%s (%s)\n",
-				      event_logging[i].name,
-				      dev_name(&sm->pdev->dev));
+			if (machineRestart && event_logging[i].fatal) {
+				setVal = readl(sm->apb2ser3_region + 0xdc);
+				/* set bit 3 in pscratch reg */
+				setVal = (setVal) | (0x1 << 3);
+				writel(setVal, sm->apb2ser3_region + 0xdc);
+				pr_info("CPU uncorrectable error\n");
+				machine_restart(NULL);
+			}
 			if (log)
 				printk_ratelimited("%s%s: %s\n",
 						   event_logging[i].level,
@@ -213,6 +224,8 @@ smmon_probe(struct platform_device *pdev)
 	int irq;
 	u32 mask;
 	int rc = 0;
+	struct device_node *np = pdev->dev.of_node;
+
 
 	sm = devm_kzalloc(&pdev->dev, sizeof(*sm), GFP_KERNEL);
 	if (!sm) {
@@ -227,6 +240,11 @@ smmon_probe(struct platform_device *pdev)
 		goto out;
 	}
 	sm->region = io->start;
+
+	sm->apb2ser3_region = of_iomap(np, 1);
+	if (!sm->apb2ser3_region)
+		sm->apb2ser3_region = ioremap(APB2_SER3_PHY_ADDR,
+				APB2_SER3_PHY_SIZE);
 
 	/* Disable all memory controller interrupts */
 	mask = 0xffffffff;

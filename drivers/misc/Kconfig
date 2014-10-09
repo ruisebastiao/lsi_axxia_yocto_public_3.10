@@ -554,6 +554,7 @@ config LSI_NCR
 config LSI_SMMON
 	tristate "LSI System Memory Monitor"
 	depends on ARCH_AXXIA || ACP
+	depends on !EDAC_AXXIA
 	help
 	  Monitor the system memory controllers for errors.
 
