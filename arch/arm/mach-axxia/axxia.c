@@ -62,6 +62,8 @@ static const char *axxia_dt_match[] __initconst = {
 	NULL
 };
 
+static void __iomem *base;
+
 #ifdef CONFIG_KEXEC
 
 static void __iomem *dickens;
@@ -200,6 +202,7 @@ static struct notifier_block axxia_amba_nb = {
 
 void __init axxia_dt_init(void)
 {
+	base = ioremap(0x2010000000, 0x40000);
 #ifdef CONFIG_KEXEC
 	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5500-sim")) {
 		dickens = ioremap(0x2000000000, SZ_4M);
@@ -228,10 +231,6 @@ void __init axxia_dt_init(void)
 
 static void axxia_restart(char str, const char *cmd)
 {
-	void __iomem *base;
-
-	base = ioremap(0x2010000000, 0x40000);
-
 	writel(0x000000ab, base + 0x31000); /* Access Key */
 	writel(0x00000040, base + 0x31004); /* Intrnl Boot, 0xffff0000 Target */
 	writel(0x80000000, base + 0x3180c); /* Set ResetReadDone */
