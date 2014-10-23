@@ -165,13 +165,13 @@ static void platform_pmu_event_read(struct perf_event *event)
 	uint32_t n;
 
 	if (ev >= AXM_55XX_VP_BASE && ev <= AXM_55XX_VP_MAX) {
-		n = vp_pmu_event_del(ev - AXM_55XX_VP_BASE, event, 0);
+		n = vp_pmu_event_read(ev - AXM_55XX_VP_BASE, event, 0);
 		local64_add(n, &event->count);
 	} else if (ev >= AXM_55XX_PCX_BASE && ev <= AXM_55XX_PCX_MAX) {
-		n = pcx_pmu_event_del(ev - AXM_55XX_PCX_BASE, event, 0);
+		n = pcx_pmu_event_read(ev - AXM_55XX_PCX_BASE, event, 0);
 		local64_add(n, &event->count);
 	} else if (ev >= AXM_55XX_MEMC_BASE && ev <= AXM_55XX_MEMC_MAX) {
-		n = memc_pmu_event_del(ev - AXM_55XX_MEMC_BASE, event, 0);
+		n = memc_pmu_event_read(ev - AXM_55XX_MEMC_BASE, event, 0);
 		local64_add(n, &event->count);
 	}
 }

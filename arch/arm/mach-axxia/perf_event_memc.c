@@ -97,6 +97,29 @@ static uint32_t memc_pmu_event_add(uint32_t ev, struct perf_event *pevent)
 }
 
 /*
+ * Return counter update.
+ */
+static uint32_t memc_pmu_event_read(uint32_t ev, struct perf_event *pevent,
+		int flags)
+{
+	uint32_t count = 0;
+
+	if (ev >= DDRC0_OFFSET && ev <= DDRC0_SMON_MAX)
+		count = smon_read(&ddrc0_smon, ev - DDRC0_OFFSET);
+	else if (ev >= DDRC1_OFFSET && ev <= DDRC1_SMON_MAX)
+		count = smon_read(&ddrc1_smon, ev - DDRC1_OFFSET);
+	else if (ev >= ELM0_OFFSET && ev <= ELM0_SMON_MAX)
+		count = smon_read(&elm0_smon, ev - ELM0_OFFSET);
+	else if (ev >= ELM1_OFFSET && ev <= ELM1_SMON_MAX)
+		count = smon_read(&elm1_smon, ev - ELM1_OFFSET);
+
+	if (count == -ENOEVENT)
+		count = 0;
+
+	return count;
+}
+
+/*
  * Remove event and return counter update.
  */
 static uint32_t memc_pmu_event_del(uint32_t ev, struct perf_event *pevent,
@@ -105,33 +128,25 @@ static uint32_t memc_pmu_event_del(uint32_t ev, struct perf_event *pevent,
 	uint32_t count = 0;
 
 	if (ev >= DDRC0_OFFSET && ev <= DDRC0_SMON_MAX) {
-
 		count = smon_read(&ddrc0_smon, ev - DDRC0_OFFSET);
-		if (count == -ENOEVENT)
-			count = 0;
 
 		smon_deallocate(&ddrc0_smon, ev - DDRC0_OFFSET);
 	} else if (ev >= DDRC1_OFFSET && ev <= DDRC1_SMON_MAX) {
-
 		count = smon_read(&ddrc1_smon, ev - DDRC1_OFFSET);
-		if (count == -ENOEVENT)
-			count = 0;
 
 		smon_deallocate(&ddrc1_smon, ev - DDRC1_OFFSET);
 	} else if (ev >= ELM0_OFFSET && ev <= ELM0_SMON_MAX) {
 		count = smon_read(&elm0_smon, ev - ELM0_OFFSET);
-		if (count == -ENOEVENT)
-			count = 0;
 
 		smon_deallocate(&elm0_smon, ev - ELM0_OFFSET);
 	} else if (ev >= ELM1_OFFSET && ev <= ELM1_SMON_MAX) {
-
 		count = smon_read(&elm1_smon, ev - ELM1_OFFSET);
-		if (count == -ENOEVENT)
-			count = 0;
 
 		smon_deallocate(&elm1_smon, ev - ELM1_OFFSET);
 	}
+
+	if (count == -ENOEVENT)
+		count = 0;
 
 	return count;
 }
