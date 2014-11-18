@@ -399,46 +399,31 @@ static struct pci_ops axxia_pciex_pci_ops = {
 	.write = arm_pciex_axxia_write_config,
 };
 
-/* RootComplex Doorbell Handler */
-void doorbell_rc_handler()
-{
-	pr_info("doorbell_rc_handler\n");
-}
-EXPORT_SYMBOL(doorbell_rc_handler);
-
-/* EndPoint Doorbell Handler */
-void doorbell_ep_handler()
-{
-	pr_info("doorbell_ep_handler\n");
-}
-EXPORT_SYMBOL(doorbell_ep_handler);
-
 /*
  * pcie_doorbell_isr
  *
  * This ISR is for doorbell interrupts for
  * Endpoint mode which has a dedicated IRQ line
+ * This support expects kernel module to handle the doorbell
+ * interrupt
  */
 static irqreturn_t
 pcie_doorbell_isr(int irq, void *arg)
 {
 	struct axxia_pciex_port *port  = arg;
 	void __iomem            *mbase = port->regs;
-	u32                      intr1_status;
-	irqreturn_t              retval = IRQ_HANDLED;
+	u32                     intr1_status;
 
-	/* read the PEI interrupt status register */
 	intr1_status = readl(mbase + PCIE_INT1_STATUS);
 
 	if (intr1_status & INT1_DOORBELL) {
-		pr_info("PCIE%d: Doorbell interrupt\n",
-			port->index);
-		doorbell_ep_handler();
-		/* clear the doorbell status */
-		writel(intr1_status, port->regs + PCIE_INT1_STATUS);
+		/* EP doorbell interrupt. This support expects kernel module
+		 * to handle this doorbell interrupt
+		 */
+		/* Clear it */
+		writel(INT1_DOORBELL, mbase + PCIE_INT1_STATUS);
 	}
-
-	return retval;
+	return IRQ_NONE;
 }
 
 
@@ -517,11 +502,12 @@ pcie_legacy_isr(int irq, void *arg)
 	}
 
 	if (intr1_status & INT1_DOORBELL) {
-		pr_info("PCIE%d: Doorbell interrupt\n",
-			port->index);
-		doorbell_rc_handler();
-		/* clear the doorbell status */
-		writel(intr1_status, port->regs + PCIE_INT1_STATUS);
+		/* RC doorbell interrupt. This support expects kernel module
+		 * to handle this doorbell interrupt
+		 */
+		/* Clear it */
+		writel(INT1_DOORBELL, mbase + PCIE_INT1_STATUS);
+		return IRQ_NONE;
 	}
 
 	/*
