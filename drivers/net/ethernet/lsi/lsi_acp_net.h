@@ -490,7 +490,12 @@ struct appnic_device {
 
 #define read_mac(address)         readl((void __iomem *)(address))
 #define write_mac(value, address) writel((value), (void __iomem *)(address))
+#else
+#define read_mac(address)         in_le32((u32 *) (address))
+#define write_mac(value, address) out_le32((u32 *) (address), (value))
+#endif /* CONFIG_ARM */
 
+#ifdef __LITTLE_ENDIAN
 static inline void
 readdescriptor(unsigned long address, struct appnic_dma_descriptor *descriptor)
 {
@@ -504,7 +509,7 @@ writedescriptor(unsigned long address,
 		const struct appnic_dma_descriptor *descriptor)
 {
 	memcpy((void *)address, descriptor,
-	       sizeof(struct appnic_dma_descriptor));
+		   sizeof(struct appnic_dma_descriptor));
 	return;
 }
 
@@ -522,9 +527,6 @@ femac_uncache(struct appnic_device *pdata)
 }
 
 #else
-
-#define read_mac(address)         in_le32((u32 *) (address))
-#define write_mac(value, address) out_le32((u32 *) (address), (value))
 
 static inline void
 readdescriptor(unsigned long address, struct appnic_dma_descriptor *descriptor)
@@ -564,7 +566,7 @@ _swab_queue_pointer(const union appnic_queue_pointer *old_queue)
 static inline void
 femac_uncache(struct appnic_device *pdata) {}
 
-#endif /* ifdef CONFIG_ARM */
+#endif /* ifdef __LITTLE_ENDIAN */
 
 static int
 femac_irq_setup(struct net_device *dev)

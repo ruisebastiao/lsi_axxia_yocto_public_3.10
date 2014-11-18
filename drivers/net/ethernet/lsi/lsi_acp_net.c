@@ -682,13 +682,21 @@ static void lsinet_rx_packet(struct net_device *dev)
 	readdescriptor(((unsigned long)pdata->rx_desc +
 			pdata->rx_tail_copy.bits.offset), &descriptor);
 
-	sk_buff = dev_alloc_skb(LSINET_MAX_MTU);
+	sk_buff = netdev_alloc_skb(NULL, LSINET_MAX_MTU);
 
 	if ((struct sk_buff *)0 == sk_buff) {
 		pr_info_ratelimited("%s: No buffer, packet dropped.\n",
 				    LSI_DRV_NAME);
 		pdata->stats.rx_dropped++;
 		return;
+	} else {
+		/*
+		  Needs to be reviewed.  This fixed an aligment
+		  exception when pinging to the target from a host.
+		*/
+
+		/* Align IP on 16 byte boundaries */
+		skb_reserve(sk_buff, 2);
 	}
 
 	ok_stat = read_mac(APPNIC_RX_STAT_PACKET_OK);
@@ -1707,15 +1715,15 @@ static int appnic_probe_config_dt(struct net_device *dev,
 		goto device_tree_failed;
 
 	value64 = of_translate_address(np, field);
-	value32 = field[1];
+	value32 = field[3];
 	field += 2;
 	pdata->rx_base = ioremap(value64, value32);
 	value64 = of_translate_address(np, field);
-	value32 = field[1];
+	value32 = field[3];
 	field += 2;
 	pdata->tx_base = ioremap(value64, value32);
 	value64 = of_translate_address(np, field);
-	value32 = field[1];
+	value32 = field[3];
 	field += 2;
 	pdata->dma_base = ioremap(value64, value32);
 

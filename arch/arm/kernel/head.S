@@ -82,6 +82,8 @@
 
 	__HEAD
 ENTRY(stext)
+ARM_BE8(setend	be)			@ ensure we are in BE8 mode
+
 
  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
@@ -295,19 +297,29 @@ __create_page_tables:
 	orr	r3, r7, r3, lsl #SECTION_SHIFT
 #ifdef CONFIG_ARM_LPAE
 	mov	r7, #1 << (54 - 32)		@ XN
-#ifdef CONFIG_CPU_ENDIAN_BE8
-	str	r7, [r0], #4
-	str	r3, [r0], #4
+	#ifdef CONFIG_CPU_ENDIAN_BE8
+		str	r7, [r0], #4
+		str	r3, [r0], #4
+	#else
+		str	r3, [r0], #4
+		str	r7, [r0], #4
+	#endif
 #else
-	str	r3, [r0], #4
-	str	r7, [r0], #4
-#endif
-#else
-	orr	r3, r3, #PMD_SECT_XN
-#ifdef CONFIG_ARCH_AXXIA
-	orr	r7, r7, #0x20
-#endif
-	str	r3, [r0], #4
+	//orr	r3, r3, #PMD_SECT_XN
+	#ifdef CONFIG_ARCH_AXXIA
+		orr	r7, r7, #0x20
+	#endif
+1:
+	#ifdef CONFIG_CPU_ENDIAN_BE8
+		str	r7, [r0], #4
+		str	r3, [r0], #4
+	#else
+		str	r3, [r0], #4
+		str	r7, [r0], #4
+	#endif /* CONFIG_CPU_ENDIAN_BE8 */
+	add	r3, r3, #1 << SECTION_SHIFT
+	cmp	r0, r6
+	blo	1b
 #endif
 
 #else /* CONFIG_DEBUG_ICEDCC || CONFIG_DEBUG_SEMIHOSTING */
@@ -364,6 +376,7 @@ ENTRY(secondary_startup)
 #endif
 	safe_svcmode_maskall r9
 
+ARM_BE8(setend	be)				@ if system starts LE, go BE8
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type
 	movs	r10, r5				@ invalid processor?
@@ -602,8 +615,14 @@ __fixup_a_pv_table:
 #else
 	b	2f
 1:	ldr	ip, [r7, r3]
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	@ in BE8, we load data in BE, but instructions still in LE
+	bic	ip, ip, #0xff000000
+	orr	ip, ip, r6, lsl#24
+#else
 	bic	ip, ip, #0x000000ff
 	orr	ip, ip, r6	@ mask in offset bits 31-24
+#endif
 	str	ip, [r7, r3]
 2:	cmp	r4, r5
 	ldrcc	r7, [r4], #4	@ use branch for delay slot

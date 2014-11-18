@@ -16,6 +16,7 @@ LDFLAGS		:=
 LDFLAGS_vmlinux	:=-p --no-undefined -X
 ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
 LDFLAGS_vmlinux	+= --be8
+LDFLAGS_MODULE += --be8
 endif
 
 OBJCOPYFLAGS	:=-O binary -R .comment -S
@@ -45,8 +46,9 @@ endif
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
 KBUILD_CPPFLAGS	+= -mbig-endian
-AS		+= -EB
-LD		+= -EB
+#AS		+= -EB
+#LD		+= -EB
+LDFLAGS += -EB
 else
 KBUILD_CPPFLAGS	+= -mlittle-endian
 AS		+= -EL
