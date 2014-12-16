@@ -165,13 +165,13 @@ static void platform_pmu_event_read(struct perf_event *event)
 	uint32_t n;
 
 	if (ev >= AXM_55XX_VP_BASE && ev <= AXM_55XX_VP_MAX) {
-		n = vp_pmu_event_del(ev - AXM_55XX_VP_BASE, event, 0);
+		n = vp_pmu_event_read(ev - AXM_55XX_VP_BASE, event, 0);
 		local64_add(n, &event->count);
 	} else if (ev >= AXM_55XX_PCX_BASE && ev <= AXM_55XX_PCX_MAX) {
-		n = pcx_pmu_event_del(ev - AXM_55XX_PCX_BASE, event, 0);
+		n = pcx_pmu_event_read(ev - AXM_55XX_PCX_BASE, event, 0);
 		local64_add(n, &event->count);
 	} else if (ev >= AXM_55XX_MEMC_BASE && ev <= AXM_55XX_MEMC_MAX) {
-		n = memc_pmu_event_del(ev - AXM_55XX_MEMC_BASE, event, 0);
+		n = memc_pmu_event_read(ev - AXM_55XX_MEMC_BASE, event, 0);
 		local64_add(n, &event->count);
 	}
 }
@@ -242,17 +242,22 @@ static int axmperf_probe(struct platform_device *dev)
 	return ret;
 }
 
+static const struct of_device_id lsi_platformperf_match[] = {
+	{ .compatible = "lsi,axm-platformperf", },
+	{},
+};
+
 static struct platform_driver axmperf_driver = {
 	.driver = {
-		   .name = "AXM55xxPlatformPerf",
-		   .owner = THIS_MODULE,
-		   },
+		.name = "AXM55xxPlatformPerf",
+		.of_match_table = lsi_platformperf_match,
+		.owner = THIS_MODULE,
+		},
 	.probe = axmperf_probe,
 };
 
 static int __init axmperf_init(void)
 {
-	platform_device_register(&axmperf_device);
 	platform_driver_register(&axmperf_driver);
 
 	return 0;

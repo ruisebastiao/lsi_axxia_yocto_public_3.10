@@ -40,12 +40,15 @@ static uint32_t vp_pmu_event_add(uint32_t event, struct perf_event *pevent)
 	return 0;
 }
 
+static uint32_t vp_pmu_event_read(uint32_t event, struct perf_event *pevent,
+		int flags)
+{
+	return 0;
+}
+
 static uint32_t vp_pmu_event_del(uint32_t event, struct perf_event *pevent,
 		int flags)
 {
 	return 0;
 }
 
-static void vp_pmu_event_destroy(uint32_t event, struct perf_event *pevent)
-{
-}

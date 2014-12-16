@@ -39,8 +39,15 @@ static uint32_t pcx_pmu_event_add(uint32_t ev, struct perf_event *event)
 	return 0;
 }
 
+static uint32_t pcx_pmu_event_read(uint32_t ev, struct perf_event *event,
+		int flags)
+{
+	return 0;
+}
+
 static uint32_t pcx_pmu_event_del(uint32_t ev, struct perf_event *event,
 		int flags)
 {
 	return 0;
 }
+

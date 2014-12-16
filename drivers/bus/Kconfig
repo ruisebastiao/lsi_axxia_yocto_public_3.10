@@ -26,4 +26,11 @@ config OMAP_INTERCONNECT
 
 	help
 	  Driver to enable OMAP interconnect error handling driver.
+
+config ARM_CCN
+       bool "ARM CCN driver support"
+       depends on ARM || ARM64
+       help
+         PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+         interconnect.
 endmenu

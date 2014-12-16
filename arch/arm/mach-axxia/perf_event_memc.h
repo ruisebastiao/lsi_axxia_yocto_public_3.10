@@ -38,15 +38,20 @@
 #define DDRC0 0x0f
 #define DDRC1 0x22
 /* Target */
+#define DDRC_CTRL 0x00
 #define DDRC_PERF 0x02
-
 /* Address */
+#define CTRL_SMON 0x1fc
+
 #ifdef AXM55XX_R1
 #define DDRC_SMON 0x40
 #endif
 #ifdef AXM55XX_R2
 #define DDRC_SMON 0xA0
 #endif
+
+/* Settings */
+#define SMON_ENABLE 0x20000000
 
 /* Base Address */
 #define ELM0 0x2010060000

@@ -685,8 +685,9 @@ static void lsinet_rx_packet(struct net_device *dev)
 	sk_buff = dev_alloc_skb(LSINET_MAX_MTU);
 
 	if ((struct sk_buff *)0 == sk_buff) {
-		pr_err("%s: dev_alloc_skb() failed! Dropping packet.\n",
-		       LSI_DRV_NAME);
+		pr_info_ratelimited("%s: No buffer, packet dropped.\n",
+				    LSI_DRV_NAME);
+		pdata->stats.rx_dropped++;
 		return;
 	}
 
@@ -701,22 +702,19 @@ static void lsinet_rx_packet(struct net_device *dev)
 	while (0 < queue_initialized(queue, pdata->rx_tail_copy,
 				     pdata->rx_num_desc)) {
 
-		if (skb_tailroom(sk_buff) >= descriptor.pdu_length)
-		{
+		if (skb_tailroom(sk_buff) >= descriptor.pdu_length) {
 			unsigned char *buffer;
 			buffer = skb_put(sk_buff, descriptor.pdu_length);
 			memcpy((void *)buffer,
 			       (void *)(descriptor.host_data_memory_pointer +
 				 pdata->dma_alloc_offset_rx),
 			       descriptor.pdu_length);
-		}
-		else
-		{
-			pr_err("%s: PDU overrun (len %u/%u, err %d)\n",
-			       LSI_DRV_NAME,
-			       descriptor.pdu_length,
-			       bytes_copied,
-			       descriptor.error);
+		} else {
+			pr_err_ratelimited("%s: PDU overrun (%u/%u, %d)\n",
+					   LSI_DRV_NAME,
+					   descriptor.pdu_length,
+					   bytes_copied,
+					   descriptor.error);
 		}
 		bytes_copied += descriptor.pdu_length;
 		descriptor.data_transfer_length = pdata->rx_buf_per_desc;
