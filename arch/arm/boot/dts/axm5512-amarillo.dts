@@ -32,6 +32,14 @@
 	mdio-clock-period = <0xf0>;
 };
 
+&ccn {
+	status = "okay";
+};
+
+&perf_platform {
+	status = "okay";
+};
+
 &sm0 {
 	status = "okay";
 };
