@@ -242,17 +242,22 @@ static int axmperf_probe(struct platform_device *dev)
 	return ret;
 }
 
+static const struct of_device_id lsi_platformperf_match[] = {
+	{ .compatible = "lsi,axm-platformperf", },
+	{},
+};
+
 static struct platform_driver axmperf_driver = {
 	.driver = {
-		   .name = "AXM55xxPlatformPerf",
-		   .owner = THIS_MODULE,
-		   },
+		.name = "AXM55xxPlatformPerf",
+		.of_match_table = lsi_platformperf_match,
+		.owner = THIS_MODULE,
+		},
 	.probe = axmperf_probe,
 };
 
 static int __init axmperf_init(void)
 {
-	platform_device_register(&axmperf_device);
 	platform_driver_register(&axmperf_driver);
 
 	return 0;

@@ -116,6 +116,8 @@ uint32_t smon_event_active(struct smon_s *smon, uint8_t event)
 
 uint32_t smon_read(struct smon_s *smon, uint8_t event)
 {
+	uint32_t deltacount;
+
 	if (smon->type == NCP_SMON)
 		ncr_read(NCP_REGION_ID(smon->node, smon->target), smon->offset,
 			 8 * REG_SZ, &smon->regs);
@@ -123,10 +125,29 @@ uint32_t smon_read(struct smon_s *smon, uint8_t event)
 		memcpy32_fromio((uint32_t *)&smon->regs,
 			(uint32_t *)smon->addr + smon->offset, 8);
 
-	if ((smon->assigned[0] == ASSIGNED) && (smon->events[0] == event))
-		return smon->regs.count0;
-	else if ((smon->assigned[1] == ASSIGNED) && (smon->events[1] == event))
-		return smon->regs.count1;
+	if ((smon->assigned[0] == ASSIGNED) &&
+			(smon->events[0] == event)) {
+		if (smon->regs.count0 >= smon->lastread[0])
+			deltacount = smon->regs.count0 - smon->lastread[0];
+		else
+			deltacount = 0xffffffff - smon->lastread[0]
+					+ smon->regs.count0;
+
+		smon->lastread[0] = smon->regs.count0;
+
+		return deltacount;
+	} else if ((smon->assigned[1] == ASSIGNED) &&
+			(smon->events[1] == event)) {
+		if (smon->regs.count1 >= smon->lastread[1])
+			deltacount = smon->regs.count1 - smon->lastread[1];
+		else
+			deltacount = 0xffffffff - smon->lastread[1]
+					+ smon->regs.count1;
+
+		smon->lastread[1] = smon->regs.count1;
+
+		return deltacount;
+	}
 
 	return -ENOEVENT;
 }
@@ -146,6 +167,7 @@ uint32_t smon_start(struct smon_s *smon, uint8_t event)
 	if ((smon->assigned[0] == ASSIGNED) && (smon->events[0] == event)) {
 		smon->regs.event0 = event;
 		smon->regs.count0 = 0;
+		smon->lastread[0] = 0;
 
 		if (smon->type == NCP_SMON) {
 			/* write configuration, but do not change count reg */
@@ -171,6 +193,7 @@ uint32_t smon_start(struct smon_s *smon, uint8_t event)
 		&& (smon->events[1] == event)) {
 		smon->regs.event1 = event;
 		smon->regs.count1 = 0;
+		smon->lastread[1] = 0;
 
 		if (smon->type == NCP_SMON) {
 			/* write configuration, but do not change count reg */

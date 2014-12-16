@@ -43,6 +43,7 @@ struct smon_s {
 	uint32_t node; /* NCP_SMON */
 	uint32_t target; /* " */
 	uint32_t offset;
+	uint32_t lastread[2];
 	uint8_t assigned[2];
 	uint8_t events[2];
 };
