@@ -701,7 +701,7 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 		writel(INT1_DOORBELL,
 			port->regs + PCIE_INT1_ENABLE);
 		release_resource(&sys->io_res);
-		return;
+		return 0;
 	}
 
 	/* Make sure the link is up */
