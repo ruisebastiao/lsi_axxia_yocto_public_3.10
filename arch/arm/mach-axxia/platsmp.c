@@ -287,13 +287,17 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 		 */
 		if (release_phys != 0) {
 			int is_kmapped = pfn_valid(__phys_to_pfn(release_phys));
+
 			if (is_kmapped)
 				release_virt = phys_to_virt(release_phys);
 			else
 				release_virt = ioremap(release_phys, PAGE_SIZE);
-			*release_virt = virt_to_phys(axxia_secondary_startup);
+
+			writel_relaxed(virt_to_phys(axxia_secondary_startup),
+				       release_virt);
 			smp_wmb();
 			__cpuc_flush_dcache_area(release_virt, sizeof(u32));
+
 			if (!is_kmapped)
 				iounmap(release_virt);
 		}

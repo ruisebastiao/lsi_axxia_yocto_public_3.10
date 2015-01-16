@@ -397,14 +397,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
 	map_word r;
 
 	if (map_bankwidth_is_1(map))
-		r.x[0] = __raw_readb(map->virt + ofs);
+		r.x[0] = readb_relaxed(map->virt + ofs);
 	else if (map_bankwidth_is_2(map))
-		r.x[0] = __raw_readw(map->virt + ofs);
+		r.x[0] = readw_relaxed(map->virt + ofs);
 	else if (map_bankwidth_is_4(map))
-		r.x[0] = __raw_readl(map->virt + ofs);
+		r.x[0] = readl_relaxed(map->virt + ofs);
 #if BITS_PER_LONG >= 64
 	else if (map_bankwidth_is_8(map))
-		r.x[0] = __raw_readq(map->virt + ofs);
+		r.x[0] = readq_relaxed(map->virt + ofs);
 #endif
 	else if (map_bankwidth_is_large(map))
 		memcpy_fromio(r.x, map->virt+ofs, map->bankwidth);
@@ -417,14 +417,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
 static inline void inline_map_write(struct map_info *map, const map_word datum, unsigned long ofs)
 {
 	if (map_bankwidth_is_1(map))
-		__raw_writeb(datum.x[0], map->virt + ofs);
+		writeb_relaxed(datum.x[0], map->virt + ofs);
 	else if (map_bankwidth_is_2(map))
-		__raw_writew(datum.x[0], map->virt + ofs);
+		writew_relaxed(datum.x[0], map->virt + ofs);
 	else if (map_bankwidth_is_4(map))
-		__raw_writel(datum.x[0], map->virt + ofs);
+		writel_relaxed(datum.x[0], map->virt + ofs);
 #if BITS_PER_LONG >= 64
 	else if (map_bankwidth_is_8(map))
-		__raw_writeq(datum.x[0], map->virt + ofs);
+		writeq_relaxed(datum.x[0], map->virt + ofs);
 #endif
 	else if (map_bankwidth_is_large(map))
 		memcpy_toio(map->virt+ofs, datum.x, map->bankwidth);

@@ -412,6 +412,16 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 	ldr	r8, [r2, #GICH_ELRSR0]
 	ldr	r9, [r2, #GICH_ELRSR1]
 	ldr	r10, [r2, #GICH_APR]
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	rev r3, r3
+	rev	r4, r4
+	rev	r5, r5
+	rev	r6, r6
+	rev	r7, r7
+	rev	r8, r8
+	rev	r9, r9
+	rev	r10, r10
+#endif
 
 	str	r3, [r11, #VGIC_CPU_HCR]
 	str	r4, [r11, #VGIC_CPU_VMCR]
@@ -431,6 +441,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 	add	r3, r11, #VGIC_CPU_LR
 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
 1:	ldr	r6, [r2], #4
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	rev	r6, r6
+#endif
 	str	r6, [r3], #4
 	subs	r4, r4, #1
 	bne	1b
@@ -458,7 +471,11 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 	ldr	r3, [r11, #VGIC_CPU_HCR]
 	ldr	r4, [r11, #VGIC_CPU_VMCR]
 	ldr	r8, [r11, #VGIC_CPU_APR]
-
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	rev	r3, r3
+	rev	r4, r4
+	rev	r8, r8
+#endif
 	str	r3, [r2, #GICH_HCR]
 	str	r4, [r2, #GICH_VMCR]
 	str	r8, [r2, #GICH_APR]
@@ -468,6 +485,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 	add	r3, r11, #VGIC_CPU_LR
 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
 1:	ldr	r6, [r3], #4
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	rev	r6, r6
+#endif
 	str	r6, [r2], #4
 	subs	r4, r4, #1
 	bne	1b
@@ -498,7 +518,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
 	isb
 
-	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
+	mrrc	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
 	add	r5, vcpu, r4
 	strd	r2, r3, [r5]
@@ -538,12 +558,12 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 
 	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
 	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
-	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
+	mcrr	p15, 4, rr_lo_hi(r2, r3), c14	@ CNTVOFF
 
 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
 	add	r5, vcpu, r4
 	ldrd	r2, r3, [r5]
-	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
+	mcrr	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
 	isb
 
 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]

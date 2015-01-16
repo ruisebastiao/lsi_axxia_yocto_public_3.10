@@ -38,12 +38,12 @@ static DEFINE_SPINLOCK(mdio_lock);
 #ifdef CONFIG_ARM
 static u32 read_reg(u32 *addr)
 {
-	return readl((void __iomem *)addr);
+	return readl_relaxed((void __iomem *)addr);
 }
 
 static void write_reg(u32 *addr, u32 value)
 {
-	writel(value, (void __iomem *)addr);
+	writel_relaxed(value, (void __iomem *)addr);
 }
 #else
 static u32 read_reg(u32 *addr)
@@ -304,7 +304,7 @@ acp_mdio_init(void)
 		goto error;
 	}
 
-	mdio_size = field[1];
+	mdio_size = field[3];
 	map = ioremap(mdio_address, mdio_size);
 
 	if (!map) {
