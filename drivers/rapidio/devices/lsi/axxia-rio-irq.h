@@ -1,12 +1,27 @@
 #ifndef __AXXIA_RIO_IRQ_H__
 #define __AXXIA_RIO_IRQ_H__
 
+/**************************sRIO SERDES *****************************/
+#define SRIO_PHY_CONTROL0_OFFSET        (0x200)
+#define APB2SER_SRIO_PHY0_CFG_OFFSET    (0x1e0)
+#define SERDES_CMD0_OFFSET              (0x0)
+#define SERDES_CMD1_OFFSET              (0x4)
+#define SERDES_READDATA0_OFFSET         (0x8)
+#define SERDES_READDATA1_OFFSET         (0xc)
+
+#define SERDES_CMD1_VALID_SHIFT         (31)
+#define SERDES_CMD1_HWRITE_SHIFT        (30)
+#define SERDES_CMD1_TSHIFT_SHIFT        (26)
+#define SERDES_CMD1_HSZIE_SHIFT         (23)
+#define SERDES_CMD1_HTRANS_SHIFT        (21)
+#define SERDES_CMD1_HADDR_MASK          (0xFFFF)
+
+#define SERDES_READDATA1_TMO_SHIFT       (2)
+#define SERDES_READDATA1_HRESP_MASK     (0x3)
+/******************************************************************/
+
 /* forward declaration */
 struct rio_priv;
-
-#if !defined(CONFIG_AXXIA_RIO_STAT)
-#define __dme_dw_dbg(priv, dw0)
-#endif
 
 #define RIO_MSG_MAX_OB_MBOX_MULTI_ENTRIES  15
 #define RIO_MSG_MULTI_SIZE                 0x1000 /* 4Kb */
