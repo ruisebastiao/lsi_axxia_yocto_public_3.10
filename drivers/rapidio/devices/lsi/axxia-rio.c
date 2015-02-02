@@ -287,6 +287,7 @@ int axxia_rio_config_read(struct rio_mport *mport, int index,
 	u32 rval = 0;
 	u32 rbar = 0, ctrl;
 	int rc = 0;
+	u32 error_code = 0;
 
 	aoutb = &priv->outb_atmu[priv->maint_win_id];
 	if (aoutb == NULL)
@@ -294,7 +295,8 @@ int axxia_rio_config_read(struct rio_mport *mport, int index,
 
 	/* 16MB maintenance windows possible */
 	/* Allow only aligned access to maintenance registers */
-	if (offset > (0x1000000 - len) || !IS_ALIGNED(offset, len))
+	if (offset > (CONFIG_RIO_MAINT_WIN_SIZE - len) ||
+		!IS_ALIGNED(offset, len))
 		return -EINVAL;
 
 	axxia_local_config_read(priv,
@@ -338,10 +340,20 @@ int axxia_rio_config_read(struct rio_mport *mport, int index,
 		rc = -EINVAL;
 	}
 
+	axxia_local_config_read(priv, 0x608, &error_code);
+	if (0 != error_code) {
+		rc = -EINVAL;
+		*val = 0xffffffffu;
+		/* clear error code */
+		axxia_local_config_write(priv,  0x608, 0);
+	}
+
 	if (rc) {
 		dev_dbg(priv->dev,
 			"axxia_rio_config_read: Error when reading\n");
-		*val = 0;
+		dev_dbg(priv->dev,
+			"rio[%d]: RCR(did=%x, hc=%02x, %08x, <%08x)\n",
+			mport->id, destid, hopcount, offset, rval);
 	} else
 		*val = rval;
 
@@ -374,6 +386,7 @@ int axxia_rio_config_write(struct rio_mport *mport, int index,
 	u8 *data;
 	u32 rbar = 0, ctrl, rval;
 	int rc = 0;
+	u32 error_code = 0;
 
 	IODP("rio[%d]: RCW(did=%x, hc=%02x, %08x, >%08x)\n",
 		mport->id, destid, hopcount, offset, val);
@@ -385,11 +398,9 @@ int axxia_rio_config_write(struct rio_mport *mport, int index,
 		return -EINVAL;
 
 	/* 16MB maintenance windows possible */
-	if (aoutb == NULL)
-		return -EINVAL;
-
 	/* Allow only aligned access to maintenance registers */
-	if (offset > (0x1000000 - len) || !IS_ALIGNED(offset, len))
+	if (offset > (CONFIG_RIO_MAINT_WIN_SIZE - len) ||
+		!IS_ALIGNED(offset, len))
 		return -EINVAL;
 
 	axxia_local_config_read(priv,
@@ -432,6 +443,21 @@ int axxia_rio_config_write(struct rio_mport *mport, int index,
 		break;
 	default:
 		rc = -EINVAL;
+	}
+
+	axxia_local_config_read(priv,  0x608, &error_code);
+	if (0 != error_code) {
+
+		dev_dbg(priv->dev,
+			"axxia_rio_config_write: Error when writing\n");
+
+		dev_dbg(priv->dev,
+			"rio[%d]: RCW(did=%x, hc=%02x, %08x, >%08x)\n",
+			mport->id, destid, hopcount, offset, val);
+
+		rc = -EINVAL;
+		/* clear error code */
+		axxia_local_config_write(priv,  0x608, 0);
 	}
 
 err:

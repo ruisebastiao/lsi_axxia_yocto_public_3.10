@@ -14,12 +14,6 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-/*
-** Debug Build Flags
-**/
-/* #define AXM55XX_OUTB_DME_BBS 1 */
-
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -80,6 +74,67 @@ static int __init axxia_hrtimer_setup(char *str)
 	return 1;
 }
 __setup("axm_srio_tmr_period=", axxia_hrtimer_setup);
+
+/**************************sRIO SERDES *****************************/
+u32 srio_serdes_write32(struct rio_priv *priv, u32 addr, u32 val)
+{
+	void __iomem *regaddr;
+	u32 regval = 0;
+	regaddr = (priv->linkdown_reset.win) +
+			APB2SER_SRIO_PHY0_CFG_OFFSET;
+	iowrite32(val, (regaddr + SERDES_CMD0_OFFSET));
+	regval = ((1<<SERDES_CMD1_VALID_SHIFT) |
+			(0x1 << SERDES_CMD1_HWRITE_SHIFT) |
+			(0x01<<SERDES_CMD1_TSHIFT_SHIFT) |
+			(0x2<<SERDES_CMD1_HSZIE_SHIFT) |
+			(0x2 << SERDES_CMD1_HTRANS_SHIFT) |
+			(addr & SERDES_CMD1_HADDR_MASK));
+	iowrite32(regval, (regaddr + SERDES_CMD1_OFFSET));
+
+	regval = 0xffffffff;
+	while (1) {
+		regval = ioread32((regaddr + SERDES_CMD1_OFFSET));
+		if (!(regval & (1 << SERDES_CMD1_VALID_SHIFT)))
+			break;
+	}
+
+	regval = ioread32((regaddr + SERDES_READDATA1_OFFSET));
+	if (regval & SERDES_READDATA1_HRESP_MASK) {
+		dev_err(priv->dev, "SerDes write Failed... Returning 0\n");
+		return 0;
+	} else
+		return 1;
+}
+
+u32 srio_serdes_read32(struct rio_priv *priv, u32 addr)
+{
+	void __iomem *regaddr;
+	u32 regval = 0;
+	regaddr = (priv->linkdown_reset.win) +
+			APB2SER_SRIO_PHY0_CFG_OFFSET;
+	regval = ((1<<SERDES_CMD1_VALID_SHIFT) |
+			(0x01<<SERDES_CMD1_TSHIFT_SHIFT) |
+			(0x2<<SERDES_CMD1_HSZIE_SHIFT) |
+			(0x2 << SERDES_CMD1_HTRANS_SHIFT) |
+			(addr & SERDES_CMD1_HADDR_MASK));
+
+	iowrite32(regval, (regaddr + SERDES_CMD1_OFFSET));
+	regval = 0xffffffff;
+	while (1) {
+		regval = ioread32((regaddr + SERDES_CMD1_OFFSET));
+		if ((regval & (1 << SERDES_CMD1_VALID_SHIFT)) == 0x0)
+			break;
+	}
+	regval = ioread32((regaddr + SERDES_READDATA1_OFFSET));
+	if (regval & SERDES_READDATA1_HRESP_MASK) {
+		dev_err(priv->dev, "SerDes Read Failed... Returning 0\n");
+		return 0;
+	}
+	regval = ioread32((regaddr + SERDES_READDATA0_OFFSET));
+	return regval;
+}
+
+/**************************sRIO SERDES Ends ***************************/
 static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/);
 /****************************************************************************
 **
@@ -96,23 +151,57 @@ static void  ib_dme_irq_handler(struct rio_irq_handler *h/*, u32 state*/);
 **
 *****************************************************************************/
 
-#if defined(CONFIG_AXXIA_RIO_STAT)
-
-static inline void __dme_dw_dbg(struct rio_msg_dme *dme, u32 dw0)
+static inline void __dme_dw_dbg(struct device *dev, struct rio_msg_dme *dme,
+			u32 iout, u32 dw0, u32 dw1)
 {
+	int did, mb, let;
+	char *io;
+	char *id;
 	if (dw0 & DME_DESC_DW0_ERROR_MASK) {
+		did = DME_DESC_DW0_GET_DST_ID(dw0);
+		let = DME_DESC_DW1_GET_LETTER(dw1);
+		mb = DME_DESC_DW1_GET_MBOX(dw1);
+		if (iout) {
+			io = "OB";
+			id = "DID";
+		} else {
+			io = "IB";
+			id = "SID";
+		}
+#if defined(CONFIG_AXXIA_RIO_STAT)
 		dme->desc_error_count++;
-		if (dw0 & DME_DESC_DW0_RIO_ERR)
+#endif
+		if (dw0 & DME_DESC_DW0_RIO_ERR) {
+			dev_err(dev,
+			"%s RIO ERR: %s = %x,Type:11,mbox=%d,letter=%d\n",
+			 io, id, did, mb, let);
+#if defined(CONFIG_AXXIA_RIO_STAT)
 			dme->desc_rio_err_count++;
-		if (dw0 & DME_DESC_DW0_AXI_ERR)
+#endif
+		}
+		if (dw0 & DME_DESC_DW0_AXI_ERR) {
+			dev_err(dev,
+			"%s AXI ERR: %s = %x,Type:11,mbox=%d,letter=%d\n",
+			 io, id, did, mb, let);
+#if defined(CONFIG_AXXIA_RIO_STAT)
 			dme->desc_axi_err_count++;
-		if (dw0 & DME_DESC_DW0_TIMEOUT_ERR)
+#endif
+		}
+		if (dw0 & DME_DESC_DW0_TIMEOUT_ERR) {
+			dev_err(dev,
+			"%s TIMEOUT ERR: %s = %x,Type:11,mbox=%d,letter=%d\n",
+			 io, id, did, mb, let);
+#if defined(CONFIG_AXXIA_RIO_STAT)
 			dme->desc_tmo_err_count++;
+#endif
+		}
 	}
+#if defined(CONFIG_AXXIA_RIO_STAT)
 	dme->desc_done_count++;
+#endif
 }
 
-
+#if defined(CONFIG_AXXIA_RIO_STAT)
 static void reset_state_counters(struct rio_priv *priv)
 {
 	priv->rpio_compl_count = 0;
@@ -320,42 +409,29 @@ static inline void __misc_fatal(struct rio_mport *mport,
 
 /**
  * srio_sw_reset - Reset the SRIO (GRIO) module when it reaches a fatal
- *                 lockup state
- * @mport: Master port with triggered interrupt
+ *                 lockup state or if it received a reset control symbol
  */
-static void srio_sw_reset(struct rio_mport *mport)
+static void srio_sw_reset(struct rio_priv *priv)
 {
-	struct rio_priv *priv = mport->priv;
-
-	/**
-	 * Reset platform if port is broken
-	 */
-	if (priv->linkdown_reset.win) {
-		u32 r0, r00, r1, r2, r3;
-
-		__rio_local_read_config_32(mport, RIO_DID_CSR, &r1);
-		__rio_local_read_config_32(mport, RIO_COMPONENT_TAG_CSR, &r2);
-		__rio_local_read_config_32(mport, RIO_GCCSR, &r3);
-
-
-		r0 = *((u32 *)priv->linkdown_reset.win+
-				priv->linkdown_reset.reg_addr);
-		*((u32 *)priv->linkdown_reset.win+
-				priv->linkdown_reset.reg_addr) =
-				r0 | priv->linkdown_reset.reg_mask;
-
-		r00 = *((u32 *)priv->linkdown_reset.win+
-				priv->linkdown_reset.reg_addr);
-			/* Verify that the bit was set? */
-
-		*((u32 *)priv->linkdown_reset.win+
-			priv->linkdown_reset.reg_addr) = r0;
-
-		__rio_local_write_config_32(mport, RIO_DID_CSR, r1);
-		__rio_local_write_config_32(mport, RIO_COMPONENT_TAG_CSR, r2);
-		__rio_local_write_config_32(mport, RIO_GCCSR, r3);
+	u32 r32;
+	u32 sval;
+	r32 = srio_serdes_read32(priv, SRIO_PHY_CONTROL0_OFFSET);
+	srio_serdes_write32(priv, SRIO_PHY_CONTROL0_OFFSET,
+			(r32 | priv->linkdown_reset.reg_mask));
+	while (1) {
+		sval = srio_serdes_read32(priv, SRIO_PHY_CONTROL0_OFFSET);
+		if ((sval & priv->linkdown_reset.reg_mask))
+			break;
+	}
+	srio_serdes_write32(priv, SRIO_PHY_CONTROL0_OFFSET, (r32));
+	sval = 0;
+	while (1) {
+		sval = srio_serdes_read32(priv, SRIO_PHY_CONTROL0_OFFSET);
+		if ((sval == r32))
+			break;
 	}
 }
+
 /**
  * PORT WRITE events
  */
@@ -498,7 +574,7 @@ static void misc_irq_handler(struct rio_irq_handler *h)
 	 * Handle miscellaneous 'Link (IPG) Reset Request'
 	 */
 	if (misc_state & LINK_REQ_INT)
-		srio_sw_reset(mport);
+		srio_sw_reset(priv);
 
 	if (misc_state & PORT_WRITE_INT)
 		pw_irq_handler(h, misc_state & PORT_WRITE_INT);
@@ -1046,7 +1122,7 @@ ob_dme_restart:
 					= dw0 & DME_DESC_DW0_NXT_DESC_VALID;
 			dw1 = *((u32 *)DESC_TABLE_W1_MEM(dme,
 						dme->read_idx));
-			__dme_dw_dbg(dme, dw0);
+			__dme_dw_dbg(priv->dev, dme, 1, dw0, dw1);
 			dme->read_idx = (dme->read_idx + 1) &
 						(dme->entries - 1);
 			mbox = (dw1 >> 2) & 0x3;
@@ -1149,13 +1225,8 @@ static int alloc_ob_dme_shared(struct rio_priv *priv,
 	for (i = 0, desc = me->desc; i < entries; i++, desc++) {
 		dw0 = 0;
 		if (!priv->intern_msg_desc) {
-#ifdef AXM55XX_OUTB_DME_BBS
-			dw1 = (u32)(desc->msg_phys >> 11) & 0x1fe00000;
-			dw2 = (u32)(desc->msg_phys >>  0) & 0x3fffffff;
-#else
 			dw1 = 0;
 			dw2 = (u32)(desc->msg_phys >>  8) & 0x3fffffff;
-#endif
 			*((u32 *)DESC_TABLE_W0_MEM(me, i)) = dw0;
 			*((u32 *)DESC_TABLE_W1_MEM(me, i)) = dw1;
 			*((u32 *)DESC_TABLE_W2_MEM(me, i)) = dw2;
@@ -1449,7 +1520,7 @@ ib_dme_restart:
 			continue;
 
 		if (dme_stat & (IB_DME_STAT_DESC_XFER_CPLT |
-				IB_DME_STAT_DESC_XFER_CPLT)) {
+				IB_DME_STAT_DESC_CHAIN_XFER_CPLT)) {
 			if (mport->inb_msg[mbox_no].mcback)
 				mport->inb_msg[mbox_no].mcback(mport,
 					me->dev_id, mbox_no, letter);
@@ -1529,7 +1600,7 @@ ib_dme_restart:
 			continue;
 
 		if (dme_stat & (IB_DME_STAT_DESC_XFER_CPLT |
-				IB_DME_STAT_DESC_XFER_CPLT)) {
+				IB_DME_STAT_DESC_CHAIN_XFER_CPLT)) {
 			if (mport->inb_msg[mbox_no].mcback)
 				mport->inb_msg[mbox_no].mcback(mport,
 					me->dev_id, mbox_no, letter);
@@ -2466,7 +2537,7 @@ void *axxia_get_inb_message(struct rio_mport *mport, int mbox, int letter,
 		*sz = 0;
 		dw0 = *((u32 *)DESC_TABLE_W0_MEM(me, idx));
 		dw1 = *((u32 *)DESC_TABLE_W1_MEM(me, idx));
-		__dme_dw_dbg(me, dw0);
+		__dme_dw_dbg(priv->dev, me, 0, dw0, dw1);
 		if ((dw0 & DME_DESC_DW0_ERROR_MASK) &&
 		    (dw0 & DME_DESC_DW0_VALID)) {
 			*((u32 *)DESC_TABLE_W0_MEM(me, idx)) =

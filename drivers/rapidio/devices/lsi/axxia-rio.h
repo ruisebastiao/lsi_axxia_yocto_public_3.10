@@ -400,6 +400,8 @@
 					 up and shift to make double word */
 #define DME_DESC_DW1_MSGLEN_F(d)        (((d) >> 8) & 0x3ff)
 #define DME_DESC_DW1_MSGLEN_B(ml)       ((ml) << 3) /* double words to bytes */
+#define DME_DESC_DW1_GET_LETTER(dw1)    ((dw1) & 0x03)
+#define DME_DESC_DW1_GET_MBOX(dw1)      ((dw1 >> 2) & 0x03)
 
 /***********************************/
 /* *********** RIO REG *********** */
