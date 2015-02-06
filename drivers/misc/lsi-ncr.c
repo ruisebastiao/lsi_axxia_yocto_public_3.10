@@ -299,19 +299,23 @@ ncr_check_pio_status(char *str)
 	do {
 		cdr0.raw =
 			nca_register_read((unsigned *)(nca_address + 0xf0));
-	} while ((0x1 == cdr0.bits.status) &&
-		(time_before(jiffies, timeout)));
+	} while ((0x1 == cdr0.bits.start_done) &&
+		 (time_before(jiffies, timeout)));
 
-	if (!(time_before(jiffies, timeout))) {
-		raw_spin_unlock_irqrestore(&ncr_spin_lock, ncr_spin_flags);
-		pr_err("ncr_check_pio_status() PIO operation timeout!\n");
+	if (0x1 == cdr0.bits.start_done) {
+		/* timed out without completing */
+		pr_err("lsi-ncr: PIO operation timeout cdr0=0x%08lx!\n",
+		       cdr0.raw);
+		ncr_pio_error_dump(str);
+		ncr_unlock(LOCK_DOMAIN);
 		BUG();
-
 		return -1;
 	}
+
 	if (0x3 != cdr0.bits.status) {
+		/* completed with non-success status */
 		ncr_pio_error_dump(str);
-        /* clear CDR0 to allow subsequent commands to complete */
+		/* clear CDR0 to allow subsequent commands to complete */
 		nca_register_write(0, (unsigned *) (nca_address + 0xf0));
 	}
 
