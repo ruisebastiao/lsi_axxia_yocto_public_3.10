@@ -37,6 +37,10 @@ static void __iomem *nca;
 static void __iomem *apb;
 static void __iomem *dickens;
 static int ddr_retention_enabled;
+extern int ncr_read_nolock(unsigned long, unsigned long, int, void *);
+extern int ncr_write_nolock(unsigned long, unsigned long, int, void *);
+
+
 
 enum {
 	AXXIA_ENGINE_CAAL,
@@ -172,8 +176,8 @@ quiesce_vp_engine(int engineType)
 
 	while (*pRegion != NCP_REGION_ID(0xff, 0xff)) {
 		/* set read/write transaction limits to zero */
-		ncr_write(*pRegion, 0x8, 4, &buf);
-		ncr_write(*pRegion, 0xc, 4, &buf);
+		ncr_write_nolock(*pRegion, 0x8, 4, &buf);
+		ncr_write_nolock(*pRegion, 0xc, 4, &buf);
 		pRegion++;
 	}
 
@@ -184,8 +188,8 @@ quiesce_vp_engine(int engineType)
 		node = (*pRegion & 0xffff0000) >> 16;
 		target = *pRegion & 0x0000ffff;
 		/* read the number of outstanding read/write transactions */
-		ncr_read(*pRegion, ortOff, 4, &ort);
-		ncr_read(*pRegion, owtOff, 4, &owt);
+		ncr_read_nolock(*pRegion, ortOff, 4, &ort);
+		ncr_read_nolock(*pRegion, owtOff, 4, &owt);
 
 		if ((ort == 0) && (owt == 0)) {
 			/* this engine has been quiesced, move on to the next */
@@ -289,7 +293,7 @@ initiate_retention_reset(void)
 
 	/* prepare to put DDR in self refresh power-down mode */
 	/* first read the CTL_244 register and OR in the LP_CMD value */
-	ncr_read(NCP_REGION_ID(34, 0), 0x3d0, 4, &ctl_244);
+	ncr_read_nolock(NCP_REGION_ID(34, 0), 0x3d0, 4, &ctl_244);
 	ctl_244 |= 0x000a0000;
 
 	/* belts & braces: put secondary CPUs into reset */
