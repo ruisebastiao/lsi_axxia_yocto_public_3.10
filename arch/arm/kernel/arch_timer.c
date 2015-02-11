@@ -23,10 +23,12 @@ static unsigned long arch_timer_read_counter_long(void)
 }
 
 static u32 sched_clock_mult __read_mostly;
+static u32 sched_clock_shift __read_mostly;
 
 static unsigned long long notrace arch_timer_sched_clock(void)
 {
-	return arch_timer_read_counter() * sched_clock_mult;
+	unsigned long long tmp = arch_timer_read_counter();
+	return (tmp * sched_clock_mult) >> sched_clock_shift;
 }
 
 static struct delay_timer arch_delay_timer;
@@ -41,15 +43,25 @@ static void __init arch_timer_delay_timer_register(void)
 
 int __init arch_timer_arch_init(void)
 {
-        u32 arch_timer_rate = arch_timer_get_rate();
+	u32 arch_timer_rate = arch_timer_get_rate();
+	u64 maxsec;
 
 	if (arch_timer_rate == 0)
 		return -ENXIO;
 
 	arch_timer_delay_timer_register();
 
-	/* Cache the sched_clock multiplier to save a divide in the hot path. */
-	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
+	/* Select maxsec so we get a large conversion range (56 bits) for the
+	 * mult/shift while making sure the resulting maxsec fits in 32 bits.
+	 */
+	maxsec = 1ULL << 56;
+	do_div(maxsec, arch_timer_rate);
+	if ((maxsec >> 32) != 0)
+		maxsec = 0xffffffff;
+
+	/* Cache the multiplier and shift to save a divide in the hot path. */
+	clocks_calc_mult_shift(&sched_clock_mult, &sched_clock_shift,
+			       arch_timer_rate, NSEC_PER_SEC, (u32)maxsec);
 	sched_clock_func = arch_timer_sched_clock;
 	pr_info("sched_clock: ARM arch timer >56 bits at %ukHz, resolution %uns\n",
 		arch_timer_rate / 1000, sched_clock_mult);
