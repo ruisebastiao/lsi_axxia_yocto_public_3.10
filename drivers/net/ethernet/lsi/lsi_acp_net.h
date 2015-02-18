@@ -190,6 +190,7 @@ struct appnic_device {
 
 	/* Spin Lock */
 	spinlock_t dev_lock;
+	spinlock_t tx_lock;
 
 	/* PHY */
 	struct mii_bus *mii_bus;
