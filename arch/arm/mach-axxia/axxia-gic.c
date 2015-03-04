@@ -32,15 +32,13 @@
  * As such, the enable set/clear, pending set/clear and active bit
  * registers are banked per-cpu for these sources.
  */
+
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/of_address.h>
 #include <linux/cpu_pm.h>
 #include <linux/irqdomain.h>
 #include <linux/irqchip/arm-gic.h>
-#include <linux/slab.h>
-#include <linux/workqueue.h>
-#include <linux/delay.h>
 
 #include <asm/exception.h>
 #include <asm/smp_plat.h>
@@ -48,7 +46,6 @@
 
 #include <mach/axxia-gic.h>
 #include "lsi_power_management.h"
-#include "axxia_circular_queue.h"
 
 #define MAX_GIC_INTERRUPTS  1020
 
@@ -160,7 +157,6 @@ struct gic_notifier_data {
 	struct notifier_block *self;
 	unsigned long cmd;
 	void *v;
-
 };
 #endif
 
@@ -169,16 +165,13 @@ struct gic_rpc_data {
 	u32 func_mask;
 	u32 cpu, oldcpu;
 	u32 type;
-	bool update_enable;
 	const struct cpumask *mask_val;
 #ifdef CONFIG_CPU_PM
 	struct gic_notifier_data gn_data;
 #endif
 };
 
-
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-
 static DEFINE_MUTEX(irq_bus_lock);
 
 static struct gic_chip_data gic_data __read_mostly;
@@ -205,48 +198,6 @@ static inline unsigned int gic_irq(struct irq_data *d)
 	return d->hwirq;
 }
 
-
-/*************************** CIRCULAR QUEUE **************************************/
-struct circular_queue_t axxia_circ_q;
-static void axxia_gic_flush_affinity_queue(struct work_struct *dummy);
-static void gic_set_affinity_remote(void *info);
-static void gic_clr_affinity_remote(void *info);
-
-static DECLARE_WORK(axxia_gic_affinity_work, axxia_gic_flush_affinity_queue);
-static DEFINE_MUTEX(affinity_lock);
-
-enum axxia_affinity_mode {
-	AFFINITY_CLEAR_LOCAL = 1,
-	AFFINITY_CLEAR_OTHER_CLUSTER,
-	AFFINITY_SET_LOCAL,
-	AFFINITY_SET_OTHER_CLUSTER
-};
-
-static void axxia_gic_flush_affinity_queue(struct work_struct *dummy)
-{
-
-	void *qdata;
-	struct gic_rpc_data *rpc_data;
-
-	while (axxia_get_item(&axxia_circ_q, &qdata) != -1) {
-
-		rpc_data = (struct gic_rpc_data *) qdata;
-		if (rpc_data->func_mask == SET_AFFINITY) {
-			if (cpu_online(rpc_data->cpu)) {
-				smp_call_function_single(rpc_data->cpu, gic_set_affinity_remote,
-						qdata, 1);
-			}
-		} else if (rpc_data->func_mask == CLR_AFFINITY) {
-			if (cpu_online(rpc_data->cpu)) {
-				smp_call_function_single(rpc_data->cpu, gic_clr_affinity_remote,
-						qdata, 1);
-			}
-		}
-		kfree(qdata);
-	}
-
-}
-
 /*
  * This GIC driver implements IRQ management routines (e.g., gic_mask_irq,
  * etc.) that work across multiple clusters. Since a core cannot directly
@@ -259,7 +210,6 @@ static void axxia_gic_flush_affinity_queue(struct work_struct *dummy)
  * The Linux interrupt code has a mechanism, which is called bus lock/unlock,
  * which was created for irq chips hanging off slow busses like i2c/spi. The
  * bus lock is mutex that is used to serialize bus accesses. We take advantage
- *
  * of this feature here, because we can think of IRQ management routines having
  * to remotely execute on other clusters as a "slow bus" action. Doing this
  * here serializes all IRQ management interfaces and guarantees that different
@@ -483,70 +433,40 @@ static int gic_retrigger(struct irq_data *d)
 	return -ENXIO;
 }
 
-static void gic_set_irq_target(void __iomem *dist_base,
-		u32 irqid, u32 cpu, bool set)
+static int _gic_set_affinity(struct irq_data *d,
+			     const struct cpumask *mask_val,
+			     bool do_clear)
 {
-	void __iomem *reg;
-	unsigned int shift;
-	u32 val;
-	u32 mask = 0;
-	u32 bit;
+	void __iomem *reg  = gic_dist_base(d) + GIC_DIST_TARGET +
+			     (gic_irq(d) & ~3);
+	unsigned int shift = (gic_irq(d) % 4) * 8;
+	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+	u32 val, mask, bit;
+	u32 enable_mask, enable_offset;
 
-	reg =  dist_base + GIC_DIST_TARGET + (irqid & ~3);
-	shift = (irqid % 4) * 8;
+	/*
+	 * Normalize the cpu number as seen by Linux (0-15) to a
+	 * number as seen by a cluster (0-3).
+	 */
+	bit = 1 << ((cpu_logical_map(cpu) % CORES_PER_CLUSTER) + shift);
 	mask = 0xff << shift;
 
-	val = readl_relaxed(reg) & ~mask;
+	enable_mask = 1 << (gic_irq(d) % 32);
+	enable_offset = 4 * (gic_irq(d) / 32);
 
-	if (!set)
+	raw_spin_lock(&irq_controller_lock);
+	val = readl_relaxed(reg) & ~mask;
+	if (do_clear == true) {
 		/* Clear affinity, mask IRQ. */
 		writel_relaxed(val, reg);
-	else {
-		bit = 1 << ((cpu_logical_map(cpu) % CORES_PER_CLUSTER) + shift);
+		writel_relaxed(enable_mask, gic_data_dist_base(&gic_data)
+				+ GIC_DIST_ENABLE_CLEAR + enable_offset);
+	} else {
+		/* Set affinity, unmask IRQ. */
 		writel_relaxed(val | bit, reg);
+		writel_relaxed(enable_mask, gic_data_dist_base(&gic_data)
+				+ GIC_DIST_ENABLE_SET + enable_offset);
 	}
-
-}
-
-static int _gic_clear_affinity(struct irq_data *d, u32 cpu, bool update_enable)
-{
-
-	u32 enable_mask, enable_offset;
-
-	raw_spin_lock(&irq_controller_lock);
-
-	gic_set_irq_target(gic_dist_base(d), gic_irq(d), cpu, false);
-
-	if (update_enable) {
-		enable_mask = 1 << (gic_irq(d) % 32);
-		enable_offset = 4 * (gic_irq(d) / 32);
-		writel_relaxed(enable_mask,
-				gic_data_dist_base(&gic_data) + GIC_DIST_ENABLE_CLEAR + enable_offset);
-	}
-
-	raw_spin_unlock(&irq_controller_lock);
-
-	return IRQ_SET_MASK_OK;
-
-}
-
-static int _gic_set_affinity(struct irq_data *d,
-			     u32 cpu,
-			     bool update_enable)
-{
-	u32 enable_mask, enable_offset;
-
-	raw_spin_lock(&irq_controller_lock);
-
-	gic_set_irq_target(gic_dist_base(d), gic_irq(d), cpu, true);
-
-	if (update_enable) {
-		enable_mask = 1 << (gic_irq(d) % 32);
-		enable_offset = 4 * (gic_irq(d) / 32);
-		writel_relaxed(enable_mask,
-				gic_data_dist_base(&gic_data) + GIC_DIST_ENABLE_SET + enable_offset);
-	}
-
 	raw_spin_unlock(&irq_controller_lock);
 
 	return IRQ_SET_MASK_OK;
@@ -561,42 +481,26 @@ static int _gic_set_affinity(struct irq_data *d,
 static void gic_set_affinity_remote(void *info)
 {
 	struct gic_rpc_data *rpc = (struct gic_rpc_data *)info;
-	_gic_set_affinity(rpc->d, rpc->cpu, rpc->update_enable);
-
+	_gic_set_affinity(rpc->d, rpc->mask_val, false);
 }
 static void gic_clr_affinity_remote(void *info)
 {
 	struct gic_rpc_data *rpc = (struct gic_rpc_data *)info;
-	_gic_clear_affinity(rpc->d, rpc->oldcpu, rpc->update_enable);
-
+	_gic_set_affinity(rpc->d, rpc->mask_val, true);
 }
 
 static int gic_set_affinity(struct irq_data *d,
 			    const struct cpumask *mask_val,
 			    bool force)
 {
-	u32 pcpu;
-	unsigned int irqid;
-	struct cpumask *affinity_mask;
-	u32 mask;
-	u32 oldcpu;
-	struct gic_rpc_data *gic_rpc_ptr;
-	int rval;
-	bool new_same_core = false;
-	bool old_same_core = false;
-	bool update_enable = false;
-	u32 clear_needed = 0;
-	u32  set_needed = 0;
-	u32 add_cpu;
-	u32 del_cpu;
+	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+	u32 pcpu = cpu_logical_map(smp_processor_id());
+	unsigned int irqid = gic_irq(d);
 
 	BUG_ON(!irqs_disabled());
 
-
-	pcpu = cpu_logical_map(smp_processor_id());
-	irqid = gic_irq(d);
-	affinity_mask = (struct cpumask *)mask_val;
-	oldcpu = irq_cpuid[irqid];
+	if (cpu >= nr_cpu_ids)
+		return -EINVAL;
 
 	if (irqid >= MAX_GIC_INTERRUPTS)
 		return -EINVAL;
@@ -605,133 +509,53 @@ static int gic_set_affinity(struct irq_data *d,
 	if ((irqid >= IPI0_CPU0) && (irqid < MAX_AXM_IPI_NUM))
 		return IRQ_SET_MASK_OK;
 
-	if (force)
-		add_cpu = cpumask_any(cpu_online_mask);
-	else
-		add_cpu = cpumask_any_and(affinity_mask, cpu_online_mask);
-
-	if (add_cpu >= nr_cpu_ids) {
-		pr_err("ERROR: no cpus left\n");
-		return -EINVAL;
-	}
-
-	del_cpu = oldcpu;
-
-	if (add_cpu == del_cpu)
+	/*
+	 * If the new IRQ affinity is the same as current, then
+	 * there's no need to update anything.
+	 */
+	if (cpu_logical_map(cpu) == irq_cpuid[irqid])
 		return IRQ_SET_MASK_OK;
 
-	new_same_core =
-			((add_cpu / CORES_PER_CLUSTER) == (pcpu / CORES_PER_CLUSTER)) ?
-					true : false;
-	old_same_core =
-			((del_cpu / CORES_PER_CLUSTER) == (pcpu / CORES_PER_CLUSTER)) ?
-					true : false;
-
-	update_enable = ((add_cpu / CORES_PER_CLUSTER) == (del_cpu / CORES_PER_CLUSTER)) ? false : true;
-
-	if (new_same_core) {
-
-		if (old_same_core) {
-			clear_needed = AFFINITY_CLEAR_LOCAL;
-			set_needed = AFFINITY_SET_LOCAL;
-		} else {
-			set_needed = AFFINITY_SET_LOCAL;
-			clear_needed = AFFINITY_CLEAR_OTHER_CLUSTER;
-		}
-
+	/*
+	 * If the new physical cpu assignment falls within the same
+	 * cluster as the cpu we're currently running on, set the IRQ
+	 * affinity directly. Otherwise, use the RPC mechanism.
+	 */
+	if ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) ==
+		(pcpu / CORES_PER_CLUSTER)) {
+		_gic_set_affinity(d, mask_val, false);
 	} else {
-
-		if (old_same_core) {
-			set_needed = AFFINITY_SET_OTHER_CLUSTER;
-			clear_needed = AFFINITY_CLEAR_LOCAL;
-		} else {
-			set_needed = AFFINITY_SET_OTHER_CLUSTER;
-			clear_needed = AFFINITY_CLEAR_OTHER_CLUSTER;
-		}
+		gic_rpc_data.func_mask |= SET_AFFINITY;
+		gic_rpc_data.cpu = cpu;
+		gic_rpc_data.d = d;
+		gic_rpc_data.mask_val = mask_val;
 	}
-
 
 	/*
-	 * We clear first to make sure the affinity mask always has a bit set,
-	 * especially when the two cpus are in the same cluster.
+	 * If the new physical cpu assignment is on a cluster that's
+	 * different than the prior cluster, clear the IRQ affinity
+	 * on the old cluster.
 	 */
-	if (irqid != IRQ_PMU) {
-		if (clear_needed == AFFINITY_CLEAR_LOCAL) {
-
-			_gic_clear_affinity(d, del_cpu, update_enable);
-
-		} else if (clear_needed == AFFINITY_CLEAR_OTHER_CLUSTER) {
-
-			mask = 0xf << ((oldcpu / CORES_PER_CLUSTER) * 4);
-			del_cpu = cpumask_any_and((struct cpumask *)&mask,
-					cpu_online_mask);
-
-			if (del_cpu < nr_cpu_ids) {
-
-				gic_rpc_ptr = kmalloc(sizeof(struct gic_rpc_data), GFP_KERNEL);
-				if (!gic_rpc_ptr) {
-					pr_err(
-							"ERROR: failed to get memory for workqueue to set affinity false\n");
-					mutex_unlock(&affinity_lock);
-					return -EFAULT;
-				}
-
-				gic_rpc_ptr->func_mask = CLR_AFFINITY;
-				gic_rpc_ptr->cpu = del_cpu;
-				gic_rpc_ptr->oldcpu = oldcpu;
-				gic_rpc_ptr->d = d;
-				gic_rpc_ptr->update_enable = update_enable;
-				get_cpu();
-				rval = axxia_put_item(&axxia_circ_q, (void *) gic_rpc_ptr);
-				put_cpu();
-				if (rval) {
-					pr_err(
-							"ERROR: failed to add CLR_AFFINITY request for cpu: %d\n",
-							del_cpu);
-					kfree((void *) gic_rpc_ptr);
-					mutex_unlock(&affinity_lock);
-					return rval;
-				}
-				schedule_work_on(0, &axxia_gic_affinity_work);
-			} else
-				pr_err("ERROR: no CPUs left\n");
+	if ((irqid != IRQ_PMU) && ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) !=
+		(irq_cpuid[irqid] / CORES_PER_CLUSTER))) {
+		/*
+		 * If old cpu assignment falls within the same cluster as
+		 * the cpu we're currently running on, clear the IRQ affinity
+		 * directly. Otherwise, use RPC mechanism.
+		 */
+		if ((irq_cpuid[irqid] / CORES_PER_CLUSTER) ==
+			(pcpu / CORES_PER_CLUSTER)) {
+			_gic_set_affinity(d, mask_val, true);
+		} else {
+			gic_rpc_data.func_mask |= CLR_AFFINITY;
+			gic_rpc_data.oldcpu = irq_cpuid[irqid];
+			gic_rpc_data.d = d;
+			gic_rpc_data.mask_val = mask_val;
 		}
-	}
-
-	if (set_needed == AFFINITY_SET_LOCAL) {
-
-		_gic_set_affinity(d, add_cpu, update_enable);
-
-	} else if (set_needed == AFFINITY_SET_OTHER_CLUSTER) {
-
-		gic_rpc_ptr = kmalloc(sizeof(struct gic_rpc_data), GFP_KERNEL);
-		if (!gic_rpc_ptr) {
-			pr_err(
-					"ERROR: failed to get memory for workqueue to set affinity false\n");
-			mutex_unlock(&affinity_lock);
-			return -EFAULT;
-		}
-
-		gic_rpc_ptr->func_mask = SET_AFFINITY;
-		gic_rpc_ptr->cpu = add_cpu;
-		gic_rpc_ptr->update_enable = update_enable;
-		gic_rpc_ptr->d = d;
-		get_cpu();
-		rval = axxia_put_item(&axxia_circ_q, (void *) gic_rpc_ptr);
-		put_cpu();
-		if (rval) {
-			pr_err("ERROR: failed to add SET_AFFINITY request for cpu: %d\n",
-					add_cpu);
-			kfree((void *) gic_rpc_ptr);
-			mutex_unlock(&affinity_lock);
-			return rval;
-		}
-		schedule_work_on(0, &axxia_gic_affinity_work);
-
 	}
 
 	/* Update Axxia IRQ affinity table with the new physical CPU number. */
-	irq_cpuid[irqid] = cpu_logical_map(add_cpu);
+	irq_cpuid[irqid] = cpu_logical_map(cpu);
 
 	return IRQ_SET_MASK_OK;
 }
@@ -1001,7 +825,6 @@ static void gic_irq_sync_unlock(struct irq_data *d)
 	int i, j, cpu;
 	int nr_cluster_ids = ((nr_cpu_ids - 1) / CORES_PER_CLUSTER) + 1;
 
-
 	if (gic_rpc_data.func_mask & IRQ_MASK) {
 		smp_call_function_single(gic_rpc_data.cpu,
 					 gic_mask_remote,
@@ -1037,6 +860,18 @@ static void gic_irq_sync_unlock(struct irq_data *d)
 		}
 	}
 
+	if (gic_rpc_data.func_mask & SET_AFFINITY) {
+		smp_call_function_single(gic_rpc_data.cpu,
+					 gic_set_affinity_remote,
+					 &gic_rpc_data, 1);
+	}
+
+	if (gic_rpc_data.func_mask & CLR_AFFINITY) {
+		smp_call_function_single(gic_rpc_data.oldcpu,
+					 gic_clr_affinity_remote,
+					 &gic_rpc_data, 1);
+	}
+
 #ifdef CONFIG_CPU_PM
 	if (gic_rpc_data.func_mask & GIC_NOTIFIER) {
 		for (i = 0; i < nr_cluster_ids; i++) {
@@ -1066,7 +901,6 @@ static void gic_irq_sync_unlock(struct irq_data *d)
 
 	/* Give the bus lock. */
 	mutex_unlock(&irq_bus_lock);
-
 }
 
 static
@@ -1209,9 +1043,10 @@ static void __init gic_axxia_init(struct gic_chip_data *gic)
 		writel_relaxed(cpumask, ipi_mask_reg_base + 0x40 + i * 4);
 }
 
-static void  gic_dist_init(struct gic_chip_data *gic)
+static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 {
 	unsigned int i;
+	u32 cpumask;
 	unsigned int gic_irqs = gic->gic_irqs;
 	void __iomem *base = gic_data_dist_base(gic);
 	u32 cpu = cpu_logical_map(smp_processor_id());
@@ -1222,22 +1057,58 @@ static void  gic_dist_init(struct gic_chip_data *gic)
 	u32 enableoff;
 	u32 val;
 	u32 this_cluster = get_cluster_id();
-	u32 powered_on;
-	u32 ccpu;
 
 	/* Initialize the distributor interface once per CPU cluster */
 	if ((test_and_set_bit(get_cluster_id(), &gic->dist_init_done)) && (!cluster_power_up[this_cluster]))
 		return;
 
-	writel_relaxed(0, base + GIC_DIST_CTRL);
+	cpumask = 1 << cpu;
+	cpumask |= cpumask << 8;
+	cpumask |= cpumask << 16;
 
-	/*################################# CONFIG IRQS ####################################*/
+	writel_relaxed(0, base + GIC_DIST_CTRL);
 
 	/*
 	 * Set all global interrupts to be level triggered, active low.
 	 */
 	for (i = 32; i < gic_irqs; i += 16)
 		writel_relaxed(0, base + GIC_DIST_CONFIG + i * 4 / 16);
+
+	/*
+	 * Set all global interrupts to this CPU only.
+	 * (Only do this for the first core on cluster 0).
+	 */
+	if (cpu == 0)
+		for (i = 32; i < gic_irqs; i += 4)
+			writel_relaxed(cpumask,
+				       base + GIC_DIST_TARGET + i * 4 / 4);
+
+	/*
+	 * Set priority on all global interrupts.
+	 */
+	for (i = 32; i < gic_irqs; i += 4)
+		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+
+	/*
+	 * Disable all interrupts.  Leave the PPI and SGIs alone
+	 * as these enables are banked registers.
+	 */
+	for (i = 32; i < gic_irqs; i += 32)
+		writel_relaxed(0xffffffff,
+			       base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+
+	/*
+	 * Set Axxia IPI interrupts for all CPUs in this cluster.
+	 */
+	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
+		cpumask_8 = 1 << ((i - IPI0_CPU0) % 4);
+		writeb_relaxed(cpumask_8, base + GIC_DIST_TARGET + i);
+	}
+
+	/*
+	 * Set the PMU IRQ to the first cpu in this cluster.
+	 */
+	writeb_relaxed(0x01, base + GIC_DIST_TARGET + IRQ_PMU);
 
 	/*
 	 * Set Axxia IPI interrupts to be edge triggered.
@@ -1250,57 +1121,16 @@ static void  gic_dist_init(struct gic_chip_data *gic)
 		writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
 	}
 
-	/*################################# PRIORITY  ####################################*/
-	/*
-	 * Set priority on PPI and SGI interrupts
-	 */
-	for (i = 0; i < 32; i += 4)
-		writel_relaxed(0xa0a0a0a0,
-				base + GIC_DIST_PRI + i * 4 / 4);
-
-	/*
-	 * Set priority on all global interrupts.
-	 */
-	for (i = 32; i < gic_irqs; i += 4)
-		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
-
-
-	/*################################# TARGET ####################################*/
-	/*
-	 * Set all global interrupts to this CPU only.
-	 * (Only do this for the first core on cluster 0).
-	 */
-	if (cpu == 0)
-		for (i = 32; i < gic_irqs; i += 4)
-			writel_relaxed(0x01010101, base + GIC_DIST_TARGET + i * 4 / 4);
-
-	/*
-	 * Set Axxia IPI interrupts for all CPUs in this cluster.
-	 */
-	powered_on = (~pm_cpu_powered_down) & 0xFFFF;
-	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
-		cpumask_8 = 1 << ((i - IPI0_CPU0) % 4);
-		ccpu = (this_cluster * 4) + ((i - IPI0_CPU0) % CORES_PER_CLUSTER);
-		if ((1 << ccpu) & powered_on)
-			writeb_relaxed(cpumask_8, base + GIC_DIST_TARGET + i);
-		else
-			writeb_relaxed(0x00, base + GIC_DIST_TARGET + i);
-	}
-
-	/*################################# ENABLE IRQS ####################################*/
 	/*
 	 * Do the initial enable of the Axxia IPI interrupts here.
 	 * NOTE: Writing a 0 to this register has no effect, so
 	 * no need to read and OR in bits, just writing is OK.
 	 */
-
-	powered_on = (~pm_cpu_powered_down) & 0xFFFF;
 	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
 		enablemask = 1 << (i % 32);
 		enableoff = (i / 32) * 4;
-		ccpu = (this_cluster * 4) + ((i - IPI0_CPU0) % CORES_PER_CLUSTER);
-		if ((1 << ccpu) & powered_on)
-			writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
+		writel_relaxed(enablemask,
+			       base + GIC_DIST_ENABLE_SET + enableoff);
 	}
 
 	/*
@@ -1310,22 +1140,14 @@ static void  gic_dist_init(struct gic_chip_data *gic)
 	enableoff = (IRQ_PMU / 32) * 4;
 	writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
 
-
 	writel_relaxed(1, base + GIC_DIST_CTRL);
-
 }
 
-static void  gic_cpu_init(struct gic_chip_data *gic)
+static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
 {
 	void __iomem *dist_base = gic_data_dist_base(gic);
 	void __iomem *base = gic_data_cpu_base(gic);
 	int i;
-	u32 enablemask;
-	u32 enableoff;
-	u32 ccpu;
-	u32 cpu = smp_processor_id();
-	u32 cluster = cpu / CORES_PER_CLUSTER;
-	u32 cpumask_8;
 
 	/*
 	 * Deal with the banked PPI and SGI interrupts - disable all
@@ -1334,23 +1156,14 @@ static void  gic_cpu_init(struct gic_chip_data *gic)
 	 */
 	writel_relaxed(0xffffffff, dist_base + GIC_DIST_ENABLE_CLEAR);
 
-	if (!cluster_power_up[cluster]) {
-		writel_relaxed(0, dist_base + GIC_DIST_CTRL);
-		for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
-			cpumask_8 = 1 << ((i - IPI0_CPU0) % 4);
-			enablemask = 1 << (i % 32);
-			enableoff = (i / 32) * 4;
-			ccpu = (cluster * 4) + ((i - IPI0_CPU0) % CORES_PER_CLUSTER);
-			if (ccpu == cpu) {
-				writeb_relaxed(cpumask_8, dist_base + GIC_DIST_TARGET + i);
-				writel_relaxed(enablemask, dist_base + GIC_DIST_ENABLE_SET + enableoff);
-			}
-		}
-		writel_relaxed(1, dist_base + GIC_DIST_CTRL);
-	}
+	/*
+	 * Set priority on PPI and SGI interrupts
+	 */
+	for (i = 0; i < 32; i += 4)
+		writel_relaxed(0xa0a0a0a0,
+			       dist_base + GIC_DIST_PRI + i * 4 / 4);
 
 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
-
 	writel_relaxed(1, base + GIC_CPU_CTRL);
 }
 
@@ -1539,16 +1352,18 @@ void __init axxia_gic_init_bases(int irq_start,
 	gic_dist_init(gic);
 	gic_cpu_init(gic);
 	gic_pm_init(gic);
-
-	axxia_initialize_queue(&axxia_circ_q);
-
 }
 
-void  axxia_gic_secondary_init(void)
+void __cpuinit axxia_gic_secondary_init(void)
 {
 	struct gic_chip_data *gic = &gic_data;
 
 	gic_dist_init(gic);
+	gic_cpu_init(&gic_data);
+}
+
+void __cpuinit axxia_hotplug_gic_secondary_init(void)
+{
 	gic_cpu_init(&gic_data);
 }
 
@@ -1576,8 +1391,6 @@ int __init axxia_gic_of_init(struct device_node *node,
 	WARN(!ipi_send_reg_base, "unable to map Axxia IPI send registers\n");
 
 	axxia_gic_init_bases(-1, dist_base, cpu_base, node);
-
-
 
 	return 0;
 }
