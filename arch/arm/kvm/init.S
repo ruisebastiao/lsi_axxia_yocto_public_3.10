@@ -22,6 +22,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_mmu.h>
+#include <asm/assembler.h>
 
 /********************************************************************
  * Hypervisor initialization
@@ -70,8 +71,10 @@ __do_hyp_init:
 	cmp	r0, #0			@ We have a SP?
 	bne	phase2			@ Yes, second stage init
 
+ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
+
 	@ Set the HTTBR to point to the hypervisor PGD pointer passed
-	mcrr	p15, 4, r2, r3, c2
+	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
 
 	@ Set the HTCR and VTCR to the same shareability and cacheability
 	@ settings as the non-secure TTBCR and with T0SZ == 0.
@@ -137,7 +140,7 @@ phase2:
 	mov	pc, r0
 
 target:	@ We're now in the trampoline code, switch page tables
-	mcrr	p15, 4, r2, r3, c2
+	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
 	isb
 
 	@ Invalidate the old TLBs

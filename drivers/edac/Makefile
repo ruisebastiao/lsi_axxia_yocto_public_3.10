@@ -15,7 +15,9 @@ edac_core-y	+= edac_module.o edac_device_sysfs.o
 ifdef CONFIG_PCI
 edac_core-y	+= edac_pci.o edac_pci_sysfs.o
 endif
-
+obj-$(CONFIG_EDAC_AXXIA_SYSMEM)		+= axxia_edac-mc.o
+obj-$(CONFIG_EDAC_AXXIA_L3)		+= axxia_edac-l3.o
+obj-$(CONFIG_EDAC_AXXIA_L2_CPU)		+= axxia_edac-l2_cpu.o
 obj-$(CONFIG_EDAC_GHES)			+= ghes_edac.o
 obj-$(CONFIG_EDAC_MCE_INJ)		+= mce_amd_inj.o
 

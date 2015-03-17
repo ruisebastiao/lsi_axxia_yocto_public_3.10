@@ -43,6 +43,30 @@ static u32 cache_levels;
 /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
 #define CSSELR_MAX 12
 
+/*
+ * kvm_vcpu_arch.cp15 holds cp15 registers as an array of u32, but some
+ * of cp15 registers can be viewed either as couple of two u32 registers
+ * or one u64 register. Current u64 register encoding is that least
+ * significant u32 word is followed by most significant u32 word.
+ */
+static inline void vcpu_cp15_reg64_set(struct kvm_vcpu *vcpu,
+				       const struct coproc_reg *r,
+				       u64 val)
+{
+	vcpu->arch.cp15[r->reg] = val & 0xffffffff;
+	vcpu->arch.cp15[r->reg + 1] = val >> 32;
+}
+
+static inline u64 vcpu_cp15_reg64_get(struct kvm_vcpu *vcpu,
+				      const struct coproc_reg *r)
+{
+	u64 val;
+	val = vcpu->arch.cp15[r->reg + 1];
+	val = val << 32;
+	val = val | vcpu->arch.cp15[r->reg];
+	return val;
+}
+
 int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	kvm_inject_undefined(vcpu);
@@ -154,85 +178,85 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
  */
 static const struct coproc_reg cp15_regs[] = {
 	/* CSSELR: swapped by interrupt.S. */
-	{ CRn( 0), CRm( 0), Op1( 2), Op2( 0), is32,
+	{ CRn(0), CRm(0), Op1(2), Op2(0), is32,
 			NULL, reset_unknown, c0_CSSELR },
 
 	/* TTBR0/TTBR1: swapped by interrupt.S. */
-	{ CRm64( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
-	{ CRm64( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+	{ CRm64(2), Op1(0), is64, NULL, reset_unknown64, c2_TTBR0 },
+	{ CRm64(2), Op1(1), is64, NULL, reset_unknown64, c2_TTBR1 },
 
 	/* TTBCR: swapped by interrupt.S. */
-	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+	{ CRn(2), CRm(0), Op1(0), Op2(2), is32,
 			NULL, reset_val, c2_TTBCR, 0x00000000 },
 
 	/* DACR: swapped by interrupt.S. */
-	{ CRn( 3), CRm( 0), Op1( 0), Op2( 0), is32,
+	{ CRn(3), CRm(0), Op1(0), Op2(0), is32,
 			NULL, reset_unknown, c3_DACR },
 
 	/* DFSR/IFSR/ADFSR/AIFSR: swapped by interrupt.S. */
-	{ CRn( 5), CRm( 0), Op1( 0), Op2( 0), is32,
+	{ CRn(5), CRm(0), Op1(0), Op2(0), is32,
 			NULL, reset_unknown, c5_DFSR },
-	{ CRn( 5), CRm( 0), Op1( 0), Op2( 1), is32,
+	{ CRn(5), CRm(0), Op1(0), Op2(1), is32,
 			NULL, reset_unknown, c5_IFSR },
-	{ CRn( 5), CRm( 1), Op1( 0), Op2( 0), is32,
+	{ CRn(5), CRm(1), Op1(0), Op2(0), is32,
 			NULL, reset_unknown, c5_ADFSR },
-	{ CRn( 5), CRm( 1), Op1( 0), Op2( 1), is32,
+	{ CRn(5), CRm(1), Op1(0), Op2(1), is32,
 			NULL, reset_unknown, c5_AIFSR },
 
 	/* DFAR/IFAR: swapped by interrupt.S. */
-	{ CRn( 6), CRm( 0), Op1( 0), Op2( 0), is32,
+	{ CRn(6), CRm(0), Op1(0), Op2(0), is32,
 			NULL, reset_unknown, c6_DFAR },
-	{ CRn( 6), CRm( 0), Op1( 0), Op2( 2), is32,
+	{ CRn(6), CRm(0), Op1(0), Op2(2), is32,
 			NULL, reset_unknown, c6_IFAR },
 
 	/* PAR swapped by interrupt.S */
-	{ CRm64( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
+	{ CRm64(7), Op1(0), is64, NULL, reset_unknown64, c7_PAR },
 
 	/*
 	 * DC{C,I,CI}SW operations:
 	 */
-	{ CRn( 7), CRm( 6), Op1( 0), Op2( 2), is32, access_dcsw},
-	{ CRn( 7), CRm(10), Op1( 0), Op2( 2), is32, access_dcsw},
-	{ CRn( 7), CRm(14), Op1( 0), Op2( 2), is32, access_dcsw},
+	{ CRn(7), CRm(6), Op1(0), Op2(2), is32, access_dcsw},
+	{ CRn(7), CRm(10), Op1(0), Op2(2), is32, access_dcsw},
+	{ CRn(7), CRm(14), Op1(0), Op2(2), is32, access_dcsw},
 	/*
 	 * Dummy performance monitor implementation.
 	 */
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 0), is32, access_pmcr},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 1), is32, access_pmcntenset},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 2), is32, access_pmcntenclr},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 3), is32, access_pmovsr},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 5), is32, access_pmselr},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 6), is32, access_pmceid0},
-	{ CRn( 9), CRm(12), Op1( 0), Op2( 7), is32, access_pmceid1},
-	{ CRn( 9), CRm(13), Op1( 0), Op2( 0), is32, access_pmccntr},
-	{ CRn( 9), CRm(13), Op1( 0), Op2( 1), is32, access_pmxevtyper},
-	{ CRn( 9), CRm(13), Op1( 0), Op2( 2), is32, access_pmxevcntr},
-	{ CRn( 9), CRm(14), Op1( 0), Op2( 0), is32, access_pmuserenr},
-	{ CRn( 9), CRm(14), Op1( 0), Op2( 1), is32, access_pmintenset},
-	{ CRn( 9), CRm(14), Op1( 0), Op2( 2), is32, access_pmintenclr},
+	{ CRn(9), CRm(12), Op1(0), Op2(0), is32, access_pmcr},
+	{ CRn(9), CRm(12), Op1(0), Op2(1), is32, access_pmcntenset},
+	{ CRn(9), CRm(12), Op1(0), Op2(2), is32, access_pmcntenclr},
+	{ CRn(9), CRm(12), Op1(0), Op2(3), is32, access_pmovsr},
+	{ CRn(9), CRm(12), Op1(0), Op2(5), is32, access_pmselr},
+	{ CRn(9), CRm(12), Op1(0), Op2(6), is32, access_pmceid0},
+	{ CRn(9), CRm(12), Op1(0), Op2(7), is32, access_pmceid1},
+	{ CRn(9), CRm(13), Op1(0), Op2(0), is32, access_pmccntr},
+	{ CRn(9), CRm(13), Op1(0), Op2(1), is32, access_pmxevtyper},
+	{ CRn(9), CRm(13), Op1(0), Op2(2), is32, access_pmxevcntr},
+	{ CRn(9), CRm(14), Op1(0), Op2(0), is32, access_pmuserenr},
+	{ CRn(9), CRm(14), Op1(0), Op2(1), is32, access_pmintenset},
+	{ CRn(9), CRm(14), Op1(0), Op2(2), is32, access_pmintenclr},
 
 	/* PRRR/NMRR (aka MAIR0/MAIR1): swapped by interrupt.S. */
-	{ CRn(10), CRm( 2), Op1( 0), Op2( 0), is32,
+	{ CRn(10), CRm(2), Op1(0), Op2(0), is32,
 			NULL, reset_unknown, c10_PRRR},
-	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
+	{ CRn(10), CRm(2), Op1(0), Op2(1), is32,
 			NULL, reset_unknown, c10_NMRR},
 
 	/* VBAR: swapped by interrupt.S. */
-	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+	{ CRn(12), CRm(0), Op1(0), Op2(0), is32,
 			NULL, reset_val, c12_VBAR, 0x00000000 },
 
 	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
-	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
+	{ CRn(13), CRm(0), Op1(0), Op2(1), is32,
 			NULL, reset_val, c13_CID, 0x00000000 },
-	{ CRn(13), CRm( 0), Op1( 0), Op2( 2), is32,
+	{ CRn(13), CRm(0), Op1(0), Op2(2), is32,
 			NULL, reset_unknown, c13_TID_URW },
-	{ CRn(13), CRm( 0), Op1( 0), Op2( 3), is32,
+	{ CRn(13), CRm(0), Op1(0), Op2(3), is32,
 			NULL, reset_unknown, c13_TID_URO },
-	{ CRn(13), CRm( 0), Op1( 0), Op2( 4), is32,
+	{ CRn(13), CRm(0), Op1(0), Op2(4), is32,
 			NULL, reset_unknown, c13_TID_PRIV },
 
 	/* CNTKCTL: swapped by interrupt.S. */
-	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
+	{ CRn(14), CRm(1), Op1(0), Op2(0), is32,
 			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
 };
 
@@ -488,43 +512,49 @@ FUNCTION_FOR32(0, 0, 1, 7, AIDR)
 
 /* ->val is filled in by kvm_invariant_coproc_table_init() */
 static struct coproc_reg invariant_cp15[] = {
-	{ CRn( 0), CRm( 0), Op1( 0), Op2( 0), is32, NULL, get_MIDR },
-	{ CRn( 0), CRm( 0), Op1( 0), Op2( 1), is32, NULL, get_CTR },
-	{ CRn( 0), CRm( 0), Op1( 0), Op2( 2), is32, NULL, get_TCMTR },
-	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
-	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
+	{ CRn(0), CRm(0), Op1(0), Op2(0), is32, NULL, get_MIDR },
+	{ CRn(0), CRm(0), Op1(0), Op2(1), is32, NULL, get_CTR },
+	{ CRn(0), CRm(0), Op1(0), Op2(2), is32, NULL, get_TCMTR },
+	{ CRn(0), CRm(0), Op1(0), Op2(3), is32, NULL, get_TLBTR },
+	{ CRn(0), CRm(0), Op1(0), Op2(6), is32, NULL, get_REVIDR },
 
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 3), is32, NULL, get_ID_AFR0 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 4), is32, NULL, get_ID_MMFR0 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 5), is32, NULL, get_ID_MMFR1 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 6), is32, NULL, get_ID_MMFR2 },
-	{ CRn( 0), CRm( 1), Op1( 0), Op2( 7), is32, NULL, get_ID_MMFR3 },
+	{ CRn(0), CRm(1), Op1(0), Op2(0), is32, NULL, get_ID_PFR0 },
+	{ CRn(0), CRm(1), Op1(0), Op2(1), is32, NULL, get_ID_PFR1 },
+	{ CRn(0), CRm(1), Op1(0), Op2(2), is32, NULL, get_ID_DFR0 },
+	{ CRn(0), CRm(1), Op1(0), Op2(3), is32, NULL, get_ID_AFR0 },
+	{ CRn(0), CRm(1), Op1(0), Op2(4), is32, NULL, get_ID_MMFR0 },
+	{ CRn(0), CRm(1), Op1(0), Op2(5), is32, NULL, get_ID_MMFR1 },
+	{ CRn(0), CRm(1), Op1(0), Op2(6), is32, NULL, get_ID_MMFR2 },
+	{ CRn(0), CRm(1), Op1(0), Op2(7), is32, NULL, get_ID_MMFR3 },
 
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 0), is32, NULL, get_ID_ISAR0 },
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 1), is32, NULL, get_ID_ISAR1 },
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, NULL, get_ID_ISAR2 },
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
+	{ CRn(0), CRm(2), Op1(0), Op2(0), is32, NULL, get_ID_ISAR0 },
+	{ CRn(0), CRm(2), Op1(0), Op2(1), is32, NULL, get_ID_ISAR1 },
+	{ CRn(0), CRm(2), Op1(0), Op2(2), is32, NULL, get_ID_ISAR2 },
+	{ CRn(0), CRm(2), Op1(0), Op2(3), is32, NULL, get_ID_ISAR3 },
+	{ CRn(0), CRm(2), Op1(0), Op2(4), is32, NULL, get_ID_ISAR4 },
+	{ CRn(0), CRm(2), Op1(0), Op2(5), is32, NULL, get_ID_ISAR5 },
 
-	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+	{ CRn(0), CRm(0), Op1(1), Op2(1), is32, NULL, get_CLIDR },
+	{ CRn(0), CRm(0), Op1(1), Op2(7), is32, NULL, get_AIDR },
 };
 
+/*
+ * Reads a register value from a userspace address to a kernel
+ * variable. Make sure that register size matches sizeof(*__val).
+ */
 static int reg_from_user(void *val, const void __user *uaddr, u64 id)
 {
-	/* This Just Works because we are little endian. */
 	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
 		return -EFAULT;
 	return 0;
 }
 
+/*
+ * Writes a register value to a userspace address from a kernel variable.
+ * Make sure that register size matches sizeof(*__val).
+ */
 static int reg_to_user(void __user *uaddr, const void *val, u64 id)
 {
-	/* This Just Works because we are little endian. */
 	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
 		return -EFAULT;
 	return 0;
@@ -534,6 +564,7 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
 {
 	struct coproc_params params;
 	const struct coproc_reg *r;
+	int ret;
 
 	if (!index_to_params(id, &params))
 		return -ENOENT;
@@ -542,7 +573,14 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
 	if (!r)
 		return -ENOENT;
 
-	return reg_to_user(uaddr, &r->val, id);
+		ret = -ENOENT;
+		if (KVM_REG_SIZE(id) == 4) {
+			u32 val = r->val;
+			ret = reg_to_user(uaddr, &val, id);
+		} else if (KVM_REG_SIZE(id) == 8) {
+			ret = reg_to_user(uaddr, &r->val, id);
+		}
+		return ret;
 }
 
 static int set_invariant_cp15(u64 id, void __user *uaddr)
@@ -550,7 +588,7 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
 	struct coproc_params params;
 	const struct coproc_reg *r;
 	int err;
-	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
+	u64 val; /* Make sure high bits are 0 for 32-bit regs */
 
 	if (!index_to_params(id, &params))
 		return -ENOENT;
@@ -558,7 +596,15 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
 	if (!r)
 		return -ENOENT;
 
-	err = reg_from_user(&val, uaddr, id);
+	err = -ENOENT;
+	if (KVM_REG_SIZE(id) == 4) {
+		u32 val32;
+			err = reg_from_user(&val32, uaddr, id);
+			if (!err)
+				val = val32;
+	} else if (KVM_REG_SIZE(id) == 8) {
+			err = reg_from_user(&val, uaddr, id);
+	}
 	if (err)
 		return err;
 
@@ -577,14 +623,14 @@ static bool is_valid_cache(u32 val)
 		return -ENOENT;
 
 	/* Bottom bit is Instruction or Data bit.  Next 3 bits are level. */
-        level = (val >> 1);
-        ctype = (cache_levels >> (level * 3)) & 7;
+	level = (val >> 1);
+	ctype = (cache_levels >> (level * 3)) & 7;
 
 	switch (ctype) {
 	case 0: /* No cache */
 		return false;
 	case 1: /* Instruction cache only */
-		return (val & 1);
+		return val & 1;
 	case 2: /* Data cache only */
 	case 4: /* Unified cache */
 		return !(val & 1);
@@ -836,6 +882,7 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 {
 	const struct coproc_reg *r;
 	void __user *uaddr = (void __user *)(long)reg->addr;
+	int ret;
 
 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
 		return demux_c15_get(reg->id, uaddr);
@@ -847,14 +894,22 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	if (!r)
 		return get_invariant_cp15(reg->id, uaddr);
 
-	/* Note: copies two regs if size is 64 bit. */
-	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+	ret = -ENOENT;
+	if (KVM_REG_SIZE(reg->id) == 8) {
+		u64 val;
+		val = vcpu_cp15_reg64_get(vcpu, r);
+		ret = reg_to_user(uaddr, &val, reg->id);
+	} else if (KVM_REG_SIZE(reg->id) == 4) {
+		ret = reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+	}
+	return ret;
 }
 
 int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 {
 	const struct coproc_reg *r;
 	void __user *uaddr = (void __user *)(long)reg->addr;
+	int ret;
 
 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
 		return demux_c15_set(reg->id, uaddr);
@@ -866,8 +921,17 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	if (!r)
 		return set_invariant_cp15(reg->id, uaddr);
 
-	/* Note: copies two regs if size is 64 bit */
-	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+	ret = -ENOENT;
+	if (KVM_REG_SIZE(reg->id) == 8) {
+		u64 val;
+		ret = reg_from_user(&val, uaddr, reg->id);
+		if (!ret)
+			vcpu_cp15_reg64_set(vcpu, r, val);
+	} else if (KVM_REG_SIZE(reg->id) == 4) {
+		ret = reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+	}
+
+	return ret;
 }
 
 static unsigned int num_demux_regs(void)

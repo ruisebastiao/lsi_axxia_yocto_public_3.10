@@ -63,10 +63,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
 #ifdef CONFIG_THUMB2_KERNEL
 	thumb = true;
 	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
-	insn = __mem_to_opcode_thumb16(((u16 *)addr)[0]);
+	insn = __opcode_to_mem_thumb16(((u16 *)addr)[0]);
 	if (is_wide_instruction(insn)) {
 		u16 inst2 = __mem_to_opcode_thumb16(((u16 *)addr)[1]);
-		insn = __opcode_thumb32_compose(insn, inst2);
+		insn = ___asm_opcode_thumb32_compose(insn, inst2);
 		decode_insn = thumb32_kprobe_decode_insn;
 	} else
 		decode_insn = thumb16_kprobe_decode_insn;

@@ -93,6 +93,7 @@ enum armv7_a5_perf_types {
 
 /* ARMv7 Cortex-A15 specific event types */
 enum armv7_a15_perf_types {
+	ARMV7_A15_PERFCTR_CPU_CYCLES			= 0x11,
 	ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_READ		= 0x40,
 	ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_WRITE	= 0x41,
 	ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_READ		= 0x42,
@@ -487,7 +488,7 @@ static const unsigned armv7_a5_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
  * Cortex-A15 HW events mapping
  */
 static const unsigned armv7_a15_perf_map[PERF_COUNT_HW_MAX] = {
-	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
+	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_A15_PERFCTR_CPU_CYCLES,
 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
@@ -917,34 +918,34 @@ static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
 	u32 val;
 	unsigned int cnt;
 
-	printk(KERN_INFO "PMNC registers dump:\n");
+	pr_info("PMNC registers dump:\n");
 
 	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (val));
-	printk(KERN_INFO "PMNC  =0x%08x\n", val);
+	pr_info("PMNC  =0x%08x\n", val);
 
 	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (val));
-	printk(KERN_INFO "CNTENS=0x%08x\n", val);
+	pr_info("CNTENS=0x%08x\n", val);
 
 	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (val));
-	printk(KERN_INFO "INTENS=0x%08x\n", val);
+	pr_info("INTENS=0x%08x\n", val);
 
 	asm volatile("mrc p15, 0, %0, c9, c12, 3" : "=r" (val));
-	printk(KERN_INFO "FLAGS =0x%08x\n", val);
+	pr_info("FLAGS =0x%08x\n", val);
 
 	asm volatile("mrc p15, 0, %0, c9, c12, 5" : "=r" (val));
-	printk(KERN_INFO "SELECT=0x%08x\n", val);
+	pr_info("SELECT=0x%08x\n", val);
 
 	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (val));
-	printk(KERN_INFO "CCNT  =0x%08x\n", val);
+	pr_info("CCNT  =0x%08x\n", val);
 
 	for (cnt = ARMV7_IDX_COUNTER0;
 			cnt <= ARMV7_IDX_COUNTER_LAST(cpu_pmu); cnt++) {
 		armv7_pmnc_select_counter(cnt);
 		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (val));
-		printk(KERN_INFO "CNT[%d] count =0x%08x\n",
+		pr_info("CNT[%d] count =0x%08x\n",
 			ARMV7_IDX_TO_COUNTER(cnt), val);
 		asm volatile("mrc p15, 0, %0, c9, c13, 1" : "=r" (val));
-		printk(KERN_INFO "CNT[%d] evtsel=0x%08x\n",
+		pr_info("CNT[%d] evtsel=0x%08x\n",
 			ARMV7_IDX_TO_COUNTER(cnt), val);
 	}
 }
