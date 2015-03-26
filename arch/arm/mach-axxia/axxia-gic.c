@@ -489,6 +489,37 @@ static void gic_clr_affinity_remote(void *info)
 	_gic_set_affinity(rpc->d, rpc->mask_val, true);
 }
 
+static bool on_same_cluster(u32 pcpu1, u32 pcpu2)
+{
+	return pcpu1 / CORES_PER_CLUSTER == pcpu2 / CORES_PER_CLUSTER;
+}
+
+static int exec_remote_set_affinity(bool clr_affinity, u32 cpu,
+				    struct irq_data *d,
+				    const struct cpumask *mask_val,
+				    bool force)
+{
+	int ret = IRQ_SET_MASK_OK;
+
+	if (force == false) {
+		gic_rpc_data.d = d;
+		gic_rpc_data.mask_val = mask_val;
+		if (clr_affinity == true) {
+			gic_rpc_data.oldcpu = cpu;
+			gic_rpc_data.func_mask |= CLR_AFFINITY;
+		} else {
+			gic_rpc_data.cpu = cpu;
+			gic_rpc_data.func_mask |= SET_AFFINITY;
+		}
+
+	} else {
+		pr_warning("Set affinity for hotplug not implemented.\n");
+		return -ENOSYS;
+	}
+
+	return ret;
+}
+
 static int gic_set_affinity(struct irq_data *d,
 			    const struct cpumask *mask_val,
 			    bool force)
@@ -496,6 +527,7 @@ static int gic_set_affinity(struct irq_data *d,
 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
 	u32 pcpu = cpu_logical_map(smp_processor_id());
 	unsigned int irqid = gic_irq(d);
+	int ret = IRQ_SET_MASK_OK;
 
 	BUG_ON(!irqs_disabled());
 
@@ -521,14 +553,14 @@ static int gic_set_affinity(struct irq_data *d,
 	 * cluster as the cpu we're currently running on, set the IRQ
 	 * affinity directly. Otherwise, use the RPC mechanism.
 	 */
-	if ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) ==
-		(pcpu / CORES_PER_CLUSTER)) {
+	if (on_same_cluster(cpu_logical_map(cpu), pcpu))
 		_gic_set_affinity(d, mask_val, false);
-	} else {
-		gic_rpc_data.func_mask |= SET_AFFINITY;
-		gic_rpc_data.cpu = cpu;
-		gic_rpc_data.d = d;
-		gic_rpc_data.mask_val = mask_val;
+	else{
+		ret = exec_remote_set_affinity(false, cpu, d, mask_val,
+					       force);
+
+		if (ret != IRQ_SET_MASK_OK)
+			return ret;
 	}
 
 	/*
@@ -536,21 +568,28 @@ static int gic_set_affinity(struct irq_data *d,
 	 * different than the prior cluster, clear the IRQ affinity
 	 * on the old cluster.
 	 */
-	if ((irqid != IRQ_PMU) && ((cpu_logical_map(cpu) / CORES_PER_CLUSTER) !=
-		(irq_cpuid[irqid] / CORES_PER_CLUSTER))) {
+	if (!on_same_cluster(cpu_logical_map(cpu), irq_cpuid[irqid]) &&
+	    (irqid != IRQ_PMU)) {
 		/*
 		 * If old cpu assignment falls within the same cluster as
 		 * the cpu we're currently running on, clear the IRQ affinity
 		 * directly. Otherwise, use RPC mechanism.
 		 */
-		if ((irq_cpuid[irqid] / CORES_PER_CLUSTER) ==
-			(pcpu / CORES_PER_CLUSTER)) {
+		if (on_same_cluster(irq_cpuid[irqid], pcpu))
 			_gic_set_affinity(d, mask_val, true);
-		} else {
-			gic_rpc_data.func_mask |= CLR_AFFINITY;
-			gic_rpc_data.oldcpu = irq_cpuid[irqid];
-			gic_rpc_data.d = d;
-			gic_rpc_data.mask_val = mask_val;
+		else
+			ret = exec_remote_set_affinity(true,
+				      get_logical_index(irq_cpuid[irqid]), d,
+				      mask_val, force);
+		if (ret != IRQ_SET_MASK_OK) {
+			/* Need to back out the set operation */
+			if (on_same_cluster(cpu_logical_map(cpu), pcpu))
+				_gic_set_affinity(d, mask_val, true);
+			else
+				exec_remote_set_affinity(true, cpu, d,
+							 mask_val, force);
+
+			return ret;
 		}
 	}
 
