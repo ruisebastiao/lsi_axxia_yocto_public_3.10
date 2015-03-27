@@ -188,13 +188,9 @@ void migrate_irqs(void)
 	for_each_irq_desc(i, desc) {
 		bool affinity_broken;
 
-		if (likely(desc->irq_data.chip->irq_bus_lock))
-			desc->irq_data.chip->irq_bus_lock(&desc->irq_data);
 		raw_spin_lock(&desc->lock);
 		affinity_broken = migrate_one_irq(desc);
 		raw_spin_unlock(&desc->lock);
-		if (likely(desc->irq_data.chip->irq_bus_sync_unlock))
-			desc->irq_data.chip->irq_bus_sync_unlock(&desc->irq_data);
 
 		if (affinity_broken && printk_ratelimit())
 			pr_warning("IRQ%u no longer affine to CPU%u\n", i,
