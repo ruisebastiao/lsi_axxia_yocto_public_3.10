@@ -453,7 +453,6 @@ pcie_legacy_isr(int irq, void *arg)
 
 	/* check if this is a PCIe message not from an external device */
 	if (intr_status & INT0_ERROR) {
-			u32 int_enb;
 			u32 offset;
 
 			pr_info("PCIE%d: Error interrupt %#x\n",
@@ -659,14 +658,6 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 		goto fail;
 	}
 
-	/* MSI interrupts */
-	for (i = 1; i <= 16; i++) {
-		port->irq[i] = irq_of_parse_and_map(port->node, i);
-		if (!port->irq[i])
-			break;
-		irq_set_chained_handler(port->irq[i], pcie_msi_irq_handler);
-	}
-
 	/* Setup as root complex */
 	pci_config = readl(port->regs + PCIE_CONFIG);
 	pci_status = readl(port->regs + PCIE_STATUS);
@@ -727,6 +718,13 @@ static int axxia_pcie_setup(int portno, struct pci_sys_data *sys)
 		}
 	}
 
+	/* MSI interrupts */
+	for (i = 2; i <= 17; i++) {
+		port->irq[i] = irq_of_parse_and_map(port->node, i);
+		if (!port->irq[i])
+			break;
+		irq_set_chained_handler(port->irq[i], pcie_msi_irq_handler);
+	}
 	/*
 	 * Setup outbound PCI Memory Window
 	 */
