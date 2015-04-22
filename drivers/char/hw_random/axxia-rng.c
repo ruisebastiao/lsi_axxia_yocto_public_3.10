@@ -101,41 +101,6 @@ enum {
 	TRNG_AXM55xx_CMD_RESET = 0x7,
 } ncp_trng_acp34xx_reg_cmds_t;
 
-struct ncp_trng_axm55xx_reg_sts_t {
-#ifdef NCP_BIG_ENDIAN
-	unsigned data_cnt:16;
-	unsigned prediction_resistance:1;
-	unsigned continuous_test_off:1;
-	unsigned reseed_required:1;
-	unsigned ro_entropy:1;
-	unsigned rdy:1;
-	unsigned err:1;
-	unsigned ro_test_in_progress:1;
-	unsigned rng_test_in_progress:1;
-	unsigned continuous_test_failed:1;
-	unsigned ro_test_failed:1;
-	unsigned rng_test_failed:1;
-	unsigned data_valid:1;
-	unsigned standby:1;
-	unsigned cmd:3;
-#else
-	unsigned cmd:3;
-	unsigned standby:1;
-	unsigned data_valid:1;
-	unsigned rng_test_failed:1;
-	unsigned ro_test_failed:1;
-	unsigned continuous_test_failed:1;
-	unsigned rng_test_in_progress:1;
-	unsigned ro_test_in_progress:1;
-	unsigned err:1;
-	unsigned rdy:1;
-	unsigned ro_entropy:1;
-	unsigned reseed_required:1;
-	unsigned continuous_test_off:1;
-	unsigned prediction_resistance:1;
-	unsigned data_cnt:16;
-#endif
-} ncp_trng_axm55xx_reg_sts_t;
 
 #define TRNG_AXM55xx_STS_RDY_MSK        (0x0800)
 #define TRNG_AXM55xx_STS_ERR_MSK        (0x0400)
@@ -330,10 +295,9 @@ static int axxia_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 {
 	static struct trng_dev *dev;
 	unsigned int j = 0, num = 0;
-	u32 rword;
-	u32 rsts;
-	struct ncp_trng_axm55xx_reg_sts_t sts = {0};
-
+	u32 rword = 0;
+	u32 rsts = 0;
+	u32 sts = 0;
 
 	if ((!rng) || (!buf))
 		return -EINVAL;
@@ -367,6 +331,7 @@ static int axxia_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 
 	if (trng_test_mode != -1)
 		return -EINVAL;
+
 	for (j = 0; j < max; ) {
 		/* Read from STS + DOUT */
 		if (dev->words_avail) {
@@ -396,14 +361,13 @@ static int axxia_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 					TRNG_AXM55xx_SLEEP_USECS + 1);
 		} else {
 			/* get next data count */
-			sts = *((struct ncp_trng_axm55xx_reg_sts_t *)
-				&(dev->regs->sts));
-
-			if (sts.err)
+			sts =  readl(&dev->regs->sts);
+			if (sts & TRNG_AXM55xx_STS_ERR_MSK)
 				return -EIO;
-			else if (sts.data_valid)
-				dev->words_avail = sts.data_cnt;
-			else if (sts.cmd != TRNG_AXM55xx_CMD_GENERATE)
+			else if (sts & TRNG_AXM55xx_STS_DOUT_VALID_MSK)
+				dev->words_avail = (sts >> 16) & 0xFFFF;
+			else if ((sts & TRNG_AXM55xx_STS_CMD_MSK) !=
+					TRNG_AXM55xx_CMD_GENERATE)
 				return -EIO;
 		}
 	}
