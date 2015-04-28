@@ -186,12 +186,14 @@ static struct gic_rpc_data gic_rpc_data = {NULL, 0, 0, 0, 0, NULL};
 static inline void __iomem *gic_dist_base(struct irq_data *d)
 {
 	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+
 	return gic_data_dist_base(gic_data);
 }
 
 static inline void __iomem *gic_cpu_base(struct irq_data *d)
 {
 	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+
 	return gic_data_cpu_base(gic_data);
 }
 
@@ -273,11 +275,13 @@ static void _gic_mask_irq(struct irq_data *d, bool do_mask)
 static void gic_mask_remote(void *info)
 {
 	struct irq_data *d = (struct irq_data *)info;
+
 	_gic_mask_irq(d, 1);
 }
 static void gic_unmask_remote(void *info)
 {
 	struct irq_data *d = (struct irq_data *)info;
+
 	_gic_mask_irq(d, 0);
 }
 
@@ -395,6 +399,7 @@ static int _gic_set_type(struct irq_data *d, unsigned int type)
 static void gic_set_type_remote(void *info)
 {
 	struct gic_rpc_data *rpc = (struct gic_rpc_data *)info;
+
 	_gic_set_type(rpc->d, rpc->type);
 }
 
@@ -436,13 +441,12 @@ static int gic_retrigger(struct irq_data *d)
 }
 
 static int _gic_set_affinity(struct irq_data *d,
-			     const struct cpumask *mask_val,
-			     bool do_clear)
+		unsigned int cpu,
+		bool do_clear)
 {
 	void __iomem *reg  = gic_dist_base(d) + GIC_DIST_TARGET +
 			     (gic_irq(d) & ~3);
 	unsigned int shift = (gic_irq(d) % 4) * 8;
-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
 	u32 val, mask, bit;
 	u32 enable_mask, enable_offset;
 
@@ -483,12 +487,16 @@ static int _gic_set_affinity(struct irq_data *d,
 static void gic_set_affinity_remote(void *info)
 {
 	struct gic_rpc_data *rpc = (struct gic_rpc_data *)info;
-	_gic_set_affinity(rpc->d, rpc->mask_val, false);
+
+	_gic_set_affinity(rpc->d, rpc->cpu, false);
+
 }
 static void gic_clr_affinity_remote(void *info)
 {
 	struct gic_rpc_data *rpc = (struct gic_rpc_data *)info;
-	_gic_set_affinity(rpc->d, rpc->mask_val, true);
+
+	_gic_set_affinity(rpc->d, rpc->oldcpu, true);
+
 }
 
 static bool on_same_cluster(u32 pcpu1, u32 pcpu2)
@@ -556,10 +564,9 @@ static int gic_set_affinity(struct irq_data *d,
 	 * affinity directly. Otherwise, use the RPC mechanism.
 	 */
 	if (on_same_cluster(cpu_logical_map(cpu), pcpu))
-		_gic_set_affinity(d, mask_val, false);
+		_gic_set_affinity(d, cpu_logical_map(cpu), false);
 	else{
-		ret = exec_remote_set_affinity(false, cpu, d, mask_val,
-					       force);
+		ret = exec_remote_set_affinity(false, cpu_logical_map(cpu), d, mask_val, force);
 
 		if (ret != IRQ_SET_MASK_OK)
 			return ret;
@@ -577,19 +584,19 @@ static int gic_set_affinity(struct irq_data *d,
 		 * the cpu we're currently running on, clear the IRQ affinity
 		 * directly. Otherwise, use RPC mechanism.
 		 */
-		if (on_same_cluster(irq_cpuid[irqid], pcpu))
-			_gic_set_affinity(d, mask_val, true);
-		else
+		if (on_same_cluster(irq_cpuid[irqid], pcpu)) {
+			_gic_set_affinity(d, irq_cpuid[irqid], true);
+		}
+		else {
 			ret = exec_remote_set_affinity(true,
-				      get_logical_index(irq_cpuid[irqid]), d,
-				      mask_val, force);
+					get_logical_index(irq_cpuid[irqid]), d, mask_val, force);
+		}
 		if (ret != IRQ_SET_MASK_OK) {
 			/* Need to back out the set operation */
 			if (on_same_cluster(cpu_logical_map(cpu), pcpu))
-				_gic_set_affinity(d, mask_val, true);
+				_gic_set_affinity(d, irq_cpuid[irqid], true);
 			else
-				exec_remote_set_affinity(true, cpu, d,
-							 mask_val, force);
+				exec_remote_set_affinity(true, cpu, d, mask_val, force);
 
 			return ret;
 		}
