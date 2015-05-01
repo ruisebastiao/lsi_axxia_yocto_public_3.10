@@ -32,10 +32,13 @@
 #include <asm/io.h>
 #include <asm/cacheflush.h>
 #include <mach/ncr.h>
+#include "axxia.h"
 
 static void __iomem *nca;
 static void __iomem *apb;
-static void __iomem *dickens;
+#ifndef CONFIG_SMP
+void __iomem *dickens;
+#endif
 static int ddr_retention_enabled;
 extern int ncr_read_nolock(unsigned long, unsigned long, int, void *);
 extern int ncr_write_nolock(unsigned long, unsigned long, int, void *);
