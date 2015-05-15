@@ -100,6 +100,7 @@ static void muxed_ipi_message_pass(const struct cpumask *mask,
 	}
 }
 
+#ifdef CONFIG_SMP
 static void axxia_ipi_demux(struct pt_regs *regs)
 {
 	struct axxia_mux_msg *info = &__get_cpu_var(ipi_mux_msg);
@@ -117,6 +118,7 @@ static void axxia_ipi_demux(struct pt_regs *regs)
 			handle_IPI(0, regs); /* 0 = ARM IPI_WAKEUP */
 	} while (info->msg);
 }
+#endif
 
 union gic_base {
 	void __iomem *common_base;
@@ -532,7 +534,7 @@ static int gic_set_affinity(struct irq_data *d,
 	BUG_ON(!irqs_disabled());
 
 	if (cpu >= nr_cpu_ids)
-		return -EINVAL;
+			return -EINVAL;
 
 	if (irqid >= MAX_GIC_INTERRUPTS)
 		return -EINVAL;
@@ -542,9 +544,9 @@ static int gic_set_affinity(struct irq_data *d,
 		return IRQ_SET_MASK_OK;
 
 	/*
-	 * If the new IRQ affinity is the same as current, then
-	 * there's no need to update anything.
-	 */
+	* If the new IRQ affinity is the same as current, then
+	* there's no need to update anything.
+	*/
 	if (cpu_logical_map(cpu) == irq_cpuid[irqid])
 		return IRQ_SET_MASK_OK;
 
@@ -611,6 +613,7 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
 #define gic_set_wake	NULL
 #endif
 
+#ifdef CONFIG_HOTPLUG_CPU
 static u32 get_cluster_id(void)
 {
 	u32 mpidr, cluster;
@@ -627,6 +630,7 @@ static u32 get_cluster_id(void)
 
 	return cluster;
 }
+#endif
 
 #ifdef CONFIG_CPU_PM
 
@@ -980,6 +984,7 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 			 * updated as well.
 			 */
 			switch (irqnr) {
+#ifdef CONFIG_SMP
 			case IPI0_CPU0:
 			case IPI0_CPU1:
 			case IPI0_CPU2:
@@ -1011,6 +1016,7 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 				/* Not currently used */
 				writel_relaxed(irqnr, cpu_base + GIC_CPU_EOI);
 				break;
+#endif
 
 			case IRQ_PMU:
 				/*
@@ -1042,7 +1048,9 @@ asmlinkage void __exception_irq_entry axxia_gic_handle_irq(struct pt_regs *regs)
 		}
 		if (irqnr < 16) {
 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+#ifdef CONFIG_SMP
 			handle_IPI(irqnr, regs);
+#endif
 			continue;
 		}
 		break;
@@ -1095,11 +1103,15 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	u32 enablemask;
 	u32 enableoff;
 	u32 val;
+#ifdef CONFIG_HOTPLUG_CPU
 	u32 this_cluster = get_cluster_id();
+#endif
 
 	/* Initialize the distributor interface once per CPU cluster */
+#ifdef CONFIG_HOTPLUG_CPU
 	if ((test_and_set_bit(get_cluster_id(), &gic->dist_init_done)) && (!cluster_power_up[this_cluster]))
 		return;
+#endif
 
 	cpumask = 1 << cpu;
 	cpumask |= cpumask << 8;
@@ -1134,7 +1146,7 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	 */
 	for (i = 32; i < gic_irqs; i += 32)
 		writel_relaxed(0xffffffff,
-			       base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+				base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
 
 	/*
 	 * Set Axxia IPI interrupts for all CPUs in this cluster.
@@ -1142,22 +1154,22 @@ static void __cpuinit gic_dist_init(struct gic_chip_data *gic)
 	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
 		cpumask_8 = 1 << ((i - IPI0_CPU0) % 4);
 		writeb_relaxed(cpumask_8, base + GIC_DIST_TARGET + i);
-	}
+		}
 
-	/*
-	 * Set the PMU IRQ to the first cpu in this cluster.
-	 */
-	writeb_relaxed(0x01, base + GIC_DIST_TARGET + IRQ_PMU);
+		/*
+		 * Set the PMU IRQ to the first cpu in this cluster.
+		 */
+		writeb_relaxed(0x01, base + GIC_DIST_TARGET + IRQ_PMU);
 
-	/*
-	 * Set Axxia IPI interrupts to be edge triggered.
-	 */
-	for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
-		confmask = 0x2 << ((i % 16) * 2);
-		confoff = (i / 16) * 4;
-		val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-		val |= confmask;
-		writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+		/*
+		 * Set Axxia IPI interrupts to be edge triggered.
+		 */
+		for (i = IPI0_CPU0; i < MAX_AXM_IPI_NUM; i++) {
+			confmask = 0x2 << ((i % 16) * 2);
+			confoff = (i / 16) * 4;
+			val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+			val |= confmask;
+			writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
 	}
 
 	/*
@@ -1196,11 +1208,11 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
 	writel_relaxed(0xffffffff, dist_base + GIC_DIST_ENABLE_CLEAR);
 
 	/*
-	 * Set priority on PPI and SGI interrupts
-	 */
+	* Set priority on PPI and SGI interrupts
+	*/
 	for (i = 0; i < 32; i += 4)
 		writel_relaxed(0xa0a0a0a0,
-			       dist_base + GIC_DIST_PRI + i * 4 / 4);
+				dist_base + GIC_DIST_PRI + i * 4 / 4);
 
 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
 	writel_relaxed(1, base + GIC_CPU_CTRL);
@@ -1383,8 +1395,9 @@ void __init axxia_gic_init_bases(int irq_start,
 				    hwirq_base, &gic_irq_domain_ops, gic);
 	if (WARN_ON(!gic->domain))
 		return;
-
+#ifdef CONFIG_SMP
 	set_smp_cross_call(axxia_gic_raise_softirq);
+#endif
 	set_handle_irq(axxia_gic_handle_irq);
 
 	gic_axxia_init(gic);
@@ -1393,6 +1406,7 @@ void __init axxia_gic_init_bases(int irq_start,
 	gic_pm_init(gic);
 }
 
+#ifdef CONFIG_SMP
 void __cpuinit axxia_gic_secondary_init(void)
 {
 	struct gic_chip_data *gic = &gic_data;
@@ -1405,6 +1419,8 @@ void __cpuinit axxia_hotplug_gic_secondary_init(void)
 {
 	gic_cpu_init(&gic_data);
 }
+
+#endif
 
 #ifdef CONFIG_OF
 
