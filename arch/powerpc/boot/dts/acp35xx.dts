@@ -307,6 +307,16 @@
 				sbb-reg = <0x00500000 0x8000>;
 				tzc-reg = <0x00541000 0x1000>;
 			};
+
+			TRNG: trng {
+				compatible = "lsi,trng";
+				enabled = <1>;
+				reg = <0x00460000  0x20000>;
+				interrupt-parent = <&MPIC>;
+				interrupts = <43>;
+				status = "ok";
+			};
+
 		};
 	};
 
