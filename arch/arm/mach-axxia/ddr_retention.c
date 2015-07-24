@@ -29,10 +29,11 @@
 #include <linux/delay.h>
 
 #include <linux/of.h>
-#include <asm/io.h>
+#include <linux/io.h>
 #include <asm/cacheflush.h>
 #include <mach/ncr.h>
 #include "axxia.h"
+#include "../../drivers/misc/lsi-ncr.h"
 
 static void __iomem *nca;
 static void __iomem *apb;
@@ -40,10 +41,6 @@ static void __iomem *apb;
 void __iomem *dickens;
 #endif
 static int ddr_retention_enabled;
-extern int ncr_read_nolock(unsigned long, unsigned long, int, void *);
-extern int ncr_write_nolock(unsigned long, unsigned long, int, void *);
-
-
 
 enum {
 	AXXIA_ENGINE_CAAL,
@@ -146,11 +143,11 @@ flush_l3(void)
 }
 
 static void
-quiesce_vp_engine(int engineType)
+quiesce_vp_engine(int engine_type)
 {
-	unsigned long *pEngineRegions;
-	unsigned long ortOff, owtOff;
-	unsigned long *pRegion;
+	unsigned long *engine_regions;
+	unsigned long ort_off, owt_off;
+	unsigned long *region;
 	unsigned ort, owt;
 	unsigned long buf = 0;
 	unsigned short node, target;
@@ -158,53 +155,53 @@ quiesce_vp_engine(int engineType)
 
 	pr_info("quiescing VP engines...\n");
 
-	switch (engineType) {
+	switch (engine_type) {
 	case AXXIA_ENGINE_CNAL:
-		pEngineRegions = ncp_cnal_regions_acp55xx;
-		ortOff = 0x1c0;
-		owtOff = 0x1c4;
+		engine_regions = ncp_cnal_regions_acp55xx;
+		ort_off = 0x1c0;
+		owt_off = 0x1c4;
 		break;
 
 	case AXXIA_ENGINE_CAAL:
-		pEngineRegions = ncp_caal_regions_acp55xx;
-		ortOff = 0xf8;
-		owtOff = 0xfc;
+		engine_regions = ncp_caal_regions_acp55xx;
+		ort_off = 0xf8;
+		owt_off = 0xfc;
 		break;
 
 	default:
 		return;
 	}
 
-	pRegion = pEngineRegions;
+	region = engine_regions;
 
-	while (*pRegion != NCP_REGION_ID(0xff, 0xff)) {
+	while (*region != NCP_REGION_ID(0xff, 0xff)) {
 		/* set read/write transaction limits to zero */
-		ncr_write_nolock(*pRegion, 0x8, 4, &buf);
-		ncr_write_nolock(*pRegion, 0xc, 4, &buf);
-		pRegion++;
+		ncr_write_nolock(*region, 0x8, 4, &buf);
+		ncr_write_nolock(*region, 0xc, 4, &buf);
+		region++;
 	}
 
-	pRegion = pEngineRegions;
+	region = engine_regions;
 	loop = 0;
 
-	while (*pRegion != NCP_REGION_ID(0xff, 0xff)) {
-		node = (*pRegion & 0xffff0000) >> 16;
-		target = *pRegion & 0x0000ffff;
+	while (*region != NCP_REGION_ID(0xff, 0xff)) {
+		node = (*region & 0xffff0000) >> 16;
+		target = *region & 0x0000ffff;
 		/* read the number of outstanding read/write transactions */
-		ncr_read_nolock(*pRegion, ortOff, 4, &ort);
-		ncr_read_nolock(*pRegion, owtOff, 4, &owt);
+		ncr_read_nolock(*region, ort_off, 4, &ort);
+		ncr_read_nolock(*region, owt_off, 4, &owt);
 
 		if ((ort == 0) && (owt == 0)) {
 			/* this engine has been quiesced, move on to the next */
 			pr_info("quiesced region 0x%02x.0x%02x\n",
 					node, target);
-			pRegion++;
+			region++;
 		} else {
 			if (loop++ > 10000) {
 				pr_info(
 						"Unable to quiesce region 0x%02x.0x%02x ort=0x%x, owt=0x%x\n",
 						node, target, ort, owt);
-				pRegion++;
+				region++;
 				loop = 0;
 				continue;
 			}
@@ -250,18 +247,23 @@ reset_elm_trace(void)
 	ncr_register_write(htonl(0x000fff01), (unsigned *) (apb + 0x78000));
 }
 
-
-extern void ncp_ddr_shutdown(void *, void *,  unsigned long);
-
-
 void
 initiate_retention_reset(void)
 {
 	unsigned long ctl_244 = 0;
 	unsigned long value;
 	unsigned cpu_id;
+    /*
+     * in order to preload the DDR shutdown function into cache
+     * we use these variables to do a word-by-word copy of the
+     * memory where the function resides. The 'tmp' variable
+     * must be declared as volatile to ensure the compiler
+     * doesn't optimize this out.
+     * Removal of this volatile to resolve the checkpatch warning
+     * will break the operation!
+     */
 	volatile long tmp;
-	volatile long *ptmp;
+	long *ptmp;
 
 	if (0 == ddr_retention_enabled) {
 		pr_info("DDR Retention Reset is Not Enabled\n");
@@ -270,6 +272,13 @@ initiate_retention_reset(void)
 
 	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
+
+	/*
+	 * If the axxia device is in reset then DDR retention is not
+	 * possible. Just do an emergency_restart instead.
+	 */
+	if (ncr_reset_active)
+		emergency_restart();
 
 	preempt_disable();
 	cpu_id = smp_processor_id();
@@ -310,7 +319,7 @@ initiate_retention_reset(void)
 		tmp += *ptmp++;
 	} while (ptmp < (long *) (ncp_ddr_shutdown + 0x1000));
 
-	asm volatile ("isb" : : : "memory");
+	isb();
 
 	/* disable L2 prefetching */
 	cpu_disable_l2_prefetch();
