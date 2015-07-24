@@ -23,7 +23,9 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include "lsi-ncr.h"
+#ifdef CONFIG_ARM
 #include <../../arch/arm/mach-axxia/axxia.h>
+#endif
 
 #ifdef CONFIG_ARCH_AXXIA
 #define NCA_PHYS_ADDRESS 0x002020100000ULL
