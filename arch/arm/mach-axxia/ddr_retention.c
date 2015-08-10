@@ -253,7 +253,16 @@ initiate_retention_reset(void)
 	unsigned long ctl_244 = 0;
 	unsigned long value;
 	unsigned cpu_id;
-	long tmp;
+    /*
+     * in order to preload the DDR shutdown function into cache
+     * we use these variables to do a word-by-word copy of the
+     * memory where the function resides. The 'tmp' variable
+     * must be declared as volatile to ensure the compiler
+     * doesn't optimize this out.
+     * Removal of this volatile to resolve the checkpatch warning
+     * will break the operation!
+     */
+	volatile long tmp;
 	long *ptmp;
 
 	if (0 == ddr_retention_enabled) {
@@ -263,6 +272,13 @@ initiate_retention_reset(void)
 
 	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
+
+	/*
+	 * If the axxia device is in reset then DDR retention is not
+	 * possible. Just do an emergency_restart instead.
+	 */
+	if (ncr_reset_active)
+		emergency_restart();
 
 	preempt_disable();
 	cpu_id = smp_processor_id();
@@ -303,7 +319,7 @@ initiate_retention_reset(void)
 		tmp += *ptmp++;
 	} while (ptmp < (long *) (ncp_ddr_shutdown + 0x1000));
 
-	asm volatile ("isb" : : : "memory");
+	isb();
 
 	/* disable L2 prefetching */
 	cpu_disable_l2_prefetch();
