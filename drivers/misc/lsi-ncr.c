@@ -47,13 +47,12 @@ static DEFINE_RAW_SPINLOCK(ncr_spin_lock);
  * is subjected to simultaneous requests from multiple masters
  */
 DEFINE_RAW_SPINLOCK(nca_access_lock);
-EXPORT_SYMBOL(nca_access_lock);
 
 static unsigned long ncr_spin_flags;
 
 #define LOCK_DOMAIN 0
 
-typedef union {
+union command_data_register_0 {
 	unsigned long raw;
 	struct {
 #ifdef __BIG_ENDIAN
@@ -76,16 +75,16 @@ typedef union {
 		unsigned long start_done:1;
 #endif
 	} __packed bits;
-} __packed command_data_register_0_t;
+} __packed;
 
-typedef union {
+union command_data_register_1 {
 	unsigned long raw;
 	struct {
 		unsigned long target_address:32;
 	} __packed bits;
-} __packed command_data_register_1_t;
+} __packed;
 
-typedef union {
+union command_data_register_2 {
 	unsigned long raw;
 	struct {
 #ifdef __BIG_ENDIAN
@@ -98,8 +97,7 @@ typedef union {
 		unsigned long unused:16;
 #endif
 	} __packed bits;
-} __packed command_data_register_2_t;
-
+} __packed;
 
 unsigned long
 ncr_register_read(unsigned *address)
@@ -231,7 +229,7 @@ static int
 ncr_check_pio_status(char *str)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
-	command_data_register_0_t cdr0;
+	union command_data_register_0 cdr0;
 
 	/*
 	  Make sure any previous commands completed, and check for errors.
@@ -279,9 +277,9 @@ int
 ncr_read_nolock(unsigned long region, unsigned long address, int number,
 	void *buffer)
 {
-	command_data_register_0_t cdr0;
-	command_data_register_1_t cdr1;
-	command_data_register_2_t cdr2;
+	union command_data_register_0 cdr0;
+	union command_data_register_1 cdr1;
+	union command_data_register_2 cdr2;
 
 	if ((NCP_NODE_ID(region) != 0x0153) && (NCP_NODE_ID(region) != 0x115)) {
 		/* make sure any previous command has completed */
@@ -451,9 +449,9 @@ int
 ncr_write_nolock(unsigned long region, unsigned long address, int number,
 		 void *buffer)
 {
-	command_data_register_0_t cdr0;
-	command_data_register_1_t cdr1;
-	command_data_register_2_t cdr2;
+	union command_data_register_0 cdr0;
+	union command_data_register_1 cdr1;
+	union command_data_register_2 cdr2;
 	unsigned long data_word_base;
 	int dbs = (number - 1);
 

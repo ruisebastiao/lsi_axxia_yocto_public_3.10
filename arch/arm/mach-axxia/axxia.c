@@ -12,12 +12,12 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307	 USA
  */
 
 #include <linux/amba/bus.h>
@@ -36,14 +36,14 @@
 #include <linux/smsc911x.h>
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
+#include <linux/sizes.h>
+#include <linux/pmu.h>
+#include <linux/kexec.h>
 #ifdef CONFIG_ARM_ARCH_TIMER
 #include <asm/arch_timer.h>
 #endif
-#include <asm/sizes.h>
-#include <asm/pmu.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
-#include <asm/kexec.h>
 #include <asm/mach/time.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <mach/hardware.h>
@@ -114,7 +114,7 @@ void __init axxia_dt_map_io(void)
 
 void __init axxia_dt_init_early(void)
 {
-	 init_dma_coherent_pool_size(SZ_1M);
+	init_dma_coherent_pool_size(SZ_1M);
 }
 
 static struct of_device_id axxia_irq_match[] __initdata = {
@@ -151,21 +151,21 @@ static struct mmci_platform_data mmc_plat_data = {
 
 static struct of_dev_auxdata axxia_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("arm,primecell", 0x20101E0000ULL,
-		       "mmci",  &mmc_plat_data),
+		       "mmci",	&mmc_plat_data),
 	{}
 };
 
 static struct resource axxia_pmu_resources[] = {
 	[0] = {
-		.start  = IRQ_PMU,
-		.end    = IRQ_PMU,
-		.flags  = IORESOURCE_IRQ,
+		.start	= IRQ_PMU,
+		.end	= IRQ_PMU,
+		.flags	= IORESOURCE_IRQ,
 	},
 };
 
 static struct platform_device pmu_device = {
 	.name			= "arm-pmu",
-	.id                     = -1,
+	.id			= -1,
 	.num_resources		= ARRAY_SIZE(axxia_pmu_resources),
 	.resource		= axxia_pmu_resources,
 };
@@ -232,7 +232,7 @@ static void axxia_restart(char str, const char *cmd)
 }
 
 DT_MACHINE_START(AXXIA_DT, "LSI Axxia")
-	.dt_compat	= axxia_dt_match,
+.dt_compat	= axxia_dt_match,
 	.smp		= smp_ops(axxia_smp_ops),
 	.map_io		= axxia_dt_map_io,
 	.init_early	= axxia_dt_init_early,
@@ -243,4 +243,4 @@ DT_MACHINE_START(AXXIA_DT, "LSI Axxia")
 #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
 	.dma_zone_size	= (4ULL * SZ_1G) - 1,
 #endif
-MACHINE_END
+	MACHINE_END
