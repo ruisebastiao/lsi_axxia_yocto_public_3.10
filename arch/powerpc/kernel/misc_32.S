@@ -207,7 +207,7 @@ _GLOBAL(low_choose_7447a_dfs)
 	mfmsr	r7
 	rlwinm	r0,r7,0,17,15
 	mtmsr	r0
-	
+
 	/* Calc new HID1 value */
 	mfspr	r4,SPRN_HID1
 	insrwi	r4,r3,1,9	/* insert parameter into bit 9 */
@@ -605,7 +605,7 @@ _GLOBAL(atomic_set_mask)
  * R5    has shift count
  * result in R3/R4
  *
- *  ashrdi3: arithmetic right shift (sign propagation)	
+ *  ashrdi3: arithmetic right shift (sign propagation)
  *  lshrdi3: logical right shift
  *  ashldi3: left shift
  */
@@ -677,7 +677,8 @@ _GLOBAL(abs)
 	blr
 
 #ifdef CONFIG_SMP
-_GLOBAL(start_secondary_resume)
+__CPUINIT
+_ENTRY(start_secondary_resume)
 	/* Reset stack */
 	CURRENT_THREAD_INFO(r1, r1)
 	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
@@ -685,8 +686,9 @@ _GLOBAL(start_secondary_resume)
 	stw	r3,0(r1)		/* Zero the stack frame pointer	*/
 	bl	start_secondary
 	b	.
+__FINIT
 #endif /* CONFIG_SMP */
-	
+
 /*
  * This routine is just here to keep GCC happy - sigh...
  */
@@ -734,7 +736,7 @@ relocate_new_kernel:
 	cmplwi	cr0,r3,PVR_476_ISS@h
 	beq	setup_map_47x
 #endif /* CONFIG_PPC_47x */
-	
+
 /*
  * Code for setting up 1:1 mapping for PPC440x for KEXEC
  *
@@ -751,7 +753,7 @@ relocate_new_kernel:
  *
  */
 
-	/* 
+	/*
 	 * Load the PID with kernel PID (0).
 	 * Also load our MSR_IS and TID to MMUCR for TLB search.
 	 */
@@ -861,11 +863,12 @@ write_out:
 next_tlb:
 	rotlwi	r3, r8, 28			/* Create EPN (bits 0-3) */
 	mr	r4, r3				/* RPN = EPN  */
-	ori	r3, r3, (PPC44x_TLB_VALID | PPC44x_TLB_256M) /* SIZE = 256M, Valid */
+	ori	r3, r3, (PPC44x_TLB_VALID | PPC44x_TLB_256M) /* SIZE = 256M,
+								Valid */
 	insrwi	r3, r7, 1, 23			/* Set TS from r7 */
 
-	tlbwe	r3, r6, PPC44x_TLB_PAGEID	/* PageID field : EPN, V, SIZE */
-	tlbwe	r4, r6, PPC44x_TLB_XLAT		/* Address translation : RPN   */
+	tlbwe	r3, r6, PPC44x_TLB_PAGEID	/* PageID field: EPN, V, SIZE */
+	tlbwe	r4, r6, PPC44x_TLB_XLAT		/* Address translation: RPN   */
 	tlbwe	r5, r6, PPC44x_TLB_ATTRIB	/* Attributes */
 
 	addi	r8, r8, 1			/* Increment PN */
@@ -928,11 +931,12 @@ setup_map_47x:
 	 * Invalidates all the tlb entries by writing to 256 RPNs(r4)
 	 * of 4k page size in all  4 ways (0-3 in r3).
 	 * This would invalidate the entire UTLB including the one we are
-	 * running from. However the shadow TLB entries would help us 
+	 * running from. However the shadow TLB entries would help us
 	 * to continue the execution, until we flush them (rfi/isync).
 	 */
 	addis	r3, 0, 0x8000			/* specify the way */
-	addi	r4, 0, 0			/* TLB Word0 = (EPN=0, VALID = 0) */
+	addi	r4, 0, 0			/* TLB Word0 = (EPN=0,
+						   VALID = 0) */
 	addi	r5, 0, 0
 	b	clear_utlb_entry
 
@@ -954,16 +958,18 @@ clear_utlb_entry:
 
 	/* Create the entries in the other address space */
 	mfmsr	r5
-	rlwinm	r7, r5, 27, 31, 31		/* Get the TS (Bit 26) from MSR */
+	rlwinm	r7, r5, 27, 31, 31		/* Get the TS (Bit 26) from MSR
+						 */
 	xori	r7, r7, 1			/* r7 = !TS */
 
-	insrwi	r24, r7, 1, 21			/* Change the TS in the saved TLB word 0 */
+	insrwi	r24, r7, 1, 21			/* Change the TS in the saved
+						   TLB word 0 */
 
-	/* 
+	/*
 	 * write out the TLB entries for the tmp mapping
 	 * Use way '0' so that we could easily invalidate it later.
 	 */
-	lis	r3, 0x8000			/* Way '0' */ 
+	lis	r3, 0x8000			/* Way '0' */
 
 	tlbwe	r24, r3, 0
 	tlbwe	r25, r3, 1
@@ -980,7 +986,7 @@ clear_utlb_entry:
 	mtspr	SPRN_SRR1, r5
 	rfi
 
-	/* 
+	/*
 	 * Now we are in the tmp address space.
 	 * Create a 1:1 mapping for 0-2GiB in the original TS.
 	 */
@@ -997,7 +1003,8 @@ clear_utlb_entry:
 
 write_utlb:
 	rotlwi	r5, r8, 28			/* RPN = PageIndex * 256M */
-						/* ERPN = 0 as we don't use memory above 2G */
+						/* ERPN = 0 as we don't use
+						   memory above 2G */
 
 	mr	r4, r5				/* EPN = RPN */
 	ori	r4, r4, (PPC47x_TLB0_VALID | PPC47x_TLB0_256M)
@@ -1013,7 +1020,7 @@ write_utlb:
 	/* make sure we complete the TLB write up */
 	isync
 
-	/* 
+	/*
 	 * Prepare to jump to the 1:1 mapping.
 	 * 1) Extract page size of the tmp mapping
 	 *    DSIZ = TLB_Word0[22:27]
@@ -1030,7 +1037,7 @@ write_utlb:
 0:
 	/* Defaults to 256M */
 	lis	r10, 0x1000
-	
+
 	bl	1f
 1:	mflr	r4
 	addi	r4, r4, (2f-1b)			/* virtual address  of 2f */
@@ -1039,7 +1046,8 @@ write_utlb:
 	not	r10, r11			/* Pagemask = ~(offsetmask) */
 
 	and	r5, r25, r10			/* Physical page */
-	and	r6, r4, r11			/* offset within the current page */
+	and	r6, r4, r11			/* offset within the current
+						   page */
 
 	or	r5, r5, r6			/* Physical address for 2f */
 
@@ -1175,3 +1183,30 @@ relocate_new_kernel_end:
 relocate_new_kernel_size:
 	.long relocate_new_kernel_end - relocate_new_kernel
 #endif
+
+#ifdef CONFIG_PPC_47x
+_GLOBAL(__icbi)
+	mflr	r5
+1:	icbi	0,r3
+	bl 2f
+2:	mflr	r3
+	li	r4,32
+	PPC_ICBT(0,R3,R4)
+	add	r3,r3,r4
+	PPC_ICBT(0,R3,R4)
+	add	r3,r3,r4
+	PPC_ICBT(0,R3,R4)
+	sync
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	mtlr	r5
+	li	r3, 0
+	blr
+#endif /* CONFIG_PPC_47x */
