@@ -66,6 +66,11 @@ static void __iomem *base;
 
 #ifdef CONFIG_KEXEC
 
+#ifdef AXXIA_NCR_RESET_CHECK
+int ncr_reset_active;
+EXPORT_SYMBOL(ncr_reset_active);
+#endif
+
 static void set_l3_pstate(u32 newstate)
 {
 	static const u8 hnf[] = {
@@ -206,6 +211,10 @@ void __init axxia_dt_init(void)
 		dickens = ioremap(0x2000000000, SZ_4M);
 		kexec_reinit = flush_l3;
 	}
+#endif
+
+#ifdef AXXIA_NCR_RESET_CHECK
+	ncr_reset_active = 0;
 #endif
 
 	bus_register_notifier(&platform_bus_type, &axxia_platform_nb);
