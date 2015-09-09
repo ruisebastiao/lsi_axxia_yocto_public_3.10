@@ -247,6 +247,37 @@ reset_elm_trace(void)
 	ncr_register_write(htonl(0x000fff01), (unsigned *) (apb + 0x78000));
 }
 
+
+/*
+ * shutdown the system in preparation for a DDR retention reset.
+ * This is only needed if initiating the retention reset while the
+ * system is running in normal state (i.e. via the /proc filesystem.)
+ * If the retention reset is called from within a restart function
+ * this should not be necessary.
+ */
+void
+retention_reset_prepare(void)
+{
+	/*
+	 * If the axxia device is in reset then DDR retention is not
+	 * possible. Just do an emergency_restart instead.
+	 */
+	if (ncr_reset_active)
+		emergency_restart();
+
+	preempt_disable();
+
+	/* send stop message to other CPUs */
+	local_irq_disable();
+	local_fiq_disable();
+	asm volatile ("dsb" : : : "memory");
+	asm volatile ("dmb" : : : "memory");
+	system_state = SYSTEM_RESTART;
+	smp_send_stop();
+	udelay(1000);
+}
+
+
 void
 initiate_retention_reset(void)
 {
@@ -273,25 +304,7 @@ initiate_retention_reset(void)
 	if (NULL == nca || NULL == apb || NULL == dickens)
 		BUG();
 
-	/*
-	 * If the axxia device is in reset then DDR retention is not
-	 * possible. Just do an emergency_restart instead.
-	 */
-	if (ncr_reset_active)
-		emergency_restart();
-
 	preempt_disable();
-	cpu_id = smp_processor_id();
-
-	/* send stop message to other CPUs */
-	local_irq_disable();
-	local_fiq_disable();
-	asm volatile ("dsb" : : : "memory");
-	asm volatile ("dmb" : : : "memory");
-	system_state = SYSTEM_RESTART;
-	smp_send_stop();
-	udelay(1000);
-
 	flush_cache_all();
 	flush_l3();
 
@@ -309,6 +322,7 @@ initiate_retention_reset(void)
 	ctl_244 |= 0x000a0000;
 
 	/* belts & braces: put secondary CPUs into reset */
+	cpu_id = smp_processor_id();
 	value = ~(1 << cpu_id);
 	value &= 0xffff;
 	ncr_register_write(htonl(value), (unsigned *) (apb + 0x31030));
@@ -338,6 +352,7 @@ static ssize_t
 axxia_ddr_retention_trigger(struct file *file, const char __user *buf,
 			    size_t count, loff_t *ppos)
 {
+    retention_reset_prepare();
 	initiate_retention_reset();
 	return 0;
 }
