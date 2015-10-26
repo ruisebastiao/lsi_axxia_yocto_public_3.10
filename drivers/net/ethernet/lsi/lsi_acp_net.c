@@ -895,6 +895,7 @@ static irqreturn_t appnic_isr(int irq, void *device_id)
 	struct appnic_device *pdata = netdev_priv(dev);
 	unsigned long dma_interrupt_status;
 	unsigned long flags;
+	unsigned long flags1;
 
 	/* Acquire the lock. */
 	spin_lock_irqsave(&pdata->dev_lock, flags);
@@ -910,7 +911,9 @@ static irqreturn_t appnic_isr(int irq, void *device_id)
 	if (TX_INTERRUPT(dma_interrupt_status)) {
 		/* transmition complete */
 		pdata->transmit_interrupts++;
+		spin_lock_irqsave(&pdata->tx_lock, flags1);
 		handle_transmit_interrupt(dev);
+		spin_unlock_irqrestore(&pdata->tx_lock, flags1);
 	}
 
 	if (RX_INTERRUPT(dma_interrupt_status)) {
@@ -1046,6 +1049,10 @@ static int appnic_hard_start_xmit(struct sk_buff *skb,
 	int length;
 	int buf_per_desc;
 	union appnic_queue_pointer queue;
+	unsigned long flags;
+
+	if (!spin_trylock_irqsave(&pdata->tx_lock, flags))
+		return NETDEV_TX_LOCKED;
 
 	length = skb->len < ETH_ZLEN ? ETH_ZLEN : skb->len;
 	buf_per_desc = pdata->tx_buf_sz / pdata->tx_num_desc;
@@ -1124,9 +1131,11 @@ static int appnic_hard_start_xmit(struct sk_buff *skb,
 		pdata->out_of_tx_descriptors++;
 		pr_err("%s: No transmit descriptors available!\n",
 		       LSI_DRV_NAME);
+		spin_unlock_irqrestore(&pdata->tx_lock, flags);
 		return NETDEV_TX_BUSY;
 	}
 
+	spin_unlock_irqrestore(&pdata->tx_lock, flags);
 	/* Free the socket buffer. */
 	dev_kfree_skb(skb);
 
@@ -1525,6 +1534,7 @@ int appnic_init(struct net_device *dev)
 	/* Initialize the spinlocks. */
 
 	spin_lock_init(&pdata->dev_lock);
+	spin_lock_init(&pdata->tx_lock);
 
 	/* Take MAC out of reset. */
 
@@ -1650,6 +1660,8 @@ int appnic_init(struct net_device *dev)
 
 	dev->netdev_ops = &appnic_netdev_ops;
 	dev->ethtool_ops = &appnic_ethtool_ops;
+	dev->features |= NETIF_F_LLTX;
+
 
 	memset((void *) &pdata->napi, 0, sizeof(struct napi_struct));
 	netif_napi_add(dev, &pdata->napi,
