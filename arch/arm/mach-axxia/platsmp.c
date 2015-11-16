@@ -27,13 +27,11 @@
 #include <mach/axxia-gic.h>
 
 #define SYSCON_PHYS_ADDR 0x002010030000ULL
-#define DICKENS_PHYS_ADDR 0x2000000000
 
 static int __cpuinitdata wfe_fixup;
 static int wfe_available;
 
 void __iomem *syscon;
-void __iomem *dickens;
 
 inline void
 __axxia_arch_wfe(void)
@@ -232,10 +230,6 @@ static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
 
 	syscon = ioremap(SYSCON_PHYS_ADDR, SZ_64K);
 	if (WARN_ON(!syscon))
-		return;
-
-	dickens = ioremap(DICKENS_PHYS_ADDR, SZ_4M);
-	if (WARN_ON(!dickens))
 		return;
 
 	check_fixup_sev(syscon);

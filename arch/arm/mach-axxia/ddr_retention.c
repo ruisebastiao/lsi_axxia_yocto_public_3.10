@@ -36,9 +36,6 @@
 
 static void __iomem *nca;
 static void __iomem *apb;
-#ifndef CONFIG_SMP
-void __iomem *dickens;
-#endif
 static int ddr_retention_enabled;
 
 enum {
@@ -79,67 +76,6 @@ ncp_cnal_regions_acp55xx[] = {
 	NCP_REGION_ID(0x32, 0x05),      /* ISBS    */
 	NCP_REGION_ID(0xff, 0xff)
 };
-
-
-/*
-  ------------------------------------------------------------------------------
-  flush_l3
-
-  This is NOT a general function to flush the L3 cache.  There are a number of
-  assumptions that are not usually true...
-
-  1) All other cores are " quiesced".
-  2) There is no need to worry about preemption or interrupts.
-*/
-
-static void
-flush_l3(void)
-{
-
-	unsigned long hnf_offsets[] = {
-		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27
-	};
-
-	int i;
-	unsigned long status;
-	int retries;
-
-	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i)
-		writel(0x0, dickens + (0x10000 * hnf_offsets[i]) + 0x10);
-
-	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
-		retries = 10000;
-
-		do {
-			status = readl(dickens +
-				       (0x10000 * hnf_offsets[i]) + 0x18);
-			udelay(1);
-		} while ((0 < --retries) && (0x0 != (status & 0xf)));
-
-		if (0 == retries)
-			BUG();
-	}
-
-	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i)
-		writel(0x3, dickens + (0x10000 * hnf_offsets[i]) + 0x10);
-
-	for (i = 0; i < (sizeof(hnf_offsets) / sizeof(unsigned long)); ++i) {
-		retries = 10000;
-
-		do {
-			status = readl(dickens +
-				       (0x10000 * hnf_offsets[i]) + 0x18);
-			udelay(1);
-		} while ((0 < --retries) && (0xc != (status & 0xf)));
-
-		if (0 == retries)
-			BUG();
-	}
-
-	asm volatile ("dsb" : : : "memory");
-
-	return;
-}
 
 static void
 quiesce_vp_engine(int engine_type)
@@ -300,7 +236,7 @@ initiate_retention_reset(void)
 		return;
 	}
 
-	if (NULL == nca || NULL == apb || NULL == dickens)
+	if (NULL == nca || NULL == apb)
 		BUG();
 
 	preempt_disable();
@@ -376,7 +312,6 @@ axxia_ddr_retention_init(void)
 		} else {
 			apb = ioremap(0x2010000000, 0x80000);
 			nca = ioremap(0x002020100000ULL, 0x20000);
-			dickens = ioremap(0x2000000000, 0x1000000);
 			ddr_retention_enabled = 1;
 			pr_info("DDR Retention Reset Initialized\n");
 		}
