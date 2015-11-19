@@ -11,8 +11,10 @@
 #include <linux/bootmem.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 
 #include <linux/io.h>
+#include <linux/lsi-ncr.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/dcr.h>
@@ -20,9 +22,6 @@
 #include <mm/mmu_decl.h>
 
 #include "ppc4xx_pci.h"
-#include "../../../drivers/misc/lsi-ncr.h"
-
-#include <linux/interrupt.h>
 
 static int acp_plx;
 
