@@ -62,6 +62,7 @@ static const char *axxia_dt_match[] __initconst = {
 };
 
 static void __iomem *base;
+void __iomem *dickens;
 
 #ifdef AXXIA_NCR_RESET_CHECK
 int ncr_reset_active;
@@ -91,7 +92,7 @@ static void set_l3_pstate(u32 newstate)
 	}
 }
 
-static void
+void
 flush_l3(void)
 {
 	/* Switch to SFONLY to flush */
@@ -202,7 +203,7 @@ void __init axxia_dt_init(void)
 {
 	base = ioremap(0x2010000000, 0x40000);
 	if (!of_find_compatible_node(NULL, NULL, "lsi,axm5500-sim")) {
-		dickens = ioremap(0x2000000000, SZ_4M);
+		dickens = ioremap(0x2000000000, SZ_16M);
 #ifdef CONFIG_KEXEC
 		kexec_reinit = flush_l3;
 #endif
